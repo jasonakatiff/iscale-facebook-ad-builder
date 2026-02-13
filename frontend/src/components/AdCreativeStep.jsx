@@ -1,7 +1,8 @@
 import { useToast } from '../context/ToastContext';
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, Upload, X, Loader, Trash2, Film, Image } from 'lucide-react';
+import { ChevronRight, Upload, X, Loader, Trash2, Film, Image, Sparkles } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
+import { useAuth } from '../context/AuthContext';
 import { getPages } from '../lib/facebookApi';
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
@@ -20,11 +21,15 @@ const CTA_OPTIONS = [
     'DONATE_NOW',
 ];
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+
 const AdCreativeStep = ({ onNext, onBack }) => {
-    const { showWarning, showError } = useToast();
+    const { showWarning, showError, showSuccess } = useToast();
+    const { authFetch } = useAuth();
     const { creativeData, setCreativeData, selectedAdAccount, selectedProduct, adsetData } = useCampaign();
     const [pages, setPages] = useState([]);
     const [loadingPages, setLoadingPages] = useState(false);
+    const [analyzingVideoId, setAnalyzingVideoId] = useState(null);
 
     const [manualPageEntry, setManualPageEntry] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
@@ -302,6 +307,56 @@ const AdCreativeStep = ({ onNext, onBack }) => {
         }));
     };
 
+    const handleAnalyzeVideo = async (creative) => {
+        if (!creative.file) {
+            showWarning('Cannot analyze videos added via URL');
+            return;
+        }
+
+        setAnalyzingVideoId(creative.id);
+        try {
+            const formData = new FormData();
+            formData.append('file', creative.file);
+
+            const response = await authFetch(`${API_URL}/video-analysis/analyze`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.detail || 'Video analysis failed');
+            }
+
+            const data = await response.json();
+
+            // Ensure we have exactly 3 slots for bodies and headlines
+            const bodies = [...(data.bodies || [])];
+            while (bodies.length < 3) bodies.push('');
+            const headlines = [...(data.headlines || [])];
+            while (headlines.length < 3) headlines.push('');
+
+            setCreativeData(prev => ({
+                ...prev,
+                bodies: bodies.slice(0, 3),
+                headlines: headlines.slice(0, 3),
+            }));
+
+            // Persist to localStorage
+            if (selectedAdAccount) {
+                localStorage.setItem(`defaultBodies_${selectedAdAccount.id}`, JSON.stringify(bodies.slice(0, 3)));
+                localStorage.setItem(`defaultHeadlines_${selectedAdAccount.id}`, JSON.stringify(headlines.slice(0, 3)));
+            }
+
+            showSuccess('AI generated ad copy from video analysis');
+        } catch (error) {
+            console.error('Video analysis error:', error);
+            showError(error.message || 'Failed to analyze video');
+        } finally {
+            setAnalyzingVideoId(null);
+        }
+    };
+
     const handleNext = () => {
         // Validate required fields
         if (!creativeData.creativeName) {
@@ -503,7 +558,17 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                                             </span>
                                         )}
                                     </div>
-                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                                        {creative.mediaType === 'video' && (
+                                            <button
+                                                onClick={() => handleAnalyzeVideo(creative)}
+                                                disabled={analyzingVideoId !== null}
+                                                className="p-2 bg-amber-500 text-white rounded-full hover:bg-amber-600 transform scale-90 hover:scale-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                                title="Analyze video with AI"
+                                            >
+                                                <Sparkles size={16} />
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => removeCreative(creative.id)}
                                             className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transform scale-90 hover:scale-100 transition-all"
@@ -517,6 +582,17 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    )}
+
+                    {/* AI Video Analysis Loading Banner */}
+                    {analyzingVideoId && (
+                        <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                            <Loader className="animate-spin text-amber-600" size={20} />
+                            <div>
+                                <p className="text-amber-800 font-medium">Analyzing video with AI...</p>
+                                <p className="text-amber-600 text-sm">Gemini is watching your video and generating ad copy. This may take 30-60 seconds.</p>
+                            </div>
                         </div>
                     )}
 
