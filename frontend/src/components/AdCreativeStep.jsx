@@ -282,7 +282,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
     };
 
     const addBodyField = () => {
-        if (creativeData.bodies.length < 3) {
+        if (creativeData.bodies.length < 6) {
             setCreativeData(prev => ({
                 ...prev,
                 bodies: [...prev.bodies, '']
@@ -291,7 +291,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
     };
 
     const addHeadlineField = () => {
-        if (creativeData.headlines.length < 3) {
+        if (creativeData.headlines.length < 6) {
             setCreativeData(prev => ({
                 ...prev,
                 headlines: [...prev.headlines, '']
@@ -372,25 +372,33 @@ const AdCreativeStep = ({ onNext, onBack }) => {
 
             const data = await response.json();
 
-            // Ensure we have exactly 3 slots for bodies and headlines
-            const bodies = [...(data.bodies || [])];
-            while (bodies.length < 3) bodies.push('');
-            const headlines = [...(data.headlines || [])];
-            while (headlines.length < 3) headlines.push('');
+            const newBodies = (data.bodies || []).filter(b => b && b.trim());
+            const newHeadlines = (data.headlines || []).filter(h => h && h.trim());
 
-            setCreativeData(prev => ({
-                ...prev,
-                bodies: bodies.slice(0, 3),
-                headlines: headlines.slice(0, 3),
-            }));
+            setCreativeData(prev => {
+                // Keep existing non-empty entries, append new ones, cap at 6
+                const existingBodies = prev.bodies.filter(b => b && b.trim());
+                const existingHeadlines = prev.headlines.filter(h => h && h.trim());
+                const mergedBodies = [...existingBodies, ...newBodies].slice(0, 6);
+                const mergedHeadlines = [...existingHeadlines, ...newHeadlines].slice(0, 6);
+                // Ensure at least 1 slot
+                if (mergedBodies.length === 0) mergedBodies.push('');
+                if (mergedHeadlines.length === 0) mergedHeadlines.push('');
+                return { ...prev, bodies: mergedBodies, headlines: mergedHeadlines };
+            });
 
-            // Persist to localStorage
+            // Persist merged results to localStorage
             if (selectedAdAccount) {
-                localStorage.setItem(`defaultBodies_${selectedAdAccount.id}`, JSON.stringify(bodies.slice(0, 3)));
-                localStorage.setItem(`defaultHeadlines_${selectedAdAccount.id}`, JSON.stringify(headlines.slice(0, 3)));
+                const existingBodies = creativeData.bodies.filter(b => b && b.trim());
+                const existingHeadlines = creativeData.headlines.filter(h => h && h.trim());
+                const allBodies = [...existingBodies, ...newBodies].slice(0, 6);
+                const allHeadlines = [...existingHeadlines, ...newHeadlines].slice(0, 6);
+                localStorage.setItem(`defaultBodies_${selectedAdAccount.id}`, JSON.stringify(allBodies));
+                localStorage.setItem(`defaultHeadlines_${selectedAdAccount.id}`, JSON.stringify(allHeadlines));
             }
 
-            showSuccess('AI generated ad copy from video analysis');
+            const providerName = provider === 'claude' ? 'Claude Haiku' : 'Gemini';
+            showSuccess(`${providerName} ad copy appended (${newBodies.length} bodies, ${newHeadlines.length} headlines)`);
         } catch (error) {
             console.error('Video analysis error:', error);
             showError(error.message || 'Failed to analyze video');
@@ -726,7 +734,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                         <label className="block text-sm font-medium text-gray-700">
                             Primary Text *
                         </label>
-                        {creativeData.bodies.length < 3 && (
+                        {creativeData.bodies.length < 6 && (
                             <button
                                 type="button"
                                 onClick={addBodyField}
@@ -772,7 +780,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                         <label className="block text-sm font-medium text-gray-700">
                             Headline *
                         </label>
-                        {creativeData.headlines.length < 3 && (
+                        {creativeData.headlines.length < 6 && (
                             <button
                                 type="button"
                                 onClick={addHeadlineField}
