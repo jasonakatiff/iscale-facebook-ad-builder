@@ -1,6 +1,6 @@
 import { useToast } from '../context/ToastContext';
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, Upload, X, Loader, Trash2, Film, Image, Sparkles } from 'lucide-react';
+import { ChevronRight, Upload, X, Loader, Trash2, Film, Image, Sparkles, Play } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
 import { useAuth } from '../context/AuthContext';
 import { getPages } from '../lib/facebookApi';
@@ -30,9 +30,12 @@ const AdCreativeStep = ({ onNext, onBack }) => {
     const [pages, setPages] = useState([]);
     const [loadingPages, setLoadingPages] = useState(false);
     const [analyzingVideoId, setAnalyzingVideoId] = useState(null);
+    const [analyzingProvider, setAnalyzingProvider] = useState(null);
+    const [providerMenuId, setProviderMenuId] = useState(null);
 
     const [manualPageEntry, setManualPageEntry] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
+    const [playingVideo, setPlayingVideo] = useState(null);
 
     const handleDragEnter = (e) => {
         e.preventDefault();
@@ -121,23 +124,60 @@ const AdCreativeStep = ({ onNext, onBack }) => {
         }
     }, [selectedAdAccount]);
 
+    const loadSavedManualPages = () => {
+        try {
+            const saved = localStorage.getItem('savedManualPages');
+            return saved ? JSON.parse(saved) : [];
+        } catch { return []; }
+    };
+
+    const mergePages = (fetchedPages) => {
+        const savedPages = loadSavedManualPages();
+        const fetchedIds = new Set(fetchedPages.map(p => p.id));
+        const uniqueSaved = savedPages.filter(p => !fetchedIds.has(p.id));
+        return [...fetchedPages, ...uniqueSaved];
+    };
+
+    const handleSaveManualPage = () => {
+        const pageId = creativeData.pageId?.trim();
+        if (!pageId) return;
+        const savedPages = loadSavedManualPages();
+        if (savedPages.some(p => p.id === pageId)) {
+            showWarning('This Page ID is already saved');
+            return;
+        }
+        const updated = [...savedPages, { id: pageId, name: `Page ${pageId}` }];
+        localStorage.setItem('savedManualPages', JSON.stringify(updated));
+        setPages(prev => {
+            if (prev.some(p => p.id === pageId)) return prev;
+            return [...prev, { id: pageId, name: `Page ${pageId}` }];
+        });
+        showSuccess('Page ID saved to dropdown list');
+    };
+
     const fetchPages = async () => {
         setLoadingPages(true);
         try {
             const fetchedPages = await getPages(selectedAdAccount.id);
-            setPages(fetchedPages);
+            const combined = mergePages(fetchedPages);
+            setPages(combined);
 
             // If no page is selected and we have pages, select the first one (or the last used one if it exists in the list)
-            if (fetchedPages.length > 0 && !creativeData.pageId) {
+            if (combined.length > 0 && !creativeData.pageId) {
                 const lastUsedPageId = localStorage.getItem('lastUsedPageId');
-                const pageToSelect = fetchedPages.find(p => p.id === lastUsedPageId) || fetchedPages[0];
-                handlePageSelection(pageToSelect.id, fetchedPages);
-            } else if (fetchedPages.length === 0) {
+                const pageToSelect = combined.find(p => p.id === lastUsedPageId) || combined[0];
+                handlePageSelection(pageToSelect.id, combined);
+            } else if (combined.length === 0) {
                 // If no pages found, default to manual entry so user isn't blocked
                 setManualPageEntry(true);
             }
         } catch (error) {
             console.error('Error fetching pages:', error);
+            // Still load saved manual pages even if fetch fails
+            const savedPages = loadSavedManualPages();
+            if (savedPages.length > 0) {
+                setPages(savedPages);
+            }
             showError('Failed to load Facebook Pages. You can enter Page ID manually.');
             setManualPageEntry(true); // Auto-switch to manual entry
         } finally {
@@ -307,18 +347,20 @@ const AdCreativeStep = ({ onNext, onBack }) => {
         }));
     };
 
-    const handleAnalyzeVideo = async (creative) => {
+    const handleAnalyzeVideo = async (creative, provider = 'gemini') => {
         if (!creative.file) {
             showWarning('Cannot analyze videos added via URL');
             return;
         }
 
         setAnalyzingVideoId(creative.id);
+        setAnalyzingProvider(provider);
+        setProviderMenuId(null);
         try {
             const formData = new FormData();
             formData.append('file', creative.file);
 
-            const response = await authFetch(`${API_URL}/video-analysis/analyze`, {
+            const response = await authFetch(`${API_URL}/video-analysis/analyze?provider=${provider}`, {
                 method: 'POST',
                 body: formData,
             });
@@ -354,6 +396,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
             showError(error.message || 'Failed to analyze video');
         } finally {
             setAnalyzingVideoId(null);
+            setAnalyzingProvider(null);
         }
     };
 
@@ -447,13 +490,23 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                     </div>
 
                     {manualPageEntry ? (
-                        <input
-                            type="text"
-                            value={creativeData.pageId}
-                            onChange={(e) => handleInputChange('pageId', e.target.value)}
-                            placeholder="Enter Facebook Page ID (e.g., 933995649786806)"
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                        />
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={creativeData.pageId}
+                                onChange={(e) => handleInputChange('pageId', e.target.value)}
+                                placeholder="Enter Facebook Page ID (e.g., 933995649786806)"
+                                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                            />
+                            {creativeData.pageId?.trim() && (
+                                <button
+                                    onClick={handleSaveManualPage}
+                                    className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium whitespace-nowrap"
+                                >
+                                    Save
+                                </button>
+                            )}
+                        </div>
                     ) : loadingPages ? (
                         <div className="flex items-center gap-2 text-gray-500 py-2">
                             <Loader className="animate-spin" size={20} />
@@ -560,13 +613,48 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                                     </div>
                                     <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
                                         {creative.mediaType === 'video' && (
+                                            <div className="relative">
+                                                <button
+                                                    onClick={() => setProviderMenuId(providerMenuId === creative.id ? null : creative.id)}
+                                                    disabled={analyzingVideoId !== null}
+                                                    className="p-2 bg-amber-500 text-white rounded-full hover:bg-amber-600 transform scale-90 hover:scale-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    title="Analyze video with AI"
+                                                >
+                                                    <Sparkles size={16} />
+                                                </button>
+                                                {providerMenuId === creative.id && (
+                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white rounded-lg shadow-xl border border-gray-200 py-1 w-52 z-50">
+                                                        <button
+                                                            onClick={() => handleAnalyzeVideo(creative, 'gemini')}
+                                                            className="w-full px-3 py-2 text-left text-sm hover:bg-amber-50 flex items-center gap-2"
+                                                        >
+                                                            <Sparkles size={14} className="text-amber-500" />
+                                                            <div>
+                                                                <div className="font-medium text-gray-800">Gemini 2.0 Flash</div>
+                                                                <div className="text-xs text-gray-500">Analyzes video + audio</div>
+                                                            </div>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleAnalyzeVideo(creative, 'claude')}
+                                                            className="w-full px-3 py-2 text-left text-sm hover:bg-purple-50 flex items-center gap-2"
+                                                        >
+                                                            <Sparkles size={14} className="text-purple-500" />
+                                                            <div>
+                                                                <div className="font-medium text-gray-800">Claude Haiku</div>
+                                                                <div className="text-xs text-gray-500">Analyzes video frames</div>
+                                                            </div>
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                        {creative.mediaType === 'video' && (
                                             <button
-                                                onClick={() => handleAnalyzeVideo(creative)}
-                                                disabled={analyzingVideoId !== null}
-                                                className="p-2 bg-amber-500 text-white rounded-full hover:bg-amber-600 transform scale-90 hover:scale-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                                title="Analyze video with AI"
+                                                onClick={() => setPlayingVideo(creative)}
+                                                className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transform scale-90 hover:scale-100 transition-all"
+                                                title="Play video"
                                             >
-                                                <Sparkles size={16} />
+                                                <Play size={16} />
                                             </button>
                                         )}
                                         <button
@@ -587,11 +675,17 @@ const AdCreativeStep = ({ onNext, onBack }) => {
 
                     {/* AI Video Analysis Loading Banner */}
                     {analyzingVideoId && (
-                        <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
-                            <Loader className="animate-spin text-amber-600" size={20} />
+                        <div className={`flex items-center gap-3 ${analyzingProvider === 'claude' ? 'bg-purple-50 border-purple-200' : 'bg-amber-50 border-amber-200'} border rounded-lg p-4 mb-4`}>
+                            <Loader className={`animate-spin ${analyzingProvider === 'claude' ? 'text-purple-600' : 'text-amber-600'}`} size={20} />
                             <div>
-                                <p className="text-amber-800 font-medium">Analyzing video with AI...</p>
-                                <p className="text-amber-600 text-sm">Gemini is watching your video and generating ad copy. This may take 30-60 seconds.</p>
+                                <p className={`${analyzingProvider === 'claude' ? 'text-purple-800' : 'text-amber-800'} font-medium`}>
+                                    Analyzing video with {analyzingProvider === 'claude' ? 'Claude Haiku' : 'Gemini 2.0 Flash'}...
+                                </p>
+                                <p className={`${analyzingProvider === 'claude' ? 'text-purple-600' : 'text-amber-600'} text-sm`}>
+                                    {analyzingProvider === 'claude'
+                                        ? 'Extracting key frames and generating ad copy. This may take 30-60 seconds.'
+                                        : 'Watching your video and generating ad copy. This may take 30-60 seconds.'}
+                                </p>
                             </div>
                         </div>
                     )}
@@ -809,6 +903,30 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                     Next Step <ChevronRight size={20} />
                 </button>
             </div>
+
+            {/* Video Playback Modal */}
+            {playingVideo && (
+                <div
+                    className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+                    onClick={() => setPlayingVideo(null)}
+                >
+                    <div className="relative w-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
+                        <button
+                            onClick={() => setPlayingVideo(null)}
+                            className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
+                            title="Close"
+                        >
+                            <X size={28} />
+                        </button>
+                        <video
+                            src={playingVideo.previewUrl}
+                            controls
+                            autoPlay
+                            className="w-full rounded-lg"
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
