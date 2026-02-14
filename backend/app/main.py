@@ -78,10 +78,11 @@ async def health_check():
 # Database Connection Validation
 @app.on_event("startup")
 async def startup_event():
-    """Validate PostgreSQL connection on startup"""
-    from app.database import engine
+    """Validate PostgreSQL connection and ensure tables exist on startup"""
+    from app.database import engine, Base
     from sqlalchemy import text
-    
+    import app.models  # noqa: F401 — ensure all models are imported
+
     try:
         with engine.connect() as conn:
             result = conn.execute(text("SELECT version()"))
@@ -94,6 +95,10 @@ async def startup_event():
         print(f"❌ Failed to connect to database: {e}")
         print(f"   DATABASE_URL: {sanitized_url}")
         raise RuntimeError(f"Database connection failed: {e}")
+
+    # Create any new tables (safe — skips existing tables)
+    Base.metadata.create_all(bind=engine)
+    print("✅ Database tables synced")
 
 
 # Include Routers
