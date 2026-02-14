@@ -236,11 +236,26 @@ const AdCreativeStep = ({ onNext, onBack }) => {
     const mergePages = (fetchedPages) => {
         const savedPages = loadSavedManualPages();
         const fetchedIds = new Set(fetchedPages.map(p => p.id));
-        const uniqueSaved = savedPages.filter(p => !fetchedIds.has(p.id));
+
+        // Update saved pages with real names from API if they had generic names
+        let needsSave = false;
+        const updatedSaved = savedPages.map(sp => {
+            const fetched = fetchedPages.find(fp => fp.id === sp.id);
+            if (fetched && sp.name.startsWith('Page ')) {
+                needsSave = true;
+                return { ...sp, name: fetched.name };
+            }
+            return sp;
+        });
+        if (needsSave) {
+            localStorage.setItem('savedManualPages', JSON.stringify(updatedSaved));
+        }
+
+        const uniqueSaved = updatedSaved.filter(p => !fetchedIds.has(p.id));
         return [...fetchedPages, ...uniqueSaved];
     };
 
-    const handleSaveManualPage = () => {
+    const handleSaveManualPage = async () => {
         const pageId = creativeData.pageId?.trim();
         if (!pageId) return;
         const savedPages = loadSavedManualPages();
@@ -248,11 +263,22 @@ const AdCreativeStep = ({ onNext, onBack }) => {
             showWarning('This Page ID is already saved');
             return;
         }
-        const updated = [...savedPages, { id: pageId, name: `Page ${pageId}` }];
+
+        // Try to fetch the page name from the API
+        let pageName = `Page ${pageId}`;
+        try {
+            const fetchedPages = await getPages(selectedAdAccount?.id);
+            const match = fetchedPages.find(p => p.id === pageId);
+            if (match?.name) pageName = match.name;
+        } catch (e) {
+            // Silently fall back to generic name
+        }
+
+        const updated = [...savedPages, { id: pageId, name: pageName }];
         localStorage.setItem('savedManualPages', JSON.stringify(updated));
         setPages(prev => {
             if (prev.some(p => p.id === pageId)) return prev;
-            return [...prev, { id: pageId, name: `Page ${pageId}` }];
+            return [...prev, { id: pageId, name: pageName }];
         });
         showSuccess('Page ID saved to dropdown list');
     };
