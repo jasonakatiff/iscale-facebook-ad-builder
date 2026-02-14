@@ -401,10 +401,10 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                         })}
                     </div>
 
-                    {/* Add Ad Button */}
+                    {/* Add Ad Button — goes back to Ad Creative to add more media/copy */}
                     <button
-                        onClick={addAd}
-                        className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
+                        onClick={onBack}
+                        className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-amber-500 hover:text-amber-600 transition-colors flex items-center justify-center gap-2"
                     >
                         <Plus size={20} />
                         Add Another Ad
