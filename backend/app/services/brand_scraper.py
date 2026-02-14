@@ -198,26 +198,29 @@ class BrandScraperService:
 
                 page.on('response', capture_image_response)
 
-                # Login to Facebook if credentials provided
+                # Login to Facebook if credentials provided (optional - public URLs work without login)
                 if fb_email and fb_password:
-                    print("Logging into Facebook...")
-                    await page.goto("https://www.facebook.com/login", timeout=30000)
-                    await page.wait_for_timeout(2000)
+                    try:
+                        print("Logging into Facebook...")
+                        await page.goto("https://www.facebook.com/login", timeout=30000)
+                        await page.wait_for_timeout(2000)
 
-                    await page.fill('input[name="email"]', fb_email)
-                    await page.fill('input[name="pass"]', fb_password)
-                    await page.click('button[name="login"]')
+                        await page.fill('input[name="email"]', fb_email)
+                        await page.fill('input[name="pass"]', fb_password)
+                        await page.click('button[name="login"]')
 
-                    # Wait for login to complete
-                    await page.wait_for_timeout(5000)
+                        # Wait for login to complete
+                        await page.wait_for_timeout(5000)
 
-                    # Check if logged in
-                    current_url = page.url.lower()
-                    if "login" in current_url or "checkpoint" in current_url:
-                        error_detail = "Login page still showing" if "login" in current_url else "Security checkpoint triggered"
-                        raise Exception(f"Facebook login failed: {error_detail}. URL: {page.url}")
-                    else:
-                        print("Facebook login successful")
+                        # Check if logged in
+                        current_url = page.url.lower()
+                        if "login" in current_url or "checkpoint" in current_url:
+                            error_detail = "Login page still showing" if "login" in current_url else "Security checkpoint triggered"
+                            print(f"Facebook login failed: {error_detail}. Continuing without login (public URL).")
+                        else:
+                            print("Facebook login successful")
+                    except Exception as login_err:
+                        print(f"Facebook login error: {login_err}. Continuing without login (public URL).")
 
                 # Build URL
                 if is_search:
