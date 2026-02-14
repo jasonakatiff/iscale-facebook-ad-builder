@@ -100,10 +100,22 @@ const AdCreativeStep = ({ onNext, onBack }) => {
             };
         });
 
-        setCreativeData(prev => ({
-            ...prev,
-            creatives: [...(prev.creatives || []), ...newCreatives]
-        }));
+        setCreativeData(prev => {
+            const updated = {
+                ...prev,
+                creatives: [...(prev.creatives || []), ...newCreatives]
+            };
+            // Auto-fill Creative Name from file name if empty or just the adset name
+            if (!prev.creativeName || prev.creativeName === adsetData?.name) {
+                const baseName = mediaFiles[0].name.replace(/\.[^/.]+$/, '');
+                if (mediaFiles.length === 1) {
+                    updated.creativeName = baseName;
+                } else {
+                    updated.creativeName = `${baseName} (+${mediaFiles.length - 1} more)`;
+                }
+            }
+            return updated;
+        });
     };
 
     // Ads Library import functions
@@ -146,10 +158,22 @@ const AdCreativeStep = ({ onNext, onBack }) => {
             mediaType: item.media_type,
         }));
 
-        setCreativeData(prev => ({
-            ...prev,
-            creatives: [...(prev.creatives || []), ...newCreatives],
-        }));
+        setCreativeData(prev => {
+            const updated = {
+                ...prev,
+                creatives: [...(prev.creatives || []), ...newCreatives],
+            };
+            // Auto-fill Creative Name from library item(s) if empty
+            if (!prev.creativeName || prev.creativeName === adsetData?.name) {
+                if (selected.length === 1) {
+                    updated.creativeName = selected[0].name || '';
+                } else {
+                    // Multiple items: use first name + count
+                    updated.creativeName = `${selected[0].name || 'Library Import'} (+${selected.length - 1} more)`;
+                }
+            }
+            return updated;
+        });
 
         // Pre-fill copy fields from first item if current fields are empty
         const firstWithCopy = selected.find(item => item.headline || item.body);
@@ -481,10 +505,22 @@ const AdCreativeStep = ({ onNext, onBack }) => {
             };
         });
 
-        setCreativeData(prev => ({
-            ...prev,
-            creatives: [...(prev.creatives || []), ...newCreatives]
-        }));
+        setCreativeData(prev => {
+            const updated = {
+                ...prev,
+                creatives: [...(prev.creatives || []), ...newCreatives]
+            };
+            // Auto-fill Creative Name from file name if empty or just the adset name
+            if (!prev.creativeName || prev.creativeName === adsetData?.name) {
+                const baseName = files[0].name.replace(/\.[^/.]+$/, ''); // strip extension
+                if (files.length === 1) {
+                    updated.creativeName = baseName;
+                } else {
+                    updated.creativeName = `${baseName} (+${files.length - 1} more)`;
+                }
+            }
+            return updated;
+        });
     };
 
     const removeCreative = (id) => {
