@@ -959,7 +959,8 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                     {creativeData.creatives && creativeData.creatives.length > 0 && (
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                             {creativeData.creatives.map((creative) => (
-                                <div key={creative.id} className="relative group border rounded-lg overflow-hidden aspect-square bg-gray-100">
+                                <div key={creative.id} className="relative group border rounded-lg aspect-square bg-gray-100 overflow-visible">
+                                  <div className="absolute inset-0 overflow-hidden rounded-lg">
                                     {creative.mediaType === 'video' ? (
                                         creative.thumbnailUrl ? (
                                             <img
@@ -985,6 +986,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                                             className="w-full h-full object-cover"
                                         />
                                     )}
+                                  </div>
                                     {/* Media type badge */}
                                     <div className="absolute top-2 left-2">
                                         {creative.mediaType === 'video' ? (
@@ -1009,7 +1011,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                                                 <Sparkles size={16} />
                                             </button>
                                             {providerMenuId === creative.id && (
-                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white rounded-lg shadow-xl border border-gray-200 py-1 w-52 z-50">
+                                                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 py-1 w-52 z-50">
                                                     {creative.mediaType === 'video' ? (
                                                         <>
                                                             <button
