@@ -134,8 +134,9 @@ const AdCreativeStep = ({ onNext, onBack }) => {
         const newCreatives = selected.map(item => ({
             id: `creative_lib_${item.id}_${Date.now()}`,
             previewUrl: item.media_type === 'video'
-                ? (item.thumbnail_url || item.media_url)
+                ? item.media_url
                 : item.media_url,
+            thumbnailUrl: item.media_type === 'video' ? item.thumbnail_url : undefined,
             imageUrl: item.media_type === 'image' ? item.media_url : undefined,
             videoUrl: item.media_type === 'video' ? item.media_url : undefined,
             name: item.name || 'Library Import',
@@ -680,14 +681,23 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                             {creativeData.creatives.map((creative) => (
                                 <div key={creative.id} className="relative group border rounded-lg overflow-hidden aspect-square bg-gray-100">
                                     {creative.mediaType === 'video' ? (
-                                        <video
-                                            src={creative.previewUrl}
-                                            className="w-full h-full object-cover"
-                                            muted
-                                            playsInline
-                                            onMouseEnter={(e) => e.target.play()}
-                                            onMouseLeave={(e) => { e.target.pause(); e.target.currentTime = 0; }}
-                                        />
+                                        creative.thumbnailUrl ? (
+                                            <img
+                                                src={creative.thumbnailUrl}
+                                                alt={creative.name}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            <video
+                                                src={creative.previewUrl}
+                                                className="w-full h-full object-cover"
+                                                muted
+                                                playsInline
+                                                poster={creative.thumbnailUrl || undefined}
+                                                onMouseEnter={(e) => e.target.play().catch(() => {})}
+                                                onMouseLeave={(e) => { e.target.pause(); e.target.currentTime = 0; }}
+                                            />
+                                        )
                                     ) : (
                                         <img
                                             src={creative.previewUrl}
