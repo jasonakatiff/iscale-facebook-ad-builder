@@ -21,7 +21,8 @@ export default function ImageAds() {
     const [generatedImages, setGeneratedImages] = useState([]);
     const [selectedCopy, setSelectedCopy] = useState(null);
     const [customImagePrompt, setCustomImagePrompt] = useState('');
-    const [templateMode, setTemplateMode] = useState('style'); // 'style' or 'template'
+    const [templateMode, setTemplateMode] = useState('style'); // 'style', 'template', or 'custom'
+    const [step4CustomPrompt, setStep4CustomPrompt] = useState('');
 
     // Load saved campaign details from localStorage on mount
     const [wizardData, setWizardData] = useState(() => {
@@ -99,7 +100,10 @@ export default function ImageAds() {
             case 1: return wizardData.brand !== null;
             case 2: return wizardData.product !== null;
             case 3: return wizardData.profile !== null;
-            case 4: return wizardData.template !== null;
+            case 4: {
+                if (wizardData.template?.type === 'custom') return !!step4CustomPrompt.trim();
+                return wizardData.template !== null;
+            }
             case 5: return wizardData.variationCount >= 1 && wizardData.variationCount <= 10;
             case 6: return wizardData.imageSizes && wizardData.imageSizes.length > 0;
             case 7: return wizardData.campaignDetails.offer && wizardData.campaignDetails.messaging;
@@ -174,7 +178,9 @@ export default function ImageAds() {
                     model: wizardData.model,
                     productShots: wizardData.useProductShots ? wizardData.product?.product_shots : [],
                     useProductImage: wizardData.useProductShots,
-                    customPrompt: customImagePrompt
+                    customPrompt: wizardData.template?.type === 'custom'
+                        ? wizardData.template.customPrompt
+                        : customImagePrompt
                 })
             });
 
@@ -379,6 +385,18 @@ export default function ImageAds() {
                                     Browse Templates
                                 </div>
                             </button>
+                            <button
+                                onClick={() => setTemplateMode('custom')}
+                                className={`px-6 py-2 rounded-md font-medium transition-all ${templateMode === 'custom'
+                                    ? 'bg-white text-amber-600 shadow-sm'
+                                    : 'text-gray-600 hover:text-gray-900'
+                                    }`}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <FileText size={18} />
+                                    Custom Prompt
+                                </div>
+                            </button>
                         </div>
 
                         {/* Conditional Rendering */}
@@ -392,7 +410,7 @@ export default function ImageAds() {
                                     nextStep();
                                 }}
                             />
-                        ) : (
+                        ) : templateMode === 'template' ? (
                             <ImageTemplateSelector
                                 onSelect={(template) => {
                                     updateData('template', {
@@ -404,6 +422,69 @@ export default function ImageAds() {
                                 onClose={() => { }}
                                 embedded={true}
                             />
+                        ) : (
+                            <div className="max-w-2xl">
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+                                    <p className="text-sm text-amber-800">
+                                        <strong>Custom Prompt Mode:</strong> Write your own image generation prompt directly.
+                                        Brand, product, and campaign details will still inform copy generation.
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Image Generation Prompt *
+                                    </label>
+                                    <textarea
+                                        value={step4CustomPrompt}
+                                        onChange={(e) => {
+                                            setStep4CustomPrompt(e.target.value);
+                                            updateData('template', {
+                                                type: 'custom',
+                                                name: 'Custom Prompt',
+                                                customPrompt: e.target.value,
+                                            });
+                                        }}
+                                        placeholder="Describe the image you want to generate. E.g.: 'A luxurious skincare product on a marble surface with soft golden lighting, surrounded by fresh botanicals, premium advertising photography, 4k quality'"
+                                        rows={6}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent font-mono text-sm"
+                                    />
+                                    <div className="flex justify-between mt-2">
+                                        <p className="text-xs text-gray-500">
+                                            Be descriptive about lighting, composition, mood, and style.
+                                        </p>
+                                        <span className="text-xs text-gray-400">
+                                            {step4CustomPrompt.length} chars
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="mt-6">
+                                    <p className="text-sm font-medium text-gray-700 mb-3">Example Prompts:</p>
+                                    <div className="space-y-2">
+                                        {[
+                                            'Professional flat lay product photography on marble surface, soft diffused lighting, minimalist style, luxury aesthetic, 4k',
+                                            'Split-screen before and after transformation, clean white background, bright natural lighting, testimonial style ad',
+                                            'Close-up macro shot of product texture with dramatic side lighting, dark moody background, premium feel',
+                                        ].map((example, i) => (
+                                            <button
+                                                key={i}
+                                                onClick={() => {
+                                                    setStep4CustomPrompt(example);
+                                                    updateData('template', {
+                                                        type: 'custom',
+                                                        name: 'Custom Prompt',
+                                                        customPrompt: example,
+                                                    });
+                                                }}
+                                                className="block w-full text-left px-3 py-2 text-sm text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                                            >
+                                                {example}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
                         )}
                     </div>
                 )}
@@ -1011,6 +1092,11 @@ function CopySelectionStep({ generatedCopy, wizardData, onBack, onRegenerate, is
 
     // Build comprehensive prompt (matching backend logic)
     const buildComprehensivePrompt = () => {
+        // If custom prompt mode, use the custom prompt directly
+        if (wizardData.template?.type === 'custom' && wizardData.template.customPrompt) {
+            return wizardData.template.customPrompt;
+        }
+
         const currentCopy = editedCopy || generatedCopy.variations[selectedIndex];
 
         // Extract all context

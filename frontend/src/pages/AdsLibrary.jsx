@@ -65,6 +65,9 @@ const AdsLibrary = () => {
     const [addVariantTarget, setAddVariantTarget] = useState(null);
     const variantInputRef = useRef(null);
 
+    // Review queue (items pending review before saving)
+    const [reviewQueue, setReviewQueue] = useState([]);
+
     // Modals
     const [selectedItem, setSelectedItem] = useState(null);
     const [editItem, setEditItem] = useState(null);
@@ -92,7 +95,10 @@ const AdsLibrary = () => {
         fetchItems();
     }, [fetchItems]);
 
-    // Upload handlers
+    // Standard ratios for FB ads
+    const STANDARD_RATIOS = ['1:1', '9:16', '4:5'];
+
+    // Upload handlers — now populates review queue instead of creating items immediately
     const handleFiles = async (files) => {
         if (!uploadBrand) {
             showError('Please select a brand first');
@@ -100,7 +106,6 @@ const AdsLibrary = () => {
         }
 
         setUploading(true);
-        let uploaded = 0;
 
         // Separate images and videos
         const imageFiles = [];
@@ -112,7 +117,7 @@ const AdsLibrary = () => {
         }
 
         // Phase 1: Upload all image files and detect ratios
-        const imageUploads = []; // { file, url, ratio }
+        const imageUploads = [];
         for (const file of imageFiles) {
             try {
                 setUploadProgress(`Uploading ${file.name}...`);
@@ -129,22 +134,17 @@ const AdsLibrary = () => {
             }
         }
 
-        // Phase 2: Group images by ratio pairs (e.g., 1:1 + 9:16 → one entry)
-        const groups = []; // each group = array of { url, ratio, size }
+        // Phase 2: Group images by ratio pairs
+        const groups = [];
         const used = new Set();
-
-        // Try to pair images with different ratios
         for (let i = 0; i < imageUploads.length; i++) {
             if (used.has(i)) continue;
             const a = imageUploads[i];
             let paired = false;
-
-            // Look for a partner with a different ratio
             for (let j = i + 1; j < imageUploads.length; j++) {
                 if (used.has(j)) continue;
                 const b = imageUploads[j];
                 if (a.ratio !== b.ratio && a.ratio !== 'unknown' && b.ratio !== 'unknown') {
-                    // Pair them
                     groups.push([a, b]);
                     used.add(i);
                     used.add(j);
@@ -158,86 +158,170 @@ const AdsLibrary = () => {
             }
         }
 
-        // Phase 3: Create library items for each group
+        // Phase 3: Build review queue items for images
+        const newQueueItems = [];
+
         for (const group of groups) {
-            try {
-                const primary = group[0];
-                const variants = {};
-                let totalSize = 0;
-                for (const item of group) {
-                    variants[item.ratio] = item.url;
-                    totalSize += item.size;
-                }
-
-                // AI name from primary image
-                let aiName = null;
-                try {
-                    setUploadProgress(`Naming with AI...`);
-                    const { name } = await getAiName(primary.url);
-                    aiName = name;
-                } catch (e) {
-                    console.warn('AI naming failed:', e);
-                }
-
-                const ratioLabel = group.length > 1
-                    ? ` (${group.map(g => g.ratio).join(' + ')})`
-                    : '';
-
-                await createLibraryItem({
-                    brand_id: uploadBrand,
-                    name: aiName || primary.file.name.replace(/\.[^.]+$/, '') + ratioLabel,
-                    media_type: 'image',
-                    media_url: primary.url,
-                    variants,
-                    file_size: totalSize,
-                    status: 'draft',
-                });
-                uploaded++;
-            } catch (error) {
-                showError('Failed to create library item');
+            const tempId = `review_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const primary = group[0];
+            const variants = {};
+            let totalSize = 0;
+            for (const item of group) {
+                variants[item.ratio] = item.url;
+                totalSize += item.size;
             }
+
+            const uploadedRatios = Object.keys(variants);
+            const missingRatios = STANDARD_RATIOS.filter(r => !uploadedRatios.includes(r));
+
+            newQueueItems.push({
+                id: tempId,
+                mediaType: 'image',
+                primaryUrl: primary.url,
+                thumbnailUrl: null,
+                variants,
+                totalSize,
+                name: primary.file.name.replace(/\.[^.]+$/, ''),
+                nameLoading: true,
+                missingRatios,
+                tags: [],
+                funnel_stage: '',
+                ad_format: '',
+                status: 'draft',
+            });
         }
 
-        // Phase 4: Handle video files
+        // Phase 4: Handle video files — upload + extract thumbnail, add to queue
         for (const file of videoFiles) {
             try {
                 setUploadProgress(`Uploading ${file.name}...`);
                 const { url } = await uploadFile(file);
 
-                // Server-side thumbnail extraction via ffmpeg
                 let thumbnailUrl = null;
                 try {
-                    setUploadProgress(`Extracting thumbnail (server)...`);
+                    setUploadProgress(`Extracting thumbnail...`);
                     const { thumbnail_url } = await getVideoThumbnail(url);
                     thumbnailUrl = thumbnail_url;
                 } catch (e) {
                     console.warn('Server thumbnail extraction failed:', e?.message || e);
                 }
 
-                // Videos just use filename, no AI naming
-                const videoName = file.name.replace(/\.[^.]+$/, '');
-
-                await createLibraryItem({
-                    brand_id: uploadBrand,
-                    name: videoName,
-                    media_type: 'video',
-                    media_url: url,
-                    thumbnail_url: thumbnailUrl,
-                    file_size: file.size,
+                const tempId = `review_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                newQueueItems.push({
+                    id: tempId,
+                    mediaType: 'video',
+                    primaryUrl: url,
+                    thumbnailUrl,
+                    variants: {},
+                    totalSize: file.size,
+                    name: file.name.replace(/\.[^.]+$/, ''),
+                    nameLoading: false,
+                    missingRatios: [],
+                    tags: [],
+                    funnel_stage: '',
+                    ad_format: '',
                     status: 'draft',
                 });
-                uploaded++;
             } catch (error) {
                 showError(`Failed to upload ${file.name}`);
             }
         }
 
-        if (uploaded > 0) {
-            showSuccess(`Uploaded ${uploaded} item${uploaded > 1 ? 's' : ''}`);
+        setReviewQueue(prev => [...prev, ...newQueueItems]);
+        setUploading(false);
+        setUploadProgress('');
+
+        // Kick off AI naming in parallel for image items
+        for (const item of newQueueItems.filter(i => i.mediaType === 'image')) {
+            getAiName(item.primaryUrl)
+                .then(({ name }) => {
+                    setReviewQueue(prev => prev.map(q =>
+                        q.id === item.id ? { ...q, name, nameLoading: false } : q
+                    ));
+                })
+                .catch(() => {
+                    setReviewQueue(prev => prev.map(q =>
+                        q.id === item.id ? { ...q, nameLoading: false } : q
+                    ));
+                });
+        }
+    };
+
+    // Save all review queue items to the library
+    const handleSaveAll = async () => {
+        setUploading(true);
+        let saved = 0;
+
+        for (const item of reviewQueue) {
+            try {
+                setUploadProgress(`Saving "${item.name}"...`);
+                await createLibraryItem({
+                    brand_id: uploadBrand,
+                    name: item.name,
+                    media_type: item.mediaType,
+                    media_url: item.primaryUrl,
+                    thumbnail_url: item.thumbnailUrl || null,
+                    variants: Object.keys(item.variants).length > 0 ? item.variants : null,
+                    file_size: item.totalSize,
+                    tags: item.tags.length > 0 ? item.tags : null,
+                    funnel_stage: item.funnel_stage || null,
+                    ad_format: item.ad_format || null,
+                    status: item.status,
+                });
+                saved++;
+            } catch (error) {
+                showError(`Failed to save "${item.name}"`);
+            }
+        }
+
+        if (saved > 0) {
+            showSuccess(`Saved ${saved} item${saved > 1 ? 's' : ''}`);
+            setReviewQueue([]);
             fetchItems();
         }
         setUploading(false);
         setUploadProgress('');
+    };
+
+    // Update a field on a review queue item
+    const updateQueueItem = (itemId, updates) => {
+        setReviewQueue(prev => prev.map(q =>
+            q.id === itemId ? { ...q, ...updates } : q
+        ));
+    };
+
+    // Remove an item from the review queue
+    const removeFromQueue = (itemId) => {
+        setReviewQueue(prev => prev.filter(q => q.id !== itemId));
+    };
+
+    // Drop a file onto a missing ratio slot
+    const handleDropOnMissingRatio = async (queueItemId, files) => {
+        const file = files[0];
+        if (!file || !ALLOWED_IMAGE_TYPES.includes(file.type)) {
+            showError('Only images can be added as size variants');
+            return;
+        }
+
+        setUploading(true);
+        setUploadProgress(`Uploading variant...`);
+        try {
+            const { url } = await uploadFile(file);
+            const detectedRatio = await detectAspectRatio(file);
+
+            setReviewQueue(prev => prev.map(q => {
+                if (q.id !== queueItemId) return q;
+                const newVariants = { ...q.variants, [detectedRatio]: url };
+                const newMissing = q.missingRatios.filter(r => r !== detectedRatio);
+                return { ...q, variants: newVariants, missingRatios: newMissing, totalSize: q.totalSize + file.size };
+            }));
+            showSuccess(`Added ${detectedRatio} variant`);
+        } catch (error) {
+            showError('Failed to upload variant');
+        } finally {
+            setUploading(false);
+            setUploadProgress('');
+        }
     };
 
     const handleAddVariant = async (files) => {
@@ -409,6 +493,149 @@ const AdsLibrary = () => {
                     />
                 </div>
             </div>
+
+            {/* Review Queue */}
+            {reviewQueue.length > 0 && (
+                <div className="bg-white rounded-xl border border-indigo-200 p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold text-gray-900">
+                            Review Uploads ({reviewQueue.length} item{reviewQueue.length !== 1 ? 's' : ''})
+                        </h2>
+                        <div className="flex gap-3">
+                            <button onClick={() => setReviewQueue([])} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm">
+                                Discard All
+                            </button>
+                            <button
+                                onClick={handleSaveAll}
+                                disabled={uploading}
+                                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium disabled:opacity-50"
+                            >
+                                Save All
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        {reviewQueue.map((qItem) => (
+                            <div key={qItem.id} className="flex gap-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                                {/* Thumbnail */}
+                                <div className="w-32 h-32 flex-shrink-0 rounded-lg overflow-hidden bg-gray-200">
+                                    {qItem.mediaType === 'video' ? (
+                                        qItem.thumbnailUrl ? (
+                                            <img src={qItem.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                                                <Video size={24} className="text-gray-500" />
+                                            </div>
+                                        )
+                                    ) : (
+                                        <img src={qItem.primaryUrl} alt="" className="w-full h-full object-cover" />
+                                    )}
+                                </div>
+
+                                {/* Fields */}
+                                <div className="flex-1 space-y-3">
+                                    {/* Name */}
+                                    <div className="flex items-center gap-2">
+                                        {qItem.nameLoading ? (
+                                            <div className="flex items-center gap-2 text-sm text-gray-500">
+                                                <Loader2 size={14} className="animate-spin" />
+                                                AI naming...
+                                            </div>
+                                        ) : null}
+                                        <input
+                                            type="text"
+                                            value={qItem.name}
+                                            onChange={(e) => updateQueueItem(qItem.id, { name: e.target.value })}
+                                            placeholder="Ad name"
+                                            className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                                        />
+                                    </div>
+
+                                    {/* Ratio badges (images only) */}
+                                    {qItem.mediaType === 'image' && (
+                                        <div className="flex flex-wrap gap-2">
+                                            {/* Uploaded ratios */}
+                                            {Object.keys(qItem.variants).map((ratio) => (
+                                                <span key={ratio} className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-md font-medium">
+                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                                    {ratio}
+                                                </span>
+                                            ))}
+                                            {/* Missing ratios as drop zones */}
+                                            {qItem.missingRatios.map((ratio) => (
+                                                <label
+                                                    key={ratio}
+                                                    className="inline-flex items-center gap-1 px-2 py-1 border border-dashed border-gray-400 text-gray-500 text-xs rounded-md cursor-pointer hover:border-amber-500 hover:text-amber-600 transition-colors"
+                                                    onDragOver={(e) => e.preventDefault()}
+                                                    onDrop={(e) => {
+                                                        e.preventDefault();
+                                                        handleDropOnMissingRatio(qItem.id, Array.from(e.dataTransfer.files));
+                                                    }}
+                                                >
+                                                    <Plus size={12} />
+                                                    {ratio}
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        className="hidden"
+                                                        onChange={(e) => handleDropOnMissingRatio(qItem.id, Array.from(e.target.files))}
+                                                    />
+                                                </label>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {qItem.mediaType === 'video' && (
+                                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-md font-medium">
+                                            <Video size={12} /> Video
+                                        </span>
+                                    )}
+
+                                    {/* Metadata row */}
+                                    <div className="flex flex-wrap gap-2">
+                                        <select
+                                            value={qItem.funnel_stage}
+                                            onChange={(e) => updateQueueItem(qItem.id, { funnel_stage: e.target.value })}
+                                            className="px-2 py-1 text-xs border border-gray-300 rounded-lg"
+                                        >
+                                            <option value="">Funnel Stage</option>
+                                            <option value="tofu">TOFU</option>
+                                            <option value="mofu">MOFU</option>
+                                            <option value="bofu">BOFU</option>
+                                        </select>
+                                        <select
+                                            value={qItem.ad_format}
+                                            onChange={(e) => updateQueueItem(qItem.id, { ad_format: e.target.value })}
+                                            className="px-2 py-1 text-xs border border-gray-300 rounded-lg"
+                                        >
+                                            {AD_FORMATS.map((f) => (
+                                                <option key={f.value} value={f.value}>{f.label}</option>
+                                            ))}
+                                        </select>
+                                        <input
+                                            type="text"
+                                            value={qItem.tags.join(', ')}
+                                            onChange={(e) => updateQueueItem(qItem.id, {
+                                                tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
+                                            })}
+                                            placeholder="Tags (comma-separated)"
+                                            className="flex-1 min-w-[120px] px-2 py-1 text-xs border border-gray-300 rounded-lg"
+                                        />
+                                        <button
+                                            onClick={() => removeFromQueue(qItem.id)}
+                                            className="px-2 py-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                            title="Remove"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Filters */}
             <div className="bg-white rounded-xl border border-amber-200 p-4">

@@ -1,9 +1,11 @@
 import { useToast } from '../context/ToastContext';
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, Upload, X, Loader, Trash2, Film, Image, Sparkles, Play } from 'lucide-react';
+import { ChevronRight, Upload, X, Loader, Trash2, Film, Image, Sparkles, Play, FolderOpen, Check } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
 import { useAuth } from '../context/AuthContext';
 import { getPages } from '../lib/facebookApi';
+import { getLibraryItems } from '../api/adsLibrary';
+import { useBrands } from '../context/BrandContext';
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
 const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
@@ -36,6 +38,15 @@ const AdCreativeStep = ({ onNext, onBack }) => {
     const [manualPageEntry, setManualPageEntry] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [playingVideo, setPlayingVideo] = useState(null);
+
+    // Ads Library import
+    const { brands } = useBrands();
+    const [showLibraryModal, setShowLibraryModal] = useState(false);
+    const [libraryItems, setLibraryItems] = useState([]);
+    const [libraryLoading, setLibraryLoading] = useState(false);
+    const [libraryFilterBrand, setLibraryFilterBrand] = useState('');
+    const [libraryFilterMediaType, setLibraryFilterMediaType] = useState('');
+    const [selectedLibraryItems, setSelectedLibraryItems] = useState(new Set());
 
     const handleDragEnter = (e) => {
         e.preventDefault();
@@ -90,6 +101,69 @@ const AdCreativeStep = ({ onNext, onBack }) => {
             ...prev,
             creatives: [...(prev.creatives || []), ...newCreatives]
         }));
+    };
+
+    // Ads Library import functions
+    const fetchLibraryItems = async (brandFilter, mediaFilter) => {
+        setLibraryLoading(true);
+        try {
+            const filters = {};
+            if (brandFilter) filters.brand_id = brandFilter;
+            if (mediaFilter) filters.media_type = mediaFilter;
+            const data = await getLibraryItems(filters);
+            setLibraryItems(data);
+        } catch (error) {
+            showError('Failed to load ads library');
+        } finally {
+            setLibraryLoading(false);
+        }
+    };
+
+    const toggleLibrarySelection = (itemId) => {
+        setSelectedLibraryItems(prev => {
+            const next = new Set(prev);
+            if (next.has(itemId)) next.delete(itemId);
+            else next.add(itemId);
+            return next;
+        });
+    };
+
+    const handleImportFromLibrary = () => {
+        const selected = libraryItems.filter(item => selectedLibraryItems.has(item.id));
+
+        const newCreatives = selected.map(item => ({
+            id: `creative_lib_${item.id}_${Date.now()}`,
+            previewUrl: item.media_type === 'video'
+                ? (item.thumbnail_url || item.media_url)
+                : item.media_url,
+            imageUrl: item.media_type === 'image' ? item.media_url : undefined,
+            videoUrl: item.media_type === 'video' ? item.media_url : undefined,
+            name: item.name || 'Library Import',
+            mediaType: item.media_type,
+        }));
+
+        setCreativeData(prev => ({
+            ...prev,
+            creatives: [...(prev.creatives || []), ...newCreatives],
+        }));
+
+        // Pre-fill copy fields from first item if current fields are empty
+        const firstWithCopy = selected.find(item => item.headline || item.body);
+        if (firstWithCopy) {
+            const bodiesEmpty = !creativeData.bodies || creativeData.bodies.every(b => !b?.trim());
+            const headlinesEmpty = !creativeData.headlines || creativeData.headlines.every(h => !h?.trim());
+
+            if (bodiesEmpty && firstWithCopy.body) {
+                setCreativeData(prev => ({ ...prev, bodies: [firstWithCopy.body] }));
+            }
+            if (headlinesEmpty && firstWithCopy.headline) {
+                setCreativeData(prev => ({ ...prev, headlines: [firstWithCopy.headline] }));
+            }
+        }
+
+        showSuccess(`Imported ${newCreatives.length} item${newCreatives.length > 1 ? 's' : ''} from library`);
+        setShowLibraryModal(false);
+        setSelectedLibraryItems(new Set());
     };
 
     // Prepopulate Creative Name with Ad Set Name if empty
@@ -586,6 +660,20 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                         </label>
                     </div>
 
+                    {/* Import from Ads Library */}
+                    <div className="flex items-center gap-3 mb-4">
+                        <button
+                            onClick={() => {
+                                setShowLibraryModal(true);
+                                fetchLibraryItems(libraryFilterBrand, libraryFilterMediaType);
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 border border-indigo-200 font-medium text-sm"
+                        >
+                            <FolderOpen size={18} />
+                            Import from Ads Library
+                        </button>
+                    </div>
+
                     {/* Media Grid */}
                     {creativeData.creatives && creativeData.creatives.length > 0 && (
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
@@ -942,6 +1030,128 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                     Next Step <ChevronRight size={20} />
                 </button>
             </div>
+
+            {/* Ads Library Import Modal */}
+            {showLibraryModal && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+                     onClick={() => { setShowLibraryModal(false); setSelectedLibraryItems(new Set()); }}>
+                    <div className="bg-white rounded-xl max-w-5xl w-full max-h-[85vh] flex flex-col"
+                         onClick={(e) => e.stopPropagation()}>
+
+                        {/* Modal Header */}
+                        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+                            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                                <FolderOpen size={24} className="text-indigo-600" />
+                                Import from Ads Library
+                            </h3>
+                            <button onClick={() => { setShowLibraryModal(false); setSelectedLibraryItems(new Set()); }}
+                                    className="text-gray-400 hover:text-gray-600">
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        {/* Filters Bar */}
+                        <div className="px-6 py-3 border-b border-gray-100 flex gap-3 items-center flex-wrap">
+                            <select value={libraryFilterBrand}
+                                    onChange={(e) => { setLibraryFilterBrand(e.target.value); fetchLibraryItems(e.target.value, libraryFilterMediaType); }}
+                                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg">
+                                <option value="">All Brands</option>
+                                {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                            </select>
+                            <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+                                {[['', 'All'], ['image', 'Images'], ['video', 'Videos']].map(([type, label]) => (
+                                    <button key={type}
+                                            onClick={() => { setLibraryFilterMediaType(type); fetchLibraryItems(libraryFilterBrand, type); }}
+                                            className={`px-3 py-1.5 text-sm ${
+                                                libraryFilterMediaType === type
+                                                    ? 'bg-amber-600 text-white'
+                                                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                                            }`}>
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                            {selectedLibraryItems.size > 0 && (
+                                <span className="ml-auto text-sm text-indigo-600 font-medium">
+                                    {selectedLibraryItems.size} selected
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Items Grid */}
+                        <div className="flex-1 overflow-y-auto p-6">
+                            {libraryLoading ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <Loader className="animate-spin text-amber-600" size={24} />
+                                </div>
+                            ) : libraryItems.length === 0 ? (
+                                <div className="text-center py-12 text-gray-500">
+                                    No library items found. Upload media in the Ads Library first.
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                    {libraryItems.map(item => {
+                                        const isSelected = selectedLibraryItems.has(item.id);
+                                        return (
+                                            <div key={item.id}
+                                                 onClick={() => toggleLibrarySelection(item.id)}
+                                                 className={`relative rounded-lg border-2 overflow-hidden cursor-pointer transition-all ${
+                                                     isSelected
+                                                         ? 'border-indigo-600 ring-2 ring-indigo-200'
+                                                         : 'border-gray-200 hover:border-indigo-300'
+                                                 }`}>
+                                                <div className="aspect-square bg-gray-100">
+                                                    {item.media_type === 'video' ? (
+                                                        item.thumbnail_url ? (
+                                                            <img src={item.thumbnail_url} alt={item.name} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                                                                <Film size={32} className="text-gray-500" />
+                                                            </div>
+                                                        )
+                                                    ) : (
+                                                        <img src={item.media_url} alt={item.name} className="w-full h-full object-cover" />
+                                                    )}
+                                                </div>
+                                                {isSelected && (
+                                                    <div className="absolute top-2 right-2 w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center">
+                                                        <Check size={14} className="text-white" />
+                                                    </div>
+                                                )}
+                                                <span className="absolute top-2 left-2 px-2 py-0.5 bg-black/60 text-white text-xs rounded">
+                                                    {item.media_type}
+                                                </span>
+                                                {item.variants && Object.keys(item.variants).length > 1 && (
+                                                    <span className="absolute bottom-12 left-2 px-2 py-0.5 bg-purple-600/90 text-white text-xs rounded">
+                                                        {Object.keys(item.variants).length} sizes
+                                                    </span>
+                                                )}
+                                                <div className="p-2">
+                                                    <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                                                    <p className="text-xs text-gray-500 truncate">{item.brand_name}</p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-4 border-t border-gray-200 flex justify-between items-center">
+                            <button onClick={() => { setShowLibraryModal(false); setSelectedLibraryItems(new Set()); }}
+                                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">
+                                Cancel
+                            </button>
+                            <button onClick={handleImportFromLibrary}
+                                    disabled={selectedLibraryItems.size === 0}
+                                    className="px-6 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                                Import {selectedLibraryItems.size > 0 ? `(${selectedLibraryItems.size})` : ''}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Video Playback Modal */}
             {playingVideo && (
