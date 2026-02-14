@@ -437,18 +437,20 @@ async def analyze_video(
             tmp_path = tmp.name
             tmp.write(content)
 
+        filename = (file.filename if file else None) or (os.path.basename(url.split("?")[0]) if url else "video.mp4")
+
         if provider == "transcribe_haiku":
             # Step 1: Gemini transcribes the audio
             print("[video_analysis:transcribe_haiku] Step 1 — Gemini transcribing audio...")
-            transcript_data = await _transcribe_with_gemini(tmp_path, file.filename or "video.mp4", len(content))
+            transcript_data = await _transcribe_with_gemini(tmp_path, filename, len(content))
             print(f"[video_analysis:transcribe_haiku] Transcript: {transcript_data.get('transcript', '')[:200]}...")
             # Step 2: Haiku generates copy from frames + transcript
             print("[video_analysis:transcribe_haiku] Step 2 — Haiku generating copy with frames + transcript...")
-            result = await _analyze_with_claude(tmp_path, file.filename or "video.mp4", transcript_data=transcript_data)
+            result = await _analyze_with_claude(tmp_path, filename, transcript_data=transcript_data)
         elif provider == "claude":
-            result = await _analyze_with_claude(tmp_path, file.filename or "video.mp4")
+            result = await _analyze_with_claude(tmp_path, filename)
         else:
-            result = await _analyze_with_gemini(tmp_path, file.filename or "video.mp4", len(content))
+            result = await _analyze_with_gemini(tmp_path, filename, len(content))
 
         return {
             "bodies": result["bodies"][:3],
