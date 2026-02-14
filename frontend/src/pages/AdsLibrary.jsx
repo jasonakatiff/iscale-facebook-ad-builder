@@ -212,7 +212,8 @@ const AdsLibrary = () => {
                     const thumbResult = await uploadFile(thumbFile);
                     thumbnailUrl = thumbResult.url;
                 } catch (e) {
-                    console.warn('Thumbnail extraction failed:', e);
+                    console.warn('Thumbnail extraction failed:', e?.message || e);
+                    setUploadProgress('Thumbnail extraction failed, continuing...');
                 }
 
                 let aiName = null;

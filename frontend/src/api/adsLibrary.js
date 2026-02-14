@@ -52,40 +52,85 @@ export const getAiName = async (imageUrl) => {
 export const extractVideoThumbnail = (videoFile) => {
     return new Promise((resolve, reject) => {
         const video = document.createElement('video');
-        video.preload = 'metadata';
+        video.preload = 'auto';
         video.muted = true;
         video.playsInline = true;
+        video.crossOrigin = 'anonymous';
 
         const url = URL.createObjectURL(videoFile);
-        video.src = url;
+        let resolved = false;
 
-        video.onloadeddata = () => {
-            // Seek to 1 second or 10% of duration, whichever is less
-            video.currentTime = Math.min(1, video.duration * 0.1);
-        };
+        // Timeout after 15 seconds
+        const timeout = setTimeout(() => {
+            if (!resolved) {
+                resolved = true;
+                cleanup();
+                reject(new Error('Thumbnail extraction timed out'));
+            }
+        }, 15000);
 
-        video.onseeked = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            canvas.toBlob((blob) => {
-                URL.revokeObjectURL(url);
-                video.remove();
-                if (blob) {
-                    resolve(blob);
-                } else {
-                    reject(new Error('Failed to create thumbnail blob'));
-                }
-            }, 'image/jpeg', 0.85);
-        };
-
-        video.onerror = () => {
+        const cleanup = () => {
+            clearTimeout(timeout);
             URL.revokeObjectURL(url);
-            video.remove();
-            reject(new Error('Failed to load video'));
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
         };
+
+        const captureFrame = () => {
+            if (resolved) return;
+            try {
+                const w = video.videoWidth || 640;
+                const h = video.videoHeight || 360;
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, w, h);
+                canvas.toBlob((blob) => {
+                    if (resolved) return;
+                    resolved = true;
+                    cleanup();
+                    if (blob && blob.size > 1000) {
+                        resolve(blob);
+                    } else {
+                        reject(new Error('Captured frame is blank'));
+                    }
+                }, 'image/jpeg', 0.85);
+            } catch (e) {
+                if (!resolved) {
+                    resolved = true;
+                    cleanup();
+                    reject(e);
+                }
+            }
+        };
+
+        video.onloadedmetadata = () => {
+            // Seek to 1 second or 10% of duration
+            const seekTo = Math.min(1, (video.duration || 5) * 0.1);
+            video.currentTime = seekTo;
+        };
+
+        video.onseeked = captureFrame;
+
+        // Fallback: if seeked never fires, try capturing on canplay
+        video.oncanplay = () => {
+            if (!resolved && video.currentTime === 0) {
+                // Seek didn't work, try capturing at 0
+                setTimeout(captureFrame, 500);
+            }
+        };
+
+        video.onerror = (e) => {
+            if (!resolved) {
+                resolved = true;
+                cleanup();
+                reject(new Error(`Video load error: ${e?.message || 'unknown'}`));
+            }
+        };
+
+        video.src = url;
     });
 };
 
