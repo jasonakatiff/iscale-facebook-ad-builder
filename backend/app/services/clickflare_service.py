@@ -6,7 +6,7 @@ import httpx
 from typing import Optional
 from urllib.parse import urlencode
 
-BASE_URL = "https://api.clickflare.io/v1"
+BASE_URL = "https://public-api.clickflare.io/api"
 TIMEOUT = 30.0
 
 
@@ -15,28 +15,43 @@ class ClickflareService:
         self.api_key = api_key
         self.tracking_domain = tracking_domain
         self.headers = {
-            "Access-Key": api_key,
+            "Api-Key": api_key,
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
+
+    def _handle_response(self, resp: httpx.Response) -> dict:
+        """Handle response with clear error messages."""
+        if resp.status_code == 403:
+            body = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
+            msg = body.get("message", "")
+            if "PublicApi" in str(body):
+                raise httpx.HTTPStatusError(
+                    "Public API access is not enabled on your Clickflare account. "
+                    "Go to Clickflare Settings > Security > API Access and ensure Public API is enabled.",
+                    request=resp.request,
+                    response=resp,
+                )
+            raise httpx.HTTPStatusError(msg or "Forbidden", request=resp.request, response=resp)
+        resp.raise_for_status()
+        return resp.json()
 
     async def test_connection(self) -> dict:
         """Test API connectivity."""
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
             resp = await client.get(
-                f"{BASE_URL}/campaigns",
+                f"{BASE_URL}/campaigns/list",
                 headers=self.headers,
                 params={"limit": 1},
             )
-            resp.raise_for_status()
-            return {"status": "connected", "data": resp.json()}
+            data = self._handle_response(resp)
+            return {"status": "connected", "data": data}
 
     async def get_traffic_sources(self) -> list:
         """List all traffic sources."""
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
             resp = await client.get(f"{BASE_URL}/traffic-sources", headers=self.headers)
-            resp.raise_for_status()
-            return resp.json()
+            return self._handle_response(resp)
 
     async def find_or_create_facebook_traffic_source(self) -> str:
         """Find existing Facebook traffic source or create one. Returns ID."""
@@ -64,8 +79,7 @@ class ClickflareService:
                     },
                 },
             )
-            resp.raise_for_status()
-            result = resp.json()
+            result = self._handle_response(resp)
             return result.get("id", result.get("data", {}).get("id"))
 
     async def create_offer(self, name: str, url: str) -> str:
@@ -76,8 +90,7 @@ class ClickflareService:
                 headers=self.headers,
                 json={"name": name, "url": url},
             )
-            resp.raise_for_status()
-            result = resp.json()
+            result = self._handle_response(resp)
             return result.get("id", result.get("data", {}).get("id"))
 
     async def create_campaign(self, name: str, offer_id: str, traffic_source_id: str) -> str:
@@ -97,8 +110,7 @@ class ClickflareService:
                     },
                 },
             )
-            resp.raise_for_status()
-            result = resp.json()
+            result = self._handle_response(resp)
             return result.get("id", result.get("data", {}).get("id"))
 
     def build_tracking_url(self, cf_campaign_id: str) -> str:
@@ -144,27 +156,28 @@ class ClickflareService:
         group_by: str = "campaign",
         cf_campaign_id: Optional[str] = None,
     ) -> dict:
-        """Fetch performance report."""
-        params = {
+        """Fetch performance report via POST."""
+        body = {
             "dateFrom": date_from,
             "dateTo": date_to,
             "groupBy": group_by,
         }
         if cf_campaign_id:
-            params["campaignId"] = cf_campaign_id
+            body["campaignId"] = cf_campaign_id
 
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-            resp = await client.get(
-                f"{BASE_URL}/reports",
+            resp = await client.post(
+                f"{BASE_URL}/report",
                 headers=self.headers,
-                params=params,
+                json=body,
             )
-            resp.raise_for_status()
-            return resp.json()
+            return self._handle_response(resp)
 
     async def get_campaigns_list(self) -> list:
         """Fetch all Clickflare campaigns."""
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-            resp = await client.get(f"{BASE_URL}/campaigns", headers=self.headers)
-            resp.raise_for_status()
-            return resp.json()
+            resp = await client.get(
+                f"{BASE_URL}/campaigns/list",
+                headers=self.headers,
+            )
+            return self._handle_response(resp)
