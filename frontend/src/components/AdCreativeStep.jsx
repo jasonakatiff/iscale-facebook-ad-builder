@@ -4,7 +4,7 @@ import { ChevronRight, ChevronLeft, Upload, X, Loader, Trash2, Film, Image, Spar
 import { useCampaign } from '../context/CampaignContext';
 import { useAuth } from '../context/AuthContext';
 import { getPages, getPageInfo } from '../lib/facebookApi';
-import { getLibraryItems } from '../api/adsLibrary';
+import { getLibraryItems, getLibraryStats, getFolders } from '../api/adsLibrary';
 import { getClickflareStatus } from '../api/clickflare';
 import { useBrands } from '../context/BrandContext';
 
@@ -54,9 +54,13 @@ const AdCreativeStep = ({ onNext, onBack }) => {
     const [showLibraryModal, setShowLibraryModal] = useState(false);
     const [libraryItems, setLibraryItems] = useState([]);
     const [libraryLoading, setLibraryLoading] = useState(false);
-    const [libraryFilterBrand, setLibraryFilterBrand] = useState('');
-    const [libraryFilterMediaType, setLibraryFilterMediaType] = useState('');
     const [selectedLibraryItems, setSelectedLibraryItems] = useState(new Set());
+    const [libraryStep, setLibraryStep] = useState('brand'); // 'brand' | 'mediaType' | 'items'
+    const [librarySelectedBrand, setLibrarySelectedBrand] = useState(null);
+    const [librarySelectedMediaType, setLibrarySelectedMediaType] = useState('');
+    const [libraryStats, setLibraryStats] = useState(null);
+    const [libraryFolders, setLibraryFolders] = useState([]);
+    const [librarySelectedFolder, setLibrarySelectedFolder] = useState(null);
 
     // When coming from "Add Another Ad", auto-open library modal
     useEffect(() => {
@@ -134,12 +138,13 @@ const AdCreativeStep = ({ onNext, onBack }) => {
     };
 
     // Ads Library import functions
-    const fetchLibraryItems = async (brandFilter, mediaFilter) => {
+    const fetchLibraryItems = async (brandId, mediaType, folderId = null) => {
         setLibraryLoading(true);
         try {
             const filters = {};
-            if (brandFilter) filters.brand_id = brandFilter;
-            if (mediaFilter) filters.media_type = mediaFilter;
+            if (brandId) filters.brand_id = brandId;
+            if (mediaType) filters.media_type = mediaType;
+            if (folderId) filters.folder_id = folderId;
             const data = await getLibraryItems(filters);
             setLibraryItems(data);
         } catch (error) {
@@ -147,6 +152,47 @@ const AdCreativeStep = ({ onNext, onBack }) => {
         } finally {
             setLibraryLoading(false);
         }
+    };
+
+    const handleLibrarySelectBrand = async (brand) => {
+        setLibrarySelectedBrand(brand);
+        setLibraryStep('mediaType');
+        try {
+            const stats = await getLibraryStats({ brand_id: brand.id });
+            setLibraryStats(stats);
+        } catch {
+            setLibraryStats({ images: 0, videos: 0 });
+        }
+    };
+
+    const handleLibrarySelectMediaType = async (mediaType) => {
+        setLibrarySelectedMediaType(mediaType);
+        setLibraryStep('items');
+        setLibrarySelectedFolder(null);
+        try {
+            const folders = await getFolders({ brand_id: librarySelectedBrand.id, media_type: mediaType });
+            setLibraryFolders(folders);
+        } catch {
+            setLibraryFolders([]);
+        }
+        fetchLibraryItems(librarySelectedBrand.id, mediaType);
+    };
+
+    const handleLibraryFolderChange = (folderId) => {
+        setLibrarySelectedFolder(folderId);
+        fetchLibraryItems(librarySelectedBrand.id, librarySelectedMediaType, folderId);
+    };
+
+    const resetLibraryModal = () => {
+        setShowLibraryModal(false);
+        setLibraryStep('brand');
+        setLibrarySelectedBrand(null);
+        setLibrarySelectedMediaType('');
+        setLibraryStats(null);
+        setLibraryFolders([]);
+        setLibrarySelectedFolder(null);
+        setLibraryItems([]);
+        setSelectedLibraryItems(new Set());
     };
 
     const toggleLibrarySelection = (itemId) => {
@@ -683,7 +729,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
         }
 
         setAnalyzingVideoId(creative.id);
-        setAnalyzingProvider(provider === 'gemini' ? 'gemini' : 'haiku');
+        setAnalyzingProvider(provider);
         setProviderMenuId(null);
         try {
             const formData = new FormData();
@@ -924,7 +970,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                             <option value="">Select a Facebook Page...</option>
                             {pages.map(page => (
                                 <option key={page.id} value={page.id}>
-                                    {page.name}
+                                    {page.name} - {page.id}
                                 </option>
                             ))}
                         </select>
@@ -985,8 +1031,8 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                     <div className="flex items-center gap-3 mb-4">
                         <button
                             onClick={() => {
+                                setLibraryStep('brand');
                                 setShowLibraryModal(true);
-                                fetchLibraryItems(libraryFilterBrand, libraryFilterMediaType);
                             }}
                             className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 border border-indigo-200 font-medium text-sm"
                         >
@@ -1085,6 +1131,17 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                                                                     <div className="text-xs text-gray-500">Analyzes video + audio</div>
                                                                 </div>
                                                             </button>
+                                                            <div className="border-t border-gray-100 my-1"></div>
+                                                            <button
+                                                                onClick={() => handleAnalyzeVideo(creative, 'safe')}
+                                                                className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center gap-2"
+                                                            >
+                                                                <Sparkles size={14} className="text-blue-500" />
+                                                                <div>
+                                                                    <div className="font-medium text-gray-800">Safe Copy</div>
+                                                                    <div className="text-xs text-gray-500">Policy-friendly, low-risk copy</div>
+                                                                </div>
+                                                            </button>
                                                         </>
                                                     ) : (
                                                         <>
@@ -1106,6 +1163,17 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                                                                 <div>
                                                                     <div className="font-medium text-gray-800">Gemini 2.0 Flash</div>
                                                                     <div className="text-xs text-gray-500">Analyzes image + generates DR copy</div>
+                                                                </div>
+                                                            </button>
+                                                            <div className="border-t border-gray-100 my-1"></div>
+                                                            <button
+                                                                onClick={() => handleAnalyzeImage(creative, 'safe')}
+                                                                className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center gap-2"
+                                                            >
+                                                                <Sparkles size={14} className="text-blue-500" />
+                                                                <div>
+                                                                    <div className="font-medium text-gray-800">Safe Copy</div>
+                                                                    <div className="text-xs text-gray-500">Policy-friendly, low-risk copy</div>
                                                                 </div>
                                                             </button>
                                                         </>
@@ -1141,22 +1209,27 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                     {/* AI Analysis Loading Banner */}
                     {analyzingVideoId && (
                         <div className={`flex items-center gap-3 ${
-                            analyzingProvider === 'transcribe_haiku' ? 'bg-green-50 border-green-200'
+                            analyzingProvider === 'safe' ? 'bg-blue-50 border-blue-200'
+                            : analyzingProvider === 'transcribe_haiku' ? 'bg-green-50 border-green-200'
                             : analyzingProvider === 'haiku' || analyzingProvider === 'claude' ? 'bg-purple-50 border-purple-200'
                             : 'bg-amber-50 border-amber-200'
                         } border rounded-lg p-4 mb-4`}>
                             <Loader className={`animate-spin ${
-                                analyzingProvider === 'transcribe_haiku' ? 'text-green-600'
+                                analyzingProvider === 'safe' ? 'text-blue-600'
+                                : analyzingProvider === 'transcribe_haiku' ? 'text-green-600'
                                 : analyzingProvider === 'haiku' || analyzingProvider === 'claude' ? 'text-purple-600'
                                 : 'text-amber-600'
                             }`} size={20} />
                             <div>
                                 <p className={`${
-                                    analyzingProvider === 'transcribe_haiku' ? 'text-green-800'
+                                    analyzingProvider === 'safe' ? 'text-blue-800'
+                                    : analyzingProvider === 'transcribe_haiku' ? 'text-green-800'
                                     : analyzingProvider === 'haiku' || analyzingProvider === 'claude' ? 'text-purple-800'
                                     : 'text-amber-800'
                                 } font-medium`}>
-                                    {analyzingProvider === 'transcribe_haiku'
+                                    {analyzingProvider === 'safe'
+                                        ? 'Generating safe, policy-friendly copy...'
+                                        : analyzingProvider === 'transcribe_haiku'
                                         ? 'Transcribing audio + generating copy with Haiku...'
                                         : analyzingProvider === 'haiku'
                                         ? 'Analyzing image with Claude Haiku...'
@@ -1165,11 +1238,14 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                                         : 'Analyzing with Gemini 2.0 Flash...'}
                                 </p>
                                 <p className={`${
-                                    analyzingProvider === 'transcribe_haiku' ? 'text-green-600'
+                                    analyzingProvider === 'safe' ? 'text-blue-600'
+                                    : analyzingProvider === 'transcribe_haiku' ? 'text-green-600'
                                     : analyzingProvider === 'haiku' || analyzingProvider === 'claude' ? 'text-purple-600'
                                     : 'text-amber-600'
                                 } text-sm`}>
-                                    {analyzingProvider === 'transcribe_haiku'
+                                    {analyzingProvider === 'safe'
+                                        ? 'Clean copy optimized for ad approval. This may take 10-15 seconds.'
+                                        : analyzingProvider === 'transcribe_haiku'
                                         ? 'Step 1: Gemini transcribes audio → Step 2: Haiku writes DR copy. This may take 60-90 seconds.'
                                         : analyzingProvider === 'haiku'
                                         ? 'Generating direct-response ad copy from your image. This may take 10-20 seconds.'
@@ -1609,120 +1685,202 @@ const AdCreativeStep = ({ onNext, onBack }) => {
             {/* Ads Library Import Modal */}
             {showLibraryModal && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-                     onClick={() => { setShowLibraryModal(false); setSelectedLibraryItems(new Set()); }}>
+                     onClick={resetLibraryModal}>
                     <div className="bg-white rounded-xl max-w-5xl w-full max-h-[85vh] flex flex-col"
                          onClick={(e) => e.stopPropagation()}>
 
-                        {/* Modal Header */}
+                        {/* Modal Header with Breadcrumb */}
                         <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-                            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                                <FolderOpen size={24} className="text-indigo-600" />
-                                Import from Ads Library
-                            </h3>
-                            <button onClick={() => { setShowLibraryModal(false); setSelectedLibraryItems(new Set()); }}
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                                    <FolderOpen size={24} className="text-indigo-600" />
+                                    Import from Ads Library
+                                </h3>
+                                {libraryStep !== 'brand' && (
+                                    <div className="flex items-center gap-1 mt-1 text-sm">
+                                        <button onClick={() => { setLibraryStep('brand'); setLibrarySelectedBrand(null); setLibraryItems([]); setSelectedLibraryItems(new Set()); }}
+                                                className="text-indigo-600 hover:underline">Brands</button>
+                                        {librarySelectedBrand && (
+                                            <>
+                                                <ChevronRight size={14} className="text-gray-400" />
+                                                {libraryStep === 'mediaType' ? (
+                                                    <span className="text-gray-700 font-medium">{librarySelectedBrand.name}</span>
+                                                ) : (
+                                                    <button onClick={() => { setLibraryStep('mediaType'); setLibraryItems([]); setSelectedLibraryItems(new Set()); }}
+                                                            className="text-indigo-600 hover:underline">{librarySelectedBrand.name}</button>
+                                                )}
+                                            </>
+                                        )}
+                                        {libraryStep === 'items' && (
+                                            <>
+                                                <ChevronRight size={14} className="text-gray-400" />
+                                                <span className="text-gray-700 font-medium">{librarySelectedMediaType === 'image' ? 'Images' : 'Videos'}</span>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            <button onClick={resetLibraryModal}
                                     className="text-gray-400 hover:text-gray-600">
                                 <X size={24} />
                             </button>
                         </div>
 
-                        {/* Filters Bar */}
-                        <div className="px-6 py-3 border-b border-gray-100 flex gap-3 items-center flex-wrap">
-                            <select value={libraryFilterBrand}
-                                    onChange={(e) => { setLibraryFilterBrand(e.target.value); fetchLibraryItems(e.target.value, libraryFilterMediaType); }}
-                                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg">
-                                <option value="">All Brands</option>
-                                {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                            </select>
-                            <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-                                {[['', 'All'], ['image', 'Images'], ['video', 'Videos']].map(([type, label]) => (
-                                    <button key={type}
-                                            onClick={() => { setLibraryFilterMediaType(type); fetchLibraryItems(libraryFilterBrand, type); }}
-                                            className={`px-3 py-1.5 text-sm ${
-                                                libraryFilterMediaType === type
-                                                    ? 'bg-amber-600 text-white'
-                                                    : 'bg-white text-gray-600 hover:bg-gray-50'
-                                            }`}>
-                                        {label}
-                                    </button>
-                                ))}
-                            </div>
-                            {selectedLibraryItems.size > 0 && (
-                                <span className="ml-auto text-sm text-indigo-600 font-medium">
-                                    {selectedLibraryItems.size} selected
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Items Grid */}
+                        {/* Step Content */}
                         <div className="flex-1 overflow-y-auto p-6">
-                            {libraryLoading ? (
-                                <div className="flex items-center justify-center py-12">
-                                    <Loader className="animate-spin text-amber-600" size={24} />
-                                </div>
-                            ) : libraryItems.length === 0 ? (
-                                <div className="text-center py-12 text-gray-500">
-                                    No library items found. Upload media in the Ads Library first.
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                    {libraryItems.map(item => {
-                                        const isSelected = selectedLibraryItems.has(item.id);
-                                        return (
-                                            <div key={item.id}
-                                                 onClick={() => toggleLibrarySelection(item.id)}
-                                                 className={`relative rounded-lg border-2 overflow-hidden cursor-pointer transition-all ${
-                                                     isSelected
-                                                         ? 'border-indigo-600 ring-2 ring-indigo-200'
-                                                         : 'border-gray-200 hover:border-indigo-300'
-                                                 }`}>
-                                                <div className="aspect-square bg-gray-100">
-                                                    {item.media_type === 'video' ? (
-                                                        item.thumbnail_url ? (
-                                                            <img src={item.thumbnail_url} alt={item.name} className="w-full h-full object-cover" />
+                            {/* Step 1: Brand Selection */}
+                            {libraryStep === 'brand' && (
+                                <div>
+                                    <p className="text-sm text-gray-500 mb-4">Select a brand to browse its library</p>
+                                    {brands.length === 0 ? (
+                                        <div className="text-center py-12 text-gray-500">No brands found. Create a brand first.</div>
+                                    ) : (
+                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                            {brands.map(brand => (
+                                                <div key={brand.id}
+                                                     onClick={() => handleLibrarySelectBrand(brand)}
+                                                     className="border-2 border-gray-200 rounded-lg p-4 cursor-pointer hover:border-indigo-300 hover:bg-indigo-50 transition-all">
+                                                    <div className="flex items-center gap-3">
+                                                        {brand.logo_url ? (
+                                                            <img src={brand.logo_url} alt={brand.name}
+                                                                 className="w-12 h-12 rounded-lg object-cover border border-gray-200" />
                                                         ) : (
-                                                            <div className="w-full h-full flex items-center justify-center bg-gray-800">
-                                                                <Film size={32} className="text-gray-500" />
+                                                            <div className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-lg"
+                                                                 style={{ backgroundColor: brand.primary_color || '#d97706' }}>
+                                                                {brand.name?.charAt(0)?.toUpperCase() || 'B'}
                                                             </div>
-                                                        )
-                                                    ) : (
-                                                        <img src={item.media_url} alt={item.name} className="w-full h-full object-cover" />
-                                                    )}
-                                                </div>
-                                                {isSelected && (
-                                                    <div className="absolute top-2 right-2 w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center">
-                                                        <Check size={14} className="text-white" />
+                                                        )}
+                                                        <div>
+                                                            <p className="font-medium text-gray-900">{brand.name}</p>
+                                                        </div>
                                                     </div>
-                                                )}
-                                                <span className="absolute top-2 left-2 px-2 py-0.5 bg-black/60 text-white text-xs rounded">
-                                                    {item.media_type}
-                                                </span>
-                                                {item.variants && Object.keys(item.variants).length > 1 && (
-                                                    <span className="absolute bottom-12 left-2 px-2 py-0.5 bg-purple-600/90 text-white text-xs rounded">
-                                                        {Object.keys(item.variants).length} sizes
-                                                    </span>
-                                                )}
-                                                <div className="p-2">
-                                                    <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
-                                                    <p className="text-xs text-gray-500 truncate">{item.brand_name}</p>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Step 2: Media Type Selection */}
+                            {libraryStep === 'mediaType' && (
+                                <div>
+                                    <p className="text-sm text-gray-500 mb-4">What type of media do you want to import?</p>
+                                    <div className="grid grid-cols-2 gap-6 max-w-lg mx-auto">
+                                        <div onClick={() => handleLibrarySelectMediaType('image')}
+                                             className="border-2 border-gray-200 rounded-xl p-8 cursor-pointer hover:border-indigo-300 hover:bg-indigo-50 transition-all text-center">
+                                            <Image size={48} className="mx-auto mb-3 text-indigo-600" />
+                                            <p className="font-semibold text-gray-900 text-lg">Images</p>
+                                            <p className="text-sm text-gray-500 mt-1">{libraryStats?.images ?? '...'} items</p>
+                                        </div>
+                                        <div onClick={() => handleLibrarySelectMediaType('video')}
+                                             className="border-2 border-gray-200 rounded-xl p-8 cursor-pointer hover:border-indigo-300 hover:bg-indigo-50 transition-all text-center">
+                                            <Film size={48} className="mx-auto mb-3 text-indigo-600" />
+                                            <p className="font-semibold text-gray-900 text-lg">Videos</p>
+                                            <p className="text-sm text-gray-500 mt-1">{libraryStats?.videos ?? '...'} items</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Step 3: Browse & Select Items */}
+                            {libraryStep === 'items' && (
+                                <div>
+                                    {/* Folder tabs */}
+                                    {libraryFolders.length > 0 && (
+                                        <div className="flex gap-2 mb-4 flex-wrap">
+                                            <button onClick={() => handleLibraryFolderChange(null)}
+                                                    className={`px-3 py-1.5 text-sm rounded-lg ${!librarySelectedFolder ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                                                All
+                                            </button>
+                                            {libraryFolders.map(folder => (
+                                                <button key={folder.id}
+                                                        onClick={() => handleLibraryFolderChange(folder.id)}
+                                                        className={`px-3 py-1.5 text-sm rounded-lg ${librarySelectedFolder === folder.id ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                                                    {folder.name} ({folder.item_count})
+                                                </button>
+                                            ))}
+                                            <button onClick={() => handleLibraryFolderChange('__none__')}
+                                                    className={`px-3 py-1.5 text-sm rounded-lg ${librarySelectedFolder === '__none__' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                                                Uncategorized
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {libraryLoading ? (
+                                        <div className="flex items-center justify-center py-12">
+                                            <Loader className="animate-spin text-amber-600" size={24} />
+                                        </div>
+                                    ) : libraryItems.length === 0 ? (
+                                        <div className="text-center py-12 text-gray-500">
+                                            No items found. Upload media in the Ads Library first.
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                            {libraryItems.map(item => {
+                                                const isSelected = selectedLibraryItems.has(item.id);
+                                                return (
+                                                    <div key={item.id}
+                                                         onClick={() => toggleLibrarySelection(item.id)}
+                                                         className={`relative rounded-lg border-2 overflow-hidden cursor-pointer transition-all ${
+                                                             isSelected
+                                                                 ? 'border-indigo-600 ring-2 ring-indigo-200'
+                                                                 : 'border-gray-200 hover:border-indigo-300'
+                                                         }`}>
+                                                        <div className="aspect-square bg-gray-100">
+                                                            {item.media_type === 'video' ? (
+                                                                item.thumbnail_url ? (
+                                                                    <img src={item.thumbnail_url} alt={item.name} className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                                                                        <Film size={32} className="text-gray-500" />
+                                                                    </div>
+                                                                )
+                                                            ) : (
+                                                                <img src={item.media_url} alt={item.name} className="w-full h-full object-cover" loading="lazy" />
+                                                            )}
+                                                        </div>
+                                                        {isSelected && (
+                                                            <div className="absolute top-2 right-2 w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center">
+                                                                <Check size={14} className="text-white" />
+                                                            </div>
+                                                        )}
+                                                        {item.variants && Object.keys(item.variants).length > 1 && (
+                                                            <span className="absolute bottom-12 left-2 px-2 py-0.5 bg-purple-600/90 text-white text-xs rounded">
+                                                                {Object.keys(item.variants).length} sizes
+                                                            </span>
+                                                        )}
+                                                        <div className="p-2">
+                                                            <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
 
                         {/* Modal Footer */}
                         <div className="p-4 border-t border-gray-200 flex justify-between items-center">
-                            <button onClick={() => { setShowLibraryModal(false); setSelectedLibraryItems(new Set()); }}
+                            <button onClick={resetLibraryModal}
                                     className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">
                                 Cancel
                             </button>
-                            <button onClick={handleImportFromLibrary}
-                                    disabled={selectedLibraryItems.size === 0}
-                                    className="px-6 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
-                                Import {selectedLibraryItems.size > 0 ? `(${selectedLibraryItems.size})` : ''}
-                            </button>
+                            {libraryStep === 'items' && (
+                                <div className="flex items-center gap-3">
+                                    {selectedLibraryItems.size > 0 && (
+                                        <span className="text-sm text-indigo-600 font-medium">
+                                            {selectedLibraryItems.size} selected
+                                        </span>
+                                    )}
+                                    <button onClick={handleImportFromLibrary}
+                                            disabled={selectedLibraryItems.size === 0}
+                                            className="px-6 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                                        Import {selectedLibraryItems.size > 0 ? `(${selectedLibraryItems.size})` : ''}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

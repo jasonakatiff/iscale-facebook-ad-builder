@@ -126,9 +126,23 @@ def create_creative(
     current_user: User = Depends(require_permission("campaigns:write"))
 ):
     try:
+        print(f"[facebook:create_creative] page_id={creative.get('page_id')}, image_hash={creative.get('image_hash')}, video_id={creative.get('video_id')}, ad_account_id={ad_account_id}")
+        print(f"[facebook:create_creative] Full payload: {creative}")
         result = service.create_creative(creative, ad_account_id)
+        print(f"[facebook:create_creative] Success: {dict(result)}")
         return dict(result)
     except Exception as e:
+        import traceback
+        print(f"[facebook:create_creative] FAILED: {type(e).__name__}: {e}")
+        print(f"[facebook:create_creative] Full traceback:")
+        traceback.print_exc()
+        # Try to extract Facebook API error details
+        if hasattr(e, 'api_error_message'):
+            print(f"[facebook:create_creative] FB API error: {e.api_error_message()}")
+        if hasattr(e, 'body'):
+            print(f"[facebook:create_creative] FB body: {e.body()}")
+        if hasattr(e, '_body'):
+            print(f"[facebook:create_creative] FB _body: {e._body}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/ads")

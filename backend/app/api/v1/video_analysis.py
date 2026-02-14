@@ -130,6 +130,80 @@ Your direct-response rules:
 You are writing ads that need to generate a positive ROI from day one. Every word must earn its place."""
 
 
+SAFE_VIDEO_PROMPT = """You are a professional Facebook ad copywriter focused on writing clean, policy-compliant ad copy that gets approved quickly and avoids any risk of rejection.
+
+Watch/analyze this video carefully — pay attention to both the visuals AND the audio/voiceover.
+
+Based on the video content, generate Facebook ad copy that is safe, professional, and compliant with Facebook Advertising Policies. Return ONLY valid JSON with this exact structure:
+
+{
+  "bodies": [
+    "Primary text variation 1 — straightforward benefit-focused",
+    "Primary text variation 2 — informational and professional",
+    "Primary text variation 3 — friendly and approachable"
+  ],
+  "headlines": [
+    "Headline 1 (under 40 chars, clear benefit)",
+    "Headline 2 (informational)",
+    "Headline 3 (simple and direct)"
+  ],
+  "video_summary": "Brief 1-2 sentence summary of what the video shows and says"
+}
+
+SAFE COPY RULES — follow these strictly:
+- Write clean, professional copy — NO hype, NO exaggerated claims, NO sensational language
+- DO NOT use words like: "shocking", "secret", "miracle", "guaranteed", "free", "limited time", "act now", "urgent"
+- DO NOT make health claims, income claims, or before/after promises
+- DO NOT use excessive capitalization, exclamation marks, or emoji spam
+- DO NOT create false urgency or scarcity
+- DO NOT use clickbait or misleading hooks
+- Focus on clearly describing what the product/service does and its genuine benefits
+- Use a friendly, professional, conversational tone
+- Headlines should be clear and descriptive, not sensational
+- CTAs should be simple: "Learn More", "Shop Now", "See Details", "Find Out More"
+- Each variation should highlight a different genuine benefit or angle
+- If there's spoken audio, reference the actual content without exaggeration
+- Write copy that would pass Facebook's automated review with zero issues
+- Return ONLY the JSON, no markdown formatting or code blocks"""
+
+
+SAFE_IMAGE_PROMPT = """You are a professional Facebook ad copywriter focused on writing clean, policy-compliant ad copy that gets approved quickly and avoids any risk of rejection.
+
+Analyze this image carefully — pay attention to the product, the setting, any text overlays, branding, and the overall mood.
+
+Based on the image, generate Facebook ad copy that is safe, professional, and compliant with Facebook Advertising Policies. Return ONLY valid JSON with this exact structure:
+
+{
+  "bodies": [
+    "Primary text variation 1 — straightforward benefit-focused",
+    "Primary text variation 2 — informational and professional",
+    "Primary text variation 3 — friendly and approachable"
+  ],
+  "headlines": [
+    "Headline 1 (under 40 chars, clear benefit)",
+    "Headline 2 (informational)",
+    "Headline 3 (simple and direct)"
+  ],
+  "image_summary": "Brief 1-2 sentence summary of what the image shows"
+}
+
+SAFE COPY RULES — follow these strictly:
+- Write clean, professional copy — NO hype, NO exaggerated claims, NO sensational language
+- DO NOT use words like: "shocking", "secret", "miracle", "guaranteed", "free", "limited time", "act now", "urgent"
+- DO NOT make health claims, income claims, or before/after promises
+- DO NOT use excessive capitalization, exclamation marks, or emoji spam
+- DO NOT create false urgency or scarcity
+- DO NOT use clickbait or misleading hooks
+- Focus on clearly describing what the product/service does and its genuine benefits
+- Use a friendly, professional, conversational tone
+- Headlines should be clear and descriptive, not sensational
+- CTAs should be simple: "Learn More", "Shop Now", "See Details", "Find Out More"
+- Each variation should highlight a different genuine benefit or angle
+- If there's text in the image, reference the actual content without exaggeration
+- Write copy that would pass Facebook's automated review with zero issues
+- Return ONLY the JSON, no markdown formatting or code blocks"""
+
+
 def _parse_ai_response(raw_text: str) -> dict:
     """Parse JSON from AI response, handling markdown code fences."""
     json_text = raw_text.strip()
@@ -238,7 +312,7 @@ def _parse_ai_response_flexible(raw_text: str) -> dict:
     return json.loads(json_text)
 
 
-async def _analyze_with_gemini(tmp_path: str, filename: str, content_length: int) -> dict:
+async def _analyze_with_gemini(tmp_path: str, filename: str, content_length: int, prompt_override: str = None) -> dict:
     """Analyze video with Gemini 2.0 Flash (supports video+audio natively)."""
     if not settings.GEMINI_API_KEY:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY is not configured")
@@ -272,7 +346,7 @@ async def _analyze_with_gemini(tmp_path: str, filename: str, content_length: int
         print(f"[video_analysis:gemini] File ready, sending to gemini-2.0-flash...")
         response = client.models.generate_content(
             model="gemini-2.0-flash",
-            contents=[gemini_file, ANALYSIS_PROMPT],
+            contents=[gemini_file, prompt_override or ANALYSIS_PROMPT],
         )
 
         if hasattr(response, "usage_metadata") and response.usage_metadata:
@@ -402,7 +476,7 @@ async def _analyze_with_claude(tmp_path: str, filename: str, transcript_data: di
 async def analyze_video(
     file: Optional[UploadFile] = File(None),
     url: Optional[str] = Form(None),
-    provider: str = Query("gemini", pattern="^(gemini|claude|transcribe_haiku)$"),
+    provider: str = Query("gemini", pattern="^(gemini|claude|transcribe_haiku|safe)$"),
     current_user: User = Depends(get_current_active_user),
 ):
     """Analyze a video with AI to generate ad copy suggestions.
@@ -410,6 +484,7 @@ async def analyze_video(
     provider: "gemini" (default) — uses Gemini 2.0 Flash with native video+audio
               "claude" — extracts key frames and sends to Claude Haiku
               "transcribe_haiku" — Gemini transcribes audio, then Haiku writes copy from frames + transcript
+              "safe" — Gemini Flash with policy-compliant, low-risk copy
     """
     if file:
         content_type = file.content_type or ""
@@ -442,7 +517,10 @@ async def analyze_video(
 
         filename = (file.filename if file else None) or (os.path.basename(url.split("?")[0]) if url else "video.mp4")
 
-        if provider == "transcribe_haiku":
+        if provider == "safe":
+            # Safe/compliant copy using Gemini Flash with toned-down prompt
+            result = await _analyze_with_gemini(tmp_path, filename, len(content), prompt_override=SAFE_VIDEO_PROMPT)
+        elif provider == "transcribe_haiku":
             # Step 1: Gemini transcribes the audio
             print("[video_analysis:transcribe_haiku] Step 1 — Gemini transcribing audio...")
             transcript_data = await _transcribe_with_gemini(tmp_path, filename, len(content))
@@ -484,13 +562,14 @@ async def analyze_video(
 async def analyze_image(
     file: Optional[UploadFile] = File(None),
     url: Optional[str] = Form(None),
-    provider: str = Query("haiku", pattern="^(haiku|gemini)$"),
+    provider: str = Query("haiku", pattern="^(haiku|gemini|safe)$"),
     current_user: User = Depends(get_current_active_user),
 ):
     """Analyze an image with AI to generate ad copy suggestions.
 
     provider: "haiku" (default) — uses Claude Haiku with vision
               "gemini" — uses Gemini 2.0 Flash with vision
+              "safe" — Gemini Flash with policy-compliant, low-risk copy
     """
     if not file and not url:
         raise HTTPException(status_code=400, detail="Either file or url is required")
@@ -516,18 +595,19 @@ async def analyze_image(
         if media_type == "image/jpg":
             media_type = "image/jpeg"
 
-        if provider == "gemini":
+        if provider in ("gemini", "safe"):
             if not genai:
                 raise HTTPException(status_code=500, detail="google-genai not installed")
             api_key = getattr(settings, "GEMINI_API_KEY", None) or os.environ.get("GEMINI_API_KEY")
             if not api_key:
                 raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
 
+            prompt = SAFE_IMAGE_PROMPT if provider == "safe" else IMAGE_ANALYSIS_PROMPT
             client = genai.Client(api_key=api_key)
             image_part = genai.types.Part.from_bytes(data=image_data, mime_type=media_type)
             response = client.models.generate_content(
                 model="gemini-2.0-flash",
-                contents=[image_part, IMAGE_ANALYSIS_PROMPT],
+                contents=[image_part, prompt],
             )
             result = _parse_ai_response(response.text)
         else:
