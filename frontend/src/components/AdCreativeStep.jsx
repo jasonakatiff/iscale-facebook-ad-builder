@@ -570,8 +570,9 @@ const AdCreativeStep = ({ onNext, onBack }) => {
     };
 
     const handleAnalyzeVideo = async (creative, provider = 'gemini') => {
-        if (!creative.file) {
-            showWarning('Cannot analyze videos added via URL');
+        const videoUrl = creative.videoUrl || creative.previewUrl;
+        if (!creative.file && !videoUrl) {
+            showWarning('No video file or URL available');
             return;
         }
 
@@ -580,7 +581,11 @@ const AdCreativeStep = ({ onNext, onBack }) => {
         setProviderMenuId(null);
         try {
             const formData = new FormData();
-            formData.append('file', creative.file);
+            if (creative.file) {
+                formData.append('file', creative.file);
+            } else {
+                formData.append('url', videoUrl);
+            }
 
             const response = await authFetch(`${API_URL}/video-analysis/analyze?provider=${provider}`, {
                 method: 'POST',
@@ -646,11 +651,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
             if (creative.file) {
                 formData.append('file', creative.file);
             } else {
-                // Fetch image from URL and convert to blob
-                const imgResponse = await fetch(imageUrl);
-                const blob = await imgResponse.blob();
-                const ext = imageUrl.split('.').pop()?.split('?')[0] || 'jpg';
-                formData.append('file', blob, `image.${ext}`);
+                formData.append('url', imageUrl);
             }
 
             const response = await authFetch(`${API_URL}/video-analysis/analyze-image?provider=${provider}`, {

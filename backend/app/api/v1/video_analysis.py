@@ -5,7 +5,9 @@ import glob
 import base64
 import tempfile
 import subprocess
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Form
+from typing import Optional
 from app.models import User
 from app.core.deps import get_current_active_user
 from app.core.config import settings
@@ -398,7 +400,8 @@ async def _analyze_with_claude(tmp_path: str, filename: str, transcript_data: di
 
 @router.post("/analyze")
 async def analyze_video(
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
+    url: Optional[str] = Form(None),
     provider: str = Query("gemini", pattern="^(gemini|claude|transcribe_haiku)$"),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -408,16 +411,30 @@ async def analyze_video(
               "claude" — extracts key frames and sends to Claude Haiku
               "transcribe_haiku" — Gemini transcribes audio, then Haiku writes copy from frames + transcript
     """
-    content_type = file.content_type or ""
-    if not content_type.startswith("video/"):
-        raise HTTPException(status_code=400, detail="File must be a video")
+    if file:
+        content_type = file.content_type or ""
+        if not content_type.startswith("video/"):
+            raise HTTPException(status_code=400, detail="File must be a video")
+
+    if not file and not url:
+        raise HTTPException(status_code=400, detail="Either file or url is required")
 
     tmp_path = None
     try:
-        suffix = os.path.splitext(file.filename or "video.mp4")[1] or ".mp4"
+        if file:
+            suffix = os.path.splitext(file.filename or "video.mp4")[1] or ".mp4"
+            content = await file.read()
+        else:
+            # Download from URL server-side
+            async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+            content = resp.content
+            ext = os.path.splitext(url.split("?")[0])[1] or ".mp4"
+            suffix = ext
+
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             tmp_path = tmp.name
-            content = await file.read()
             tmp.write(content)
 
         if provider == "transcribe_haiku":
@@ -457,7 +474,8 @@ async def analyze_video(
 
 @router.post("/analyze-image")
 async def analyze_image(
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
+    url: Optional[str] = Form(None),
     provider: str = Query("haiku", pattern="^(haiku|gemini)$"),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -466,16 +484,27 @@ async def analyze_image(
     provider: "haiku" (default) — uses Claude Haiku with vision
               "gemini" — uses Gemini 2.0 Flash with vision
     """
-    content_type = file.content_type or ""
-    if not content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File must be an image")
+    if not file and not url:
+        raise HTTPException(status_code=400, detail="Either file or url is required")
 
     try:
-        image_data = await file.read()
+        if file:
+            content_type = file.content_type or ""
+            if not content_type.startswith("image/"):
+                raise HTTPException(status_code=400, detail="File must be an image")
+            image_data = await file.read()
+            media_type = content_type
+        else:
+            # Download from URL server-side (avoids CORS)
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+            image_data = resp.content
+            media_type = resp.headers.get("content-type", "image/jpeg").split(";")[0]
+
         image_b64 = base64.b64encode(image_data).decode("utf-8")
 
         # Map content types
-        media_type = content_type
         if media_type == "image/jpg":
             media_type = "image/jpeg"
 
