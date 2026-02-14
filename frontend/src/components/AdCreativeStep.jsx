@@ -631,8 +631,9 @@ const AdCreativeStep = ({ onNext, onBack }) => {
     };
 
     const handleAnalyzeImage = async (creative, provider = 'haiku') => {
-        if (!creative.file) {
-            showWarning('Cannot analyze images added via URL');
+        const imageUrl = creative.imageUrl || creative.previewUrl;
+        if (!creative.file && !imageUrl) {
+            showWarning('No image file or URL available');
             return;
         }
 
@@ -641,7 +642,16 @@ const AdCreativeStep = ({ onNext, onBack }) => {
         setProviderMenuId(null);
         try {
             const formData = new FormData();
-            formData.append('file', creative.file);
+
+            if (creative.file) {
+                formData.append('file', creative.file);
+            } else {
+                // Fetch image from URL and convert to blob
+                const imgResponse = await fetch(imageUrl);
+                const blob = await imgResponse.blob();
+                const ext = imageUrl.split('.').pop()?.split('?')[0] || 'jpg';
+                formData.append('file', blob, `image.${ext}`);
+            }
 
             const response = await authFetch(`${API_URL}/video-analysis/analyze-image?provider=${provider}`, {
                 method: 'POST',
