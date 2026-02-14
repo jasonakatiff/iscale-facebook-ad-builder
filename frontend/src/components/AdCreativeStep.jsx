@@ -793,8 +793,8 @@ const AdCreativeStep = ({ onNext, onBack }) => {
         <div>
             <h2 className="text-2xl font-bold mb-4">Ad Creative</h2>
 
-            {/* Mode Toggle */}
-            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg mb-6 w-fit">
+            {/* Mode Toggle — hidden for now, default to per_creative. Unhide by removing the hidden class */}
+            <div className="hidden items-center gap-1 bg-gray-100 p-1 rounded-lg mb-6 w-fit">
                 <button
                     onClick={() => setCreativeData(prev => ({ ...prev, creativeMode: 'standard' }))}
                     className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${

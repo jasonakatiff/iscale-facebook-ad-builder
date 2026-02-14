@@ -68,7 +68,7 @@ export const CampaignProvider = ({ children }) => {
     });
 
     const [creativeData, setCreativeData] = useState({
-        creativeMode: 'standard', // 'standard' or 'per_creative'
+        creativeMode: 'per_creative', // 'standard' or 'per_creative'
         creativeName: '',
         creatives: [], // Array of { id, file, previewUrl, name, mediaType, headlines?, bodies?, description?, cta? }
         bodies: [''], // Start with 1 field (used in standard mode)
