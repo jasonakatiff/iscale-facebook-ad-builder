@@ -630,6 +630,84 @@ const AdCreativeStep = ({ onNext, onBack }) => {
         }
     };
 
+    const handleAnalyzeImage = async (creative, provider = 'haiku') => {
+        if (!creative.file) {
+            showWarning('Cannot analyze images added via URL');
+            return;
+        }
+
+        setAnalyzingVideoId(creative.id);
+        setAnalyzingProvider(provider === 'gemini' ? 'gemini' : 'haiku');
+        setProviderMenuId(null);
+        try {
+            const formData = new FormData();
+            formData.append('file', creative.file);
+
+            const response = await authFetch(`${API_URL}/video-analysis/analyze-image?provider=${provider}`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.detail || 'Image analysis failed');
+            }
+
+            const data = await response.json();
+            const newBodies = (data.bodies || []).filter(b => b && b.trim());
+            const newHeadlines = (data.headlines || []).filter(h => h && h.trim());
+
+            if (isPerCreative) {
+                // In per-creative mode, put copy on the specific creative
+                const idx = creativeData.creatives.findIndex(c => c.id === creative.id);
+                if (idx !== -1) {
+                    setCreativeData(prev => {
+                        const updated = [...prev.creatives];
+                        const existing = updated[idx];
+                        const existingBodies = (existing.bodies || []).filter(b => b && b.trim());
+                        const existingHeadlines = (existing.headlines || []).filter(h => h && h.trim());
+                        updated[idx] = {
+                            ...existing,
+                            bodies: [...existingBodies, ...newBodies].slice(0, 6),
+                            headlines: [...existingHeadlines, ...newHeadlines].slice(0, 6),
+                        };
+                        if (updated[idx].bodies.length === 0) updated[idx].bodies = [''];
+                        if (updated[idx].headlines.length === 0) updated[idx].headlines = [''];
+                        return { ...prev, creatives: updated };
+                    });
+                    setCurrentCreativeIndex(idx);
+                }
+            } else {
+                // Standard mode: merge into global copy fields
+                setCreativeData(prev => {
+                    const existingBodies = prev.bodies.filter(b => b && b.trim());
+                    const existingHeadlines = prev.headlines.filter(h => h && h.trim());
+                    const mergedBodies = [...existingBodies, ...newBodies].slice(0, 6);
+                    const mergedHeadlines = [...existingHeadlines, ...newHeadlines].slice(0, 6);
+                    if (mergedBodies.length === 0) mergedBodies.push('');
+                    if (mergedHeadlines.length === 0) mergedHeadlines.push('');
+                    return { ...prev, bodies: mergedBodies, headlines: mergedHeadlines };
+                });
+
+                if (selectedAdAccount) {
+                    const existingBodies = creativeData.bodies.filter(b => b && b.trim());
+                    const existingHeadlines = creativeData.headlines.filter(h => h && h.trim());
+                    localStorage.setItem(`defaultBodies_${selectedAdAccount.id}`, JSON.stringify([...existingBodies, ...newBodies].slice(0, 6)));
+                    localStorage.setItem(`defaultHeadlines_${selectedAdAccount.id}`, JSON.stringify([...existingHeadlines, ...newHeadlines].slice(0, 6)));
+                }
+            }
+
+            const providerName = provider === 'gemini' ? 'Gemini' : 'Claude Haiku';
+            showSuccess(`${providerName} ad copy generated (${newBodies.length} bodies, ${newHeadlines.length} headlines)`);
+        } catch (error) {
+            console.error('Image analysis error:', error);
+            showError(error.message || 'Failed to analyze image');
+        } finally {
+            setAnalyzingVideoId(null);
+            setAnalyzingProvider(null);
+        }
+    };
+
     const handleNext = () => {
         // Validate required fields
         if (!creativeData.creativeName) {
@@ -909,53 +987,79 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                                         )}
                                     </div>
                                     <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                                        {creative.mediaType === 'video' && (
-                                            <div className="relative">
-                                                <button
-                                                    onClick={() => setProviderMenuId(providerMenuId === creative.id ? null : creative.id)}
-                                                    disabled={analyzingVideoId !== null}
-                                                    className="p-2 bg-amber-500 text-white rounded-full hover:bg-amber-600 transform scale-90 hover:scale-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    title="Analyze video with AI"
-                                                >
-                                                    <Sparkles size={16} />
-                                                </button>
-                                                {providerMenuId === creative.id && (
-                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white rounded-lg shadow-xl border border-gray-200 py-1 w-52 z-50">
-                                                        <button
-                                                            onClick={() => handleAnalyzeVideo(creative, 'gemini')}
-                                                            className="w-full px-3 py-2 text-left text-sm hover:bg-amber-50 flex items-center gap-2"
-                                                        >
-                                                            <Sparkles size={14} className="text-amber-500" />
-                                                            <div>
-                                                                <div className="font-medium text-gray-800">Gemini 2.0 Flash</div>
-                                                                <div className="text-xs text-gray-500">Analyzes video + audio</div>
-                                                            </div>
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleAnalyzeVideo(creative, 'transcribe_haiku')}
-                                                            className="w-full px-3 py-2 text-left text-sm hover:bg-green-50 flex items-center gap-2"
-                                                        >
-                                                            <Sparkles size={14} className="text-green-500" />
-                                                            <div>
-                                                                <div className="font-medium text-gray-800">Transcribe + Haiku</div>
-                                                                <div className="text-xs text-gray-500">Gemini transcribes → Haiku writes copy</div>
-                                                            </div>
-                                                        </button>
-                                                        <div className="border-t border-gray-100 my-1"></div>
-                                                        <button
-                                                            onClick={() => handleAnalyzeVideo(creative, 'claude')}
-                                                            className="w-full px-3 py-2 text-left text-sm hover:bg-purple-50 flex items-center gap-2"
-                                                        >
-                                                            <Sparkles size={14} className="text-purple-500" />
-                                                            <div>
-                                                                <div className="font-medium text-gray-800">Claude Haiku</div>
-                                                                <div className="text-xs text-gray-500">Frames only (no audio)</div>
-                                                            </div>
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
+                                        {/* AI Analyze Button — works for both images and videos */}
+                                        <div className="relative">
+                                            <button
+                                                onClick={() => setProviderMenuId(providerMenuId === creative.id ? null : creative.id)}
+                                                disabled={analyzingVideoId !== null}
+                                                className="p-2 bg-amber-500 text-white rounded-full hover:bg-amber-600 transform scale-90 hover:scale-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                                title={`Generate ad copy with AI`}
+                                            >
+                                                <Sparkles size={16} />
+                                            </button>
+                                            {providerMenuId === creative.id && (
+                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white rounded-lg shadow-xl border border-gray-200 py-1 w-52 z-50">
+                                                    {creative.mediaType === 'video' ? (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleAnalyzeVideo(creative, 'gemini')}
+                                                                className="w-full px-3 py-2 text-left text-sm hover:bg-amber-50 flex items-center gap-2"
+                                                            >
+                                                                <Sparkles size={14} className="text-amber-500" />
+                                                                <div>
+                                                                    <div className="font-medium text-gray-800">Gemini 2.0 Flash</div>
+                                                                    <div className="text-xs text-gray-500">Analyzes video + audio</div>
+                                                                </div>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleAnalyzeVideo(creative, 'transcribe_haiku')}
+                                                                className="w-full px-3 py-2 text-left text-sm hover:bg-green-50 flex items-center gap-2"
+                                                            >
+                                                                <Sparkles size={14} className="text-green-500" />
+                                                                <div>
+                                                                    <div className="font-medium text-gray-800">Transcribe + Haiku</div>
+                                                                    <div className="text-xs text-gray-500">Gemini transcribes → Haiku writes copy</div>
+                                                                </div>
+                                                            </button>
+                                                            <div className="border-t border-gray-100 my-1"></div>
+                                                            <button
+                                                                onClick={() => handleAnalyzeVideo(creative, 'claude')}
+                                                                className="w-full px-3 py-2 text-left text-sm hover:bg-purple-50 flex items-center gap-2"
+                                                            >
+                                                                <Sparkles size={14} className="text-purple-500" />
+                                                                <div>
+                                                                    <div className="font-medium text-gray-800">Claude Haiku</div>
+                                                                    <div className="text-xs text-gray-500">Frames only (no audio)</div>
+                                                                </div>
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleAnalyzeImage(creative, 'haiku')}
+                                                                className="w-full px-3 py-2 text-left text-sm hover:bg-purple-50 flex items-center gap-2"
+                                                            >
+                                                                <Sparkles size={14} className="text-purple-500" />
+                                                                <div>
+                                                                    <div className="font-medium text-gray-800">Claude Haiku</div>
+                                                                    <div className="text-xs text-gray-500">Analyzes image + generates DR copy</div>
+                                                                </div>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleAnalyzeImage(creative, 'gemini')}
+                                                                className="w-full px-3 py-2 text-left text-sm hover:bg-amber-50 flex items-center gap-2"
+                                                            >
+                                                                <Sparkles size={14} className="text-amber-500" />
+                                                                <div>
+                                                                    <div className="font-medium text-gray-800">Gemini 2.0 Flash</div>
+                                                                    <div className="text-xs text-gray-500">Analyzes image + generates DR copy</div>
+                                                                </div>
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                         {creative.mediaType === 'video' && (
                                             <button
                                                 onClick={() => setPlayingVideo(creative)}
@@ -981,38 +1085,44 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                         </div>
                     )}
 
-                    {/* AI Video Analysis Loading Banner */}
+                    {/* AI Analysis Loading Banner */}
                     {analyzingVideoId && (
                         <div className={`flex items-center gap-3 ${
                             analyzingProvider === 'transcribe_haiku' ? 'bg-green-50 border-green-200'
-                            : analyzingProvider === 'claude' ? 'bg-purple-50 border-purple-200'
+                            : analyzingProvider === 'haiku' || analyzingProvider === 'claude' ? 'bg-purple-50 border-purple-200'
                             : 'bg-amber-50 border-amber-200'
                         } border rounded-lg p-4 mb-4`}>
                             <Loader className={`animate-spin ${
                                 analyzingProvider === 'transcribe_haiku' ? 'text-green-600'
-                                : analyzingProvider === 'claude' ? 'text-purple-600'
+                                : analyzingProvider === 'haiku' || analyzingProvider === 'claude' ? 'text-purple-600'
                                 : 'text-amber-600'
                             }`} size={20} />
                             <div>
                                 <p className={`${
                                     analyzingProvider === 'transcribe_haiku' ? 'text-green-800'
-                                    : analyzingProvider === 'claude' ? 'text-purple-800'
+                                    : analyzingProvider === 'haiku' || analyzingProvider === 'claude' ? 'text-purple-800'
                                     : 'text-amber-800'
                                 } font-medium`}>
                                     {analyzingProvider === 'transcribe_haiku'
                                         ? 'Transcribing audio + generating copy with Haiku...'
-                                        : `Analyzing video with ${analyzingProvider === 'claude' ? 'Claude Haiku' : 'Gemini 2.0 Flash'}...`}
+                                        : analyzingProvider === 'haiku'
+                                        ? 'Analyzing image with Claude Haiku...'
+                                        : analyzingProvider === 'claude'
+                                        ? 'Analyzing video with Claude Haiku...'
+                                        : 'Analyzing with Gemini 2.0 Flash...'}
                                 </p>
                                 <p className={`${
                                     analyzingProvider === 'transcribe_haiku' ? 'text-green-600'
-                                    : analyzingProvider === 'claude' ? 'text-purple-600'
+                                    : analyzingProvider === 'haiku' || analyzingProvider === 'claude' ? 'text-purple-600'
                                     : 'text-amber-600'
                                 } text-sm`}>
                                     {analyzingProvider === 'transcribe_haiku'
                                         ? 'Step 1: Gemini transcribes audio → Step 2: Haiku writes DR copy. This may take 60-90 seconds.'
+                                        : analyzingProvider === 'haiku'
+                                        ? 'Generating direct-response ad copy from your image. This may take 10-20 seconds.'
                                         : analyzingProvider === 'claude'
                                         ? 'Extracting key frames and generating ad copy. This may take 30-60 seconds.'
-                                        : 'Watching your video and generating ad copy. This may take 30-60 seconds.'}
+                                        : 'Generating ad copy. This may take 15-30 seconds.'}
                                 </p>
                             </div>
                         </div>

@@ -73,6 +73,41 @@ Rules:
 - If no audio/speech is detected, set transcript to "" and still fill in key_claims from any on-screen text
 - Return ONLY the JSON, no markdown formatting or code blocks"""
 
+IMAGE_ANALYSIS_PROMPT = """You are an elite direct-response copywriter who specializes in Facebook ads that CONVERT. You've studied the greats — Gary Halbert, Eugene Schwartz, David Ogilvy — and you write scroll-stopping copy that drives clicks and sales.
+
+Analyze this image carefully — pay attention to the product, the setting, any text overlays, branding, and the overall mood/vibe.
+
+Based on the image, generate high-converting Facebook ad copy using direct response and affiliate marketing principles. Return ONLY valid JSON with this exact structure:
+
+{
+  "bodies": [
+    "Primary text variation 1 — Problem-Agitate-Solve angle with a strong CTA",
+    "Primary text variation 2 — Curiosity hook with benefit-stacking",
+    "Primary text variation 3 — Social proof / story-driven with urgency"
+  ],
+  "headlines": [
+    "Headline 1 (under 40 chars, power words)",
+    "Headline 2 (benefit-driven, curiosity)",
+    "Headline 3 (urgency or fear of missing out)"
+  ],
+  "image_summary": "Brief 1-2 sentence summary of what the image shows"
+}
+
+DIRECT RESPONSE COPYWRITING RULES — follow these strictly:
+- Open with a pattern interrupt or curiosity hook that stops the scroll (e.g., "Wait — did you know...?" or a bold claim)
+- Use the Problem-Agitate-Solve framework: name the pain, twist the knife, present the product as the solution
+- Write in a conversational, first-person tone — like texting a friend, not writing an essay
+- Stack benefits, not features. Every feature must answer "so what?" for the reader
+- Use power words: "secret", "shocking", "finally", "free", "instant", "proven", "limited"
+- Create urgency: limited time, limited stock, exclusive access, "before it's gone"
+- End EVERY body copy with a clear, compelling CTA (e.g., "Tap the link before they sell out")
+- Headlines should be punchy, benefit-first, and create an open loop the reader MUST click to close
+- Each variation should take a genuinely different angle — don't just rephrase the same idea
+- If there's text in the image, incorporate key phrases, claims, or offers from it
+- Write like a top affiliate marketer: conversational, urgent, benefit-obsessed, action-oriented
+- Return ONLY the JSON, no markdown formatting or code blocks"""
+
+
 HAIKU_SYSTEM_PROMPT = """You are an elite direct-response copywriter for Facebook ads, specializing in affiliate marketing that needs to be profitable on the frontend FAST. You write for cold traffic — people who have never heard of this product — and your only job is to stop their scroll, hook them, and get the click.
 
 Your copy philosophy:
@@ -418,3 +453,93 @@ async def analyze_video(
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)
+
+
+@router.post("/analyze-image")
+async def analyze_image(
+    file: UploadFile = File(...),
+    provider: str = Query("haiku", pattern="^(haiku|gemini)$"),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Analyze an image with AI to generate ad copy suggestions.
+
+    provider: "haiku" (default) — uses Claude Haiku with vision
+              "gemini" — uses Gemini 2.0 Flash with vision
+    """
+    content_type = file.content_type or ""
+    if not content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    try:
+        image_data = await file.read()
+        image_b64 = base64.b64encode(image_data).decode("utf-8")
+
+        # Map content types
+        media_type = content_type
+        if media_type == "image/jpg":
+            media_type = "image/jpeg"
+
+        if provider == "gemini":
+            if not genai:
+                raise HTTPException(status_code=500, detail="google-genai not installed")
+            api_key = getattr(settings, "GEMINI_API_KEY", None) or os.environ.get("GEMINI_API_KEY")
+            if not api_key:
+                raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
+
+            client = genai.Client(api_key=api_key)
+            image_part = genai.types.Part.from_bytes(data=image_data, mime_type=media_type)
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=[image_part, IMAGE_ANALYSIS_PROMPT],
+            )
+            result = _parse_ai_response(response.text)
+        else:
+            # Claude Haiku
+            if not anthropic:
+                raise HTTPException(status_code=500, detail="anthropic package not installed")
+            api_key = getattr(settings, "ANTHROPIC_API_KEY", None) or os.environ.get("ANTHROPIC_API_KEY")
+            if not api_key:
+                raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured")
+
+            client = anthropic.Anthropic(api_key=api_key)
+            response = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=2000,
+                system=HAIKU_SYSTEM_PROMPT,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": media_type,
+                                "data": image_b64,
+                            },
+                        },
+                        {
+                            "type": "text",
+                            "text": IMAGE_ANALYSIS_PROMPT,
+                        },
+                    ],
+                }],
+            )
+            result = _parse_ai_response(response.content[0].text)
+
+        return {
+            "bodies": result.get("bodies", [])[:3],
+            "headlines": result.get("headlines", [])[:3],
+            "image_summary": result.get("image_summary", ""),
+            "provider": provider,
+        }
+
+    except json.JSONDecodeError as e:
+        print(f"[image_analysis] JSON parse error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to parse AI response as JSON")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[image_analysis] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
