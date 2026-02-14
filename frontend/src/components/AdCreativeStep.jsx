@@ -598,9 +598,15 @@ const AdCreativeStep = ({ onNext, onBack }) => {
             }
 
             const data = await response.json();
+            console.log('[handleAnalyzeVideo] API response:', JSON.stringify(data));
 
             const newBodies = (data.bodies || []).filter(b => b && b.trim());
             const newHeadlines = (data.headlines || []).filter(h => h && h.trim());
+
+            if (newBodies.length === 0 && newHeadlines.length === 0) {
+                showWarning('AI returned no ad copy. Try a different provider or re-upload the video.');
+                return;
+            }
 
             if (isPerCreative) {
                 // In per-creative mode, put copy on the specific creative

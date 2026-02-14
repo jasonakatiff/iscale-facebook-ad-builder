@@ -426,12 +426,15 @@ async def analyze_video(
             content = await file.read()
         else:
             # Download from URL server-side
+            print(f"[video_analysis] Downloading video from URL: {url[:100]}...")
             async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
                 resp = await client.get(url)
                 resp.raise_for_status()
             content = resp.content
+            resp_ct = resp.headers.get("content-type", "")
             ext = os.path.splitext(url.split("?")[0])[1] or ".mp4"
             suffix = ext
+            print(f"[video_analysis] Downloaded {len(content)} bytes, content-type: {resp_ct}, suffix: {suffix}")
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             tmp_path = tmp.name
@@ -452,9 +455,12 @@ async def analyze_video(
         else:
             result = await _analyze_with_gemini(tmp_path, filename, len(content))
 
+        bodies = result.get("bodies", [])[:3]
+        headlines = result.get("headlines", [])[:3]
+        print(f"[video_analysis] Final result — {len(bodies)} bodies, {len(headlines)} headlines")
         return {
-            "bodies": result["bodies"][:3],
-            "headlines": result["headlines"][:3],
+            "bodies": bodies,
+            "headlines": headlines,
             "video_summary": result.get("video_summary", ""),
             "provider": provider,
         }
