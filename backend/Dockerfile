@@ -8,6 +8,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
+    ffmpeg \
     # Playwright Chromium dependencies
     libnss3 \
     libnspr4 \

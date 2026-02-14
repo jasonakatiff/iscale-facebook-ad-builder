@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '../context/ToastContext';
 import { useBrands } from '../context/BrandContext';
-import { getLibraryItems, createLibraryItem, updateLibraryItem, deleteLibraryItem, uploadFile, getAiName, extractVideoThumbnail, detectAspectRatio } from '../api/adsLibrary';
+import { getLibraryItems, createLibraryItem, updateLibraryItem, deleteLibraryItem, uploadFile, getAiName, getVideoThumbnail, detectAspectRatio } from '../api/adsLibrary';
 import { Upload, Image, Video, Trash2, Pencil, X, Download, Play, FolderOpen, Loader2, Wand2, Layers, Plus, Filter, Sparkles } from 'lucide-react';
 import GenerateVideoModal from '../components/GenerateVideoModal';
 
@@ -204,32 +204,22 @@ const AdsLibrary = () => {
                 setUploadProgress(`Uploading ${file.name}...`);
                 const { url } = await uploadFile(file);
 
+                // Server-side thumbnail extraction via ffmpeg
                 let thumbnailUrl = null;
                 try {
-                    setUploadProgress(`Extracting thumbnail...`);
-                    const thumbBlob = await extractVideoThumbnail(file);
-                    const thumbFile = new File([thumbBlob], `thumb_${file.name.replace(/\.[^.]+$/, '.jpg')}`, { type: 'image/jpeg' });
-                    const thumbResult = await uploadFile(thumbFile);
-                    thumbnailUrl = thumbResult.url;
+                    setUploadProgress(`Extracting thumbnail (server)...`);
+                    const { thumbnail_url } = await getVideoThumbnail(url);
+                    thumbnailUrl = thumbnail_url;
                 } catch (e) {
-                    console.warn('Thumbnail extraction failed:', e?.message || e);
-                    setUploadProgress('Thumbnail extraction failed, continuing...');
+                    console.warn('Server thumbnail extraction failed:', e?.message || e);
                 }
 
-                let aiName = null;
-                if (thumbnailUrl) {
-                    try {
-                        setUploadProgress(`Naming with AI...`);
-                        const { name } = await getAiName(thumbnailUrl);
-                        aiName = name;
-                    } catch (e) {
-                        console.warn('AI naming failed:', e);
-                    }
-                }
+                // Videos just use filename, no AI naming
+                const videoName = file.name.replace(/\.[^.]+$/, '');
 
                 await createLibraryItem({
                     brand_id: uploadBrand,
-                    name: aiName || file.name.replace(/\.[^.]+$/, ''),
+                    name: videoName,
                     media_type: 'video',
                     media_url: url,
                     thumbnail_url: thumbnailUrl,

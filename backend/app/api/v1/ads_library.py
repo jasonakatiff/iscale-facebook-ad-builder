@@ -119,6 +119,70 @@ async def generate_ai_name(
         raise HTTPException(status_code=500, detail=f"AI naming failed: {str(e)}")
 
 
+class VideoThumbnailRequest(BaseModel):
+    video_url: str
+
+
+@router.post("/video-thumbnail")
+async def extract_video_thumbnail(
+    request: VideoThumbnailRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """Extract a thumbnail frame from a video URL using ffmpeg with direct URL streaming."""
+    import tempfile
+    import subprocess
+    import uuid
+
+    tmp_thumb_path = None
+    try:
+        # Use ffmpeg directly with the video URL (handles HTTP streaming/seeking)
+        tmp_thumb_path = tempfile.mktemp(suffix=".jpg")
+        result = subprocess.run([
+            "ffmpeg", "-y",
+            "-ss", "1",           # seek to 1 second (before -i for fast seek)
+            "-i", request.video_url,
+            "-vframes", "1",      # extract 1 frame
+            "-q:v", "3",          # quality (2-5, lower=better)
+            tmp_thumb_path
+        ], capture_output=True, timeout=30)
+
+        if result.returncode != 0 or not os.path.exists(tmp_thumb_path):
+            # Fallback: try at 0 seconds
+            result = subprocess.run([
+                "ffmpeg", "-y",
+                "-i", request.video_url,
+                "-vframes", "1",
+                "-q:v", "3",
+                tmp_thumb_path
+            ], capture_output=True, timeout=30)
+
+        if not os.path.exists(tmp_thumb_path) or os.path.getsize(tmp_thumb_path) < 1000:
+            stderr = result.stderr.decode() if result.stderr else "unknown error"
+            raise Exception(f"ffmpeg failed to extract frame: {stderr[-200:]}")
+
+        # Upload thumbnail to R2
+        with open(tmp_thumb_path, "rb") as f:
+            thumb_bytes = f.read()
+
+        filename = f"thumb_{uuid.uuid4()}.jpg"
+        if settings.r2_enabled:
+            from app.api.v1.uploads import upload_to_r2
+            thumb_url = await upload_to_r2(thumb_bytes, filename, "image/jpeg")
+        else:
+            from app.api.v1.uploads import upload_to_local
+            thumb_url = await upload_to_local(thumb_bytes, filename)
+
+        # Cleanup
+        os.unlink(tmp_thumb_path)
+
+        return {"thumbnail_url": thumb_url}
+
+    except Exception as e:
+        if tmp_thumb_path and os.path.exists(tmp_thumb_path):
+            os.unlink(tmp_thumb_path)
+        raise HTTPException(status_code=500, detail=f"Thumbnail extraction failed: {str(e)}")
+
+
 @router.post("", response_model=AdLibraryItemResponse)
 def create_item(
     item: AdLibraryItemCreate,

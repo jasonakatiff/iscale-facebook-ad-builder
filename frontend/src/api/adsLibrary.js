@@ -40,6 +40,11 @@ export const uploadFile = async (file) => {
     return response.data;
 };
 
+export const getVideoThumbnail = async (videoUrl) => {
+    const response = await axios.post(`${API_URL}/video-thumbnail`, { video_url: videoUrl }, { headers: authHeaders() });
+    return response.data;
+};
+
 export const getAiName = async (imageUrl) => {
     const response = await axios.post(`${API_URL}/ai-name`, { image_url: imageUrl }, { headers: authHeaders() });
     return response.data;
