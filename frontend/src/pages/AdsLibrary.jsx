@@ -868,23 +868,37 @@ const AdsLibrary = () => {
                             <X size={28} />
                         </button>
 
-                        {(() => {
-                            const isActualVideo = selectedItem.media_url?.match(/\.(mp4|webm|mov)(\?|$)/i);
-                            return isActualVideo ? (
+                        {selectedItem.media_type === 'video' ? (
+                            <div className="relative">
                                 <video
+                                    key={selectedItem.id}
                                     src={selectedItem.media_url}
                                     controls
                                     autoPlay
+                                    playsInline
+                                    poster={selectedItem.thumbnail_url || undefined}
                                     className="w-full rounded-lg max-h-[70vh] object-contain bg-black"
+                                    style={{ minHeight: '300px' }}
                                 />
-                            ) : (
-                                <img
-                                    src={selectedItem.media_url}
-                                    alt={selectedItem.name || 'Ad'}
-                                    className="w-full rounded-lg max-h-[70vh] object-contain bg-black"
-                                />
-                            );
-                        })()}
+                                <a
+                                    href={selectedItem.media_url}
+                                    download
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="absolute top-3 right-3 flex items-center gap-1 px-3 py-1.5 bg-white/90 text-gray-800 rounded-lg text-sm font-medium hover:bg-white transition-colors"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <Download size={14} />
+                                    Download
+                                </a>
+                            </div>
+                        ) : (
+                            <img
+                                src={selectedItem.media_url}
+                                alt={selectedItem.name || 'Ad'}
+                                className="w-full rounded-lg max-h-[70vh] object-contain bg-black"
+                            />
+                        )}
 
                         {/* Variant previews */}
                         {selectedItem.variants && Object.keys(selectedItem.variants).length > 1 && (
