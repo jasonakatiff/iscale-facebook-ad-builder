@@ -1,7 +1,11 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env.local first (overrides), then .env as fallback
+project_root = Path(__file__).parent.parent.parent.parent
+load_dotenv(project_root / ".env.local")
+load_dotenv(project_root / ".env")
 
 class Settings:
     PROJECT_NAME: str = "Facebook Ad Automation App"
@@ -28,9 +32,12 @@ class Settings:
     
     # External APIs
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    FAL_AI_API_KEY: str = os.getenv("FAL_AI_API_KEY", "")
+    ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
     KIE_AI_API_KEY: str = os.getenv("KIE_AI_API_KEY", "")
     FACEBOOK_ACCESS_TOKEN: str = os.getenv("FACEBOOK_ACCESS_TOKEN", "")
+
+    # Google Imagen 4 (image generation) - uses same GEMINI_API_KEY
+    IMAGEN_MODEL: str = os.getenv("IMAGEN_MODEL", "imagen-4.0-generate-001")
 
     # Auth settings - SECRET_KEY is required
     SECRET_KEY: str = os.getenv("SECRET_KEY", "")
@@ -52,8 +59,18 @@ class Settings:
     R2_PUBLIC_URL: str = os.getenv("R2_PUBLIC_URL", "")
 
     @property
+    def imagen_enabled(self) -> bool:
+        return bool(self.GEMINI_API_KEY)
+
+    @property
     def r2_enabled(self) -> bool:
-        return bool(self.R2_ACCOUNT_ID and self.R2_ACCESS_KEY_ID and self.R2_SECRET_ACCESS_KEY)
+        placeholders = {"", "your-r2-account-id", "your-r2-access-key-id", "your-r2-secret-access-key"}
+        return bool(
+            self.R2_ACCOUNT_ID and self.R2_ACCESS_KEY_ID and self.R2_SECRET_ACCESS_KEY
+            and self.R2_ACCOUNT_ID not in placeholders
+            and self.R2_ACCESS_KEY_ID not in placeholders
+            and self.R2_SECRET_ACCESS_KEY not in placeholders
+        )
 
     @property
     def r2_endpoint_url(self) -> str:

@@ -44,7 +44,7 @@ def read_profiles(
         "created_at": p.created_at
     } for p in profiles]
 
-@router.post("/", response_model=CustomerProfile)
+@router.post("", response_model=CustomerProfile)
 def create_profile(
     profile: CustomerProfileCreate,
     db: Session = Depends(get_db),

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../context/ToastContext';
 import { createBrandScrape, getBrandScrapes, getBrandScrape, deleteBrandScrape } from '../api/research';
-import { Search, Trash2, ChevronDown, ChevronRight, ExternalLink, Image, Video, Loader2, RefreshCw, X, Download, ChevronLeft, Play } from 'lucide-react';
+import { Search, Trash2, ChevronDown, ChevronRight, ExternalLink, Image, Video, Loader2, RefreshCw, X, Download, ChevronLeft, Wand2 } from 'lucide-react';
+import GenerateVideoModal from '../components/GenerateVideoModal';
 
 const BrandScrapes = () => {
     const { showSuccess, showError, showInfo } = useToast();
@@ -34,6 +35,24 @@ const BrandScrapes = () => {
     const [scrapeToDelete, setScrapeToDelete] = useState(null);
     const [selectedAd, setSelectedAd] = useState(null);
     const [mediaIndex, setMediaIndex] = useState(0);
+    const [videoGenImage, setVideoGenImage] = useState(null);
+
+    const handleDownload = async (url) => {
+        try {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = url.split('/').pop() || 'download';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(blobUrl);
+        } catch {
+            window.open(url, '_blank');
+        }
+    };
 
     useEffect(() => {
         fetchScrapes();
@@ -302,38 +321,19 @@ const BrandScrapes = () => {
                                                             onClick={() => { setSelectedAd(ad); setMediaIndex(0); }}
                                                         >
                                                             {ad.media_urls && ad.media_urls.length > 0 ? (
-                                                                ad.media_type === 'video' ? (
-                                                                    <>
-                                                                        <img
-                                                                            src={ad.media_urls[0]}
-                                                                            alt={ad.headline || 'Ad'}
-                                                                            className="w-full h-full object-cover"
-                                                                        />
-                                                                        <div className="absolute inset-0 flex items-center justify-center">
-                                                                            <div className="w-12 h-12 bg-black/60 rounded-full flex items-center justify-center group-hover:bg-black/80 transition-colors">
-                                                                                <Play size={24} className="text-white ml-1" fill="white" />
-                                                                            </div>
-                                                                        </div>
-                                                                    </>
-                                                                ) : (
-                                                                    <img
-                                                                        src={ad.media_urls[0]}
-                                                                        alt={ad.headline || 'Ad'}
-                                                                        className="w-full h-full object-cover"
-                                                                    />
-                                                                )
+                                                                <img
+                                                                    src={ad.media_urls[0]}
+                                                                    alt={ad.headline || 'Ad'}
+                                                                    className="w-full h-full object-cover"
+                                                                />
                                                             ) : (
                                                                 <div className="w-full h-full flex items-center justify-center text-gray-400">
                                                                     <Image size={32} />
                                                                 </div>
                                                             )}
                                                             {ad.media_type && (
-                                                                <span className="absolute top-2 right-2 px-2 py-0.5 bg-black/60 text-white text-xs rounded">
-                                                                    {ad.media_type === 'video' ? (
-                                                                        <Video size={12} className="inline mr-1" />
-                                                                    ) : (
-                                                                        <Image size={12} className="inline mr-1" />
-                                                                    )}
+                                                                <span className="absolute top-2 right-2 px-2 py-0.5 bg-black/60 text-white text-xs rounded flex items-center gap-1">
+                                                                    {ad.media_type === 'video' ? <Video size={12} /> : <Image size={12} />}
                                                                     {ad.media_type}
                                                                 </span>
                                                             )}
@@ -439,8 +439,8 @@ const BrandScrapes = () => {
                         {/* Main media display */}
                         {(() => {
                             const currentUrl = selectedAd.media_urls[mediaIndex];
-                            const isVideo = selectedAd.media_type === 'video' || currentUrl?.endsWith('.mp4');
-                            return isVideo ? (
+                            const isActualVideo = currentUrl?.match(/\.(mp4|webm|mov)(\?|$)/i);
+                            return isActualVideo ? (
                                 <video
                                     key={currentUrl}
                                     src={currentUrl}
@@ -495,7 +495,7 @@ const BrandScrapes = () => {
                             </div>
                         )}
 
-                        {/* Ad info + download */}
+                        {/* Ad info + actions */}
                         <div className="mt-4 bg-white/10 backdrop-blur rounded-lg p-4">
                             <div className="flex items-start justify-between gap-4">
                                 <div className="flex-1 min-w-0">
@@ -517,28 +517,39 @@ const BrandScrapes = () => {
                                         {selectedAd.start_date && (
                                             <span className="text-white/50 text-xs">{selectedAd.start_date}</span>
                                         )}
-                                        {selectedAd.ad_link && (
-                                            <a
-                                                href={selectedAd.ad_link}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-amber-400 hover:text-amber-300 text-xs flex items-center gap-1"
-                                            >
-                                                <ExternalLink size={12} /> View in Ad Library
-                                            </a>
-                                        )}
                                     </div>
                                 </div>
-                                <a
-                                    href={selectedAd.media_urls[mediaIndex]}
-                                    download
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors flex-shrink-0"
-                                >
-                                    <Download size={16} />
-                                    Download
-                                </a>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                    <button
+                                        onClick={() => {
+                                            setVideoGenImage(selectedAd.media_urls[mediaIndex]);
+                                            setSelectedAd(null);
+                                        }}
+                                        className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                                        title="Generate video from this image"
+                                    >
+                                        <Wand2 size={16} />
+                                        Generate Video
+                                    </button>
+                                    {selectedAd.ad_link && (
+                                        <a
+                                            href={selectedAd.ad_link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                                        >
+                                            <ExternalLink size={16} />
+                                            {selectedAd.media_type === 'video' ? 'Watch on Facebook' : 'View on Facebook'}
+                                        </a>
+                                    )}
+                                    <button
+                                        onClick={() => handleDownload(selectedAd.media_urls[mediaIndex])}
+                                        className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors"
+                                    >
+                                        <Download size={16} />
+                                        Download
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -574,6 +585,18 @@ const BrandScrapes = () => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Generate Video Modal */}
+            {videoGenImage && (
+                <GenerateVideoModal
+                    imageUrl={videoGenImage}
+                    onClose={() => setVideoGenImage(null)}
+                    onVideoReady={(videoUrl) => {
+                        showSuccess('Video saved! Check your Ads Library.');
+                        setVideoGenImage(null);
+                    }}
+                />
             )}
         </div>
     );

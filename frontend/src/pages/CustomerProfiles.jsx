@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useBrands } from '../context/BrandContext';
+import { useToast } from '../context/ToastContext';
 import CustomerProfileForm from '../components/CustomerProfileForm';
 import { Plus, Edit2, Trash2, Users, LayoutGrid, List, Search, UserCircle } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
 
 const CustomerProfiles = () => {
     const { customerProfiles, brands, addProfile, updateProfile, deleteProfile } = useBrands();
+    const { showSuccess, showError } = useToast();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingProfile, setEditingProfile] = useState(null);
     const [viewMode, setViewMode] = useState(localStorage.getItem('preferred_view_mode') || 'list');
@@ -27,14 +29,20 @@ const CustomerProfiles = () => {
         profile.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const handleSave = (profileData) => {
-        if (editingProfile) {
-            updateProfile(editingProfile.id, profileData);
-        } else {
-            addProfile(profileData);
+    const handleSave = async (profileData) => {
+        try {
+            if (editingProfile) {
+                await updateProfile(editingProfile.id, profileData);
+                showSuccess('Profile updated successfully');
+            } else {
+                await addProfile(profileData);
+                showSuccess('Profile created successfully');
+            }
+            setIsFormOpen(false);
+            setEditingProfile(null);
+        } catch (error) {
+            showError(error.message || 'Failed to save profile');
         }
-        setIsFormOpen(false);
-        setEditingProfile(null);
     };
 
     const handleEdit = (profile) => {

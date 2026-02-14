@@ -195,6 +195,32 @@ const AdAccountStep = ({ onNext }) => {
                             </div>
                         </div>
 
+                        {/* Balance */}
+                        {selectedAdAccount.balance && (
+                            <div className="flex items-start gap-3">
+                                <CreditCard className="text-gray-400 mt-0.5" size={18} />
+                                <div>
+                                    <div className="text-xs text-gray-500 font-medium">Balance</div>
+                                    <div className="text-sm font-semibold text-gray-900">
+                                        {formatCurrency(selectedAdAccount.balance, selectedAdAccount.currency) || '$0.00'}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Total Spent */}
+                        {selectedAdAccount.amountSpent && (
+                            <div className="flex items-start gap-3">
+                                <TrendingUp className="text-gray-400 mt-0.5" size={18} />
+                                <div>
+                                    <div className="text-xs text-gray-500 font-medium">Total Spent</div>
+                                    <div className="text-sm font-semibold text-gray-900">
+                                        {formatCurrency(selectedAdAccount.amountSpent, selectedAdAccount.currency) || '$0.00'}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Business Name - only if exists */}
                         {selectedAdAccount.businessName && (
                             <div className="col-span-2 flex items-start gap-3">

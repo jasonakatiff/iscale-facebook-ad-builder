@@ -115,134 +115,112 @@ from pathlib import Path
 from app.core.config import settings
 
 try:
-    import fal_client
+    from google import genai
+    from google.genai import types as genai_types
 except ImportError:
-    fal_client = None
+    genai = None
 
 # Setup uploads directory
 UPLOAD_DIR = Path(__file__).parent.parent.parent.parent / "uploads"
 UPLOAD_DIR = UPLOAD_DIR.resolve()
 os.makedirs(UPLOAD_DIR, mode=0o755, exist_ok=True)
 
-async def download_and_save_image(image_url: str, prefix: str = "generated") -> str:
-    """
-    Download image from external URL and save it locally.
-    Returns the local URL path.
-    """
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(image_url, timeout=30.0)
-            response.raise_for_status()
+# Map frontend aspect ratios from width/height to string format
+def get_aspect_ratio(width: int, height: int) -> str:
+    """Convert width/height to aspect ratio string for Imagen API."""
+    ratio_map = {
+        (1080, 1080): "1:1",
+        (1080, 1350): "3:4",
+        (1080, 1920): "9:16",
+        (1920, 1080): "16:9",
+    }
+    return ratio_map.get((width, height), "1:1")
 
-            # Generate unique filename
-            unique_id = str(uuid.uuid4())
-            filename = f"{prefix}_{unique_id}.png"
-            file_path = UPLOAD_DIR / filename
-
-            # Save image
-            with open(file_path, "wb") as f:
-                f.write(response.content)
-
-            # Return local URL
-            return f"/uploads/{filename}"
-    except Exception as e:
-        print(f"Error downloading image: {e}")
-        # Return original URL as fallback
-        return image_url
+def save_image_bytes(image_bytes: bytes, prefix: str = "generated") -> str:
+    """Save image bytes to local uploads directory. Returns the local URL path."""
+    unique_id = str(uuid.uuid4())
+    filename = f"{prefix}_{unique_id}.png"
+    file_path = UPLOAD_DIR / filename
+    with open(file_path, "wb") as f:
+        f.write(image_bytes)
+    return f"/uploads/{filename}"
 
 @router.post("/generate-image")
 async def generate_image(
     request: ImageGenerationRequest,
     current_user: User = Depends(require_permission("ads:write"))
 ):
-    """Generate ad images using Fal.ai (with mock fallback)"""
-    
+    """Generate ad images using Google Imagen 4 (with mock fallback)"""
+
     images = []
-    use_fal = settings.FAL_AI_API_KEY and fal_client
-    
-    if use_fal:
-        os.environ["FAL_KEY"] = settings.FAL_AI_API_KEY
-        print(f"Generating images with Fal.ai using key: {settings.FAL_AI_API_KEY[:5]}...")
-    
+    use_imagen = settings.imagen_enabled and genai
+
+    imagen_client = None
+    if use_imagen:
+        imagen_client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        print(f"Generating images with Imagen 4 using key: {settings.GEMINI_API_KEY[:8]}...")
+
     for i in range(request.count):
         for size in request.imageSizes:
             width = size.get('width', 1080)
             height = size.get('height', 1080)
             size_name = size.get('name', 'Square')
-            
+            aspect_ratio = size.get('aspectRatio') or get_aspect_ratio(width, height)
+
             # Build comprehensive prompt using old system logic
             prompt = build_comprehensive_prompt(request)
-            
+
             print(f"\n{'='*80}")
-            print(f"🎨 IMAGE GENERATION REQUEST")
+            print(f"IMAGE GENERATION REQUEST")
             print(f"{'='*80}")
-            print(f"📦 Brand: {request.brand.get('name') if request.brand else 'None'}")
-            print(f"📦 Product: {request.product.get('name') if request.product else 'None'}")
-            print(f"📦 Product Desc: {request.product.get('description') if request.product else 'None'}")
-            print(f"📦 Template Type: {request.template.get('type') if request.template else 'None'}")
-            print(f"📦 Copy Headline: {request.copy.get('headline') if request.copy else 'None'}")
-            print(f"\n📝 FULL GENERATED PROMPT:")
+            print(f"Brand: {request.brand.get('name') if request.brand else 'None'}")
+            print(f"Product: {request.product.get('name') if request.product else 'None'}")
+            print(f"Template Type: {request.template.get('type') if request.template else 'None'}")
+            print(f"Copy Headline: {request.copy.get('headline') if request.copy else 'None'}")
+            print(f"Size: {size_name} ({width}x{height}, aspect_ratio={aspect_ratio})")
+            print(f"\nFULL GENERATED PROMPT:")
             print(f"{prompt}")
             print(f"{'='*80}\n")
-            
-            if use_fal:
-                try:
-                    # Determine model and endpoint
-                    if request.useProductImage and request.productShots:
-                        # Use edit endpoint for image-to-image with product photo
-                        model_id = "fal-ai/nano-banana-pro/edit"
-                        print(f"Using product image: {request.productShots[0][:50]}...")
-                        
-                        arguments = {
-                            "prompt": prompt,
-                            "image_urls": request.productShots,
-                            "aspect_ratio": f"{width}:{height}",
-                            "output_format": "png"
-                        }
-                    else:
-                        # Standard text-to-image
-                        if request.model == "imagen4":
-                            model_id = "fal-ai/imagen4/preview"
-                            print(f"Using Imagen 4 model: {model_id}")
-                        else:
-                            model_id = "fal-ai/nano-banana-pro"
-                            print(f"Using Nano Banana Pro model: {model_id}")
-                        
-                        arguments = {
-                            "prompt": prompt,
-                            "image_size": {
-                                "width": width,
-                                "height": height
-                            }
-                        }
-                    
-                    # Submit to Fal.ai
-                    handler = await fal_client.submit_async(model_id, arguments=arguments)
-                    result = await handler.get()
-                    external_url = result['images'][0]['url']
 
-                    # Download and save image locally
-                    print(f"Downloading image from Fal.ai: {external_url[:50]}...")
-                    image_url = await download_and_save_image(external_url, prefix="generated")
-                    print(f"Saved locally as: {image_url}")
+            if use_imagen and imagen_client:
+                try:
+                    model = settings.IMAGEN_MODEL
+                    print(f"Calling Imagen 4: model={model}, aspect_ratio={aspect_ratio}")
+
+                    result = imagen_client.models.generate_images(
+                        model=model,
+                        prompt=prompt,
+                        config=genai_types.GenerateImagesConfig(
+                            number_of_images=1,
+                            aspect_ratio=aspect_ratio,
+                            person_generation="allow_adult",
+                        ),
+                    )
+
+                    if result.generated_images:
+                        image_bytes = result.generated_images[0].image.image_bytes
+                        image_url = save_image_bytes(image_bytes, prefix="generated")
+                        print(f"Saved locally as: {image_url}")
+                    else:
+                        print("Imagen returned no images")
+                        image_url = f"https://placehold.co/{width}x{height}/png?text=No+Image+Returned"
 
                 except Exception as e:
-                    print(f"Fal.ai generation failed: {e}")
-                    # Fallback to mock on error
-                    product_name = request.product.get('name', 'Product') if request.product else 'Product'
-                    image_url = f"https://placehold.co/{width}x{height}/png?text={product_name}+Error"
+                    print(f"Imagen generation failed: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    image_url = f"https://placehold.co/{width}x{height}/png?text=Generation+Error"
             else:
-                # Mock generation
-                product_name = request.product.get('name', 'Product') if request.product else 'Product'
-                image_url = f"https://placehold.co/{width}x{height}/png?text={product_name}+{i+1}"
-            
+                # Mock generation (no GEMINI_API_KEY configured)
+                image_url = f"https://placehold.co/{width}x{height}/png?text=No+AI+Key+Configured"
+
             images.append({
                 "url": image_url,
                 "size": size_name,
                 "dimensions": f"{width}x{height}",
                 "prompt": prompt
             })
-            
+
     return {"images": images}
 
 @router.get("/")
@@ -361,12 +339,20 @@ def batch_save_ads(
         existing = db.query(GeneratedAd).filter(GeneratedAd.id == ad_data.id).first()
         if existing:
             continue
-            
+
+        # Validate template_id exists in DB (style archetypes are frontend-only)
+        template_id = ad_data.templateId
+        if template_id:
+            from app.models import WinningAd
+            template_exists = db.query(WinningAd).filter(WinningAd.id == template_id).first()
+            if not template_exists:
+                template_id = None
+
         new_ad = GeneratedAd(
             id=ad_data.id,
             brand_id=ad_data.brandId,
             product_id=ad_data.productId,
-            template_id=ad_data.templateId,
+            template_id=template_id,
             image_url=ad_data.imageUrl,
             headline=ad_data.headline,
             body=ad_data.body,
@@ -389,4 +375,7 @@ def batch_save_ads(
         return {"message": f"Saved {len(saved_ads)} ads", "count": len(saved_ads)}
     except Exception as e:
         db.rollback()
+        import traceback
+        traceback.print_exc()
+        print(f"Batch save error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

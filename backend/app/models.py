@@ -478,3 +478,26 @@ class BrandScrapedAd(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     brand_scrape = relationship("BrandScrape", back_populates="ads")
+
+
+class AdLibraryItem(Base):
+    __tablename__ = "ad_library_items"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    brand_id = Column(String, ForeignKey("brands.id", ondelete="SET NULL"), nullable=True)
+    name = Column(String, nullable=True)
+    media_type = Column(String, nullable=False, default="image")  # 'image' or 'video'
+    media_url = Column(String, nullable=False)
+    thumbnail_url = Column(String, nullable=True)
+    file_size = Column(Integer, nullable=True)
+    headline = Column(String, nullable=True)
+    body = Column(Text, nullable=True)
+    cta = Column(String, nullable=True)
+    tags = Column(JSON, nullable=True)  # ["testimonial", "Q1"]
+    funnel_stage = Column(String, nullable=True)  # tofu, mofu, bofu
+    ad_format = Column(String, nullable=True)  # single_image, carousel, story, reel, ugc, testimonial
+    status = Column(String, nullable=False, default="draft")  # draft, ready, active, archived
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    brand = relationship("Brand")

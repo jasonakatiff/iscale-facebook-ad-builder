@@ -330,6 +330,30 @@ class BrandScraperService:
                                 }
                             });
 
+                            // Extract start date - try multiple patterns
+                            let startDate = null;
+                            // Pattern 1: "Started running on Feb 4, 2026"
+                            let dateMatch = text.match(/Started running on\\s+(.+?)(?:\\n|$)/);
+                            if (!dateMatch) {
+                                // Pattern 2: "Active since ..."
+                                dateMatch = text.match(/Active since\\s+(.+?)(?:\\n|$)/);
+                            }
+                            if (!dateMatch) {
+                                // Pattern 3: Look for month day, year pattern near end of text
+                                dateMatch = text.match(/((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\s+\\d{1,2},?\\s+\\d{4})(?:\\n|$)/);
+                            }
+                            if (!dateMatch) {
+                                // Pattern 4: ISO-ish date YYYY-MM-DD
+                                dateMatch = text.match(/(\\d{4}-\\d{2}-\\d{2})/);
+                            }
+                            if (dateMatch) startDate = dateMatch[1].trim();
+
+                            // Debug: log first ad's text around date area
+                            if (results.length === 0) {
+                                const last200 = text.slice(-200);
+                                console.log('DEBUG date extraction - last 200 chars of first ad text:', last200);
+                            }
+
                             // Check if this ad has a video
                             const hasVideo = div.querySelector('video') !== null ||
                                            text.match(/\\d+:\\d+/) !== null;
@@ -341,6 +365,7 @@ class BrandScraperService:
                                 ad_creative_link_titles: headline ? [headline] : null,
                                 ad_creative_bodies: adCopy ? [adCopy] : null,
                                 ad_creative_link_captions: ctaText ? [ctaText] : null,
+                                ad_delivery_start_time: startDate,
                                 _image_urls: imageUrls,
                                 _has_video: hasVideo
                             });
@@ -351,6 +376,12 @@ class BrandScraperService:
                 """)
 
                 print(f"Playwright extracted {len(ads)} ads, captured {len(captured_images)} images and {len(captured_videos)} videos from network")
+
+                # Debug: show date extraction results
+                dates_found = sum(1 for ad in ads if ad.get('ad_delivery_start_time'))
+                print(f"Dates extracted: {dates_found}/{len(ads)} ads have start dates")
+                if ads and not ads[0].get('ad_delivery_start_time'):
+                    print(f"DEBUG: First ad keys: {list(ads[0].keys()) if ads else 'none'}")
 
                 # Log image URL stats
                 total_img_urls = sum(len(ad.get('_image_urls', [])) for ad in ads)

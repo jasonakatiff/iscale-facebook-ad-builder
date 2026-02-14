@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useBrands } from '../context/BrandContext';
+import { useToast } from '../context/ToastContext';
 import BrandForm from '../components/BrandForm';
 import { Plus, Edit2, Trash2, Briefcase, LayoutGrid, List } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
 
 const Brands = () => {
     const { brands, addBrand, updateBrand, deleteBrand } = useBrands();
+    const { showSuccess, showError } = useToast();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingBrand, setEditingBrand] = useState(null);
     const [viewMode, setViewMode] = useState(localStorage.getItem('preferred_view_mode') || 'list'); // 'list' or 'grid'
@@ -17,14 +19,20 @@ const Brands = () => {
 
     const [brandToDelete, setBrandToDelete] = useState(null);
 
-    const handleSave = (brandData) => {
-        if (editingBrand) {
-            updateBrand(editingBrand.id, brandData);
-        } else {
-            addBrand(brandData);
+    const handleSave = async (brandData) => {
+        try {
+            if (editingBrand) {
+                await updateBrand(editingBrand.id, brandData);
+                showSuccess('Brand updated successfully');
+            } else {
+                await addBrand(brandData);
+                showSuccess('Brand created successfully');
+            }
+            setIsFormOpen(false);
+            setEditingBrand(null);
+        } catch (error) {
+            showError(error.message || 'Failed to save brand');
         }
-        setIsFormOpen(false);
-        setEditingBrand(null);
     };
 
     const handleEdit = (brand) => {

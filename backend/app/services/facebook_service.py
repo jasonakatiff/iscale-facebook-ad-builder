@@ -54,21 +54,34 @@ class FacebookService:
 
 
     def get_ad_accounts(self):
-        """Fetch all ad accounts for the current user."""
+        """Fetch all ad accounts for the current user or system user."""
         if not self.api:
-            # Try to initialize if not already done
             self.initialize()
-        
-        # Use the SDK's User object to fetch ad accounts
+
+        # First try /me/adaccounts (works for user tokens)
         print("Fetching ad accounts for user 'me'...")
         try:
             me = User(fbid='me', api=self.api)
             my_accounts = me.get_ad_accounts(fields=['id', 'name', 'account_id', 'account_status', 'currency', 'balance', 'amount_spent'])
-            print(f"Found {len(my_accounts)} accounts.")
-            return [dict(acc) for acc in my_accounts]
+            if len(my_accounts) > 0:
+                print(f"Found {len(my_accounts)} accounts.")
+                return [dict(acc) for acc in my_accounts]
+            print("/me/adaccounts returned 0 accounts, falling back to direct account lookup...")
         except Exception as e:
-            print(f"Error fetching ad accounts: {e}")
-            raise e
+            print(f"/me/adaccounts failed ({e}), falling back to direct account lookup...")
+
+        # Fallback for system user tokens: query the configured ad account directly
+        if self.account:
+            try:
+                fields = ['id', 'name', 'account_id', 'account_status', 'currency', 'balance', 'amount_spent']
+                account_data = self.account.api_get(fields=fields)
+                print(f"Found configured account: {account_data.get('name')}")
+                return [dict(account_data)]
+            except Exception as e2:
+                print(f"Direct account lookup also failed: {e2}")
+                raise e2
+
+        raise Exception("No ad accounts found and no default account configured.")
 
     def _get_account(self, ad_account_id=None):
         """Helper to get AdAccount object."""

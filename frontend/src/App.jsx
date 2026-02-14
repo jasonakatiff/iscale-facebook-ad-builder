@@ -34,6 +34,7 @@ import AdRemix from './pages/AdRemix';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import UserManagement from './pages/UserManagement';
+import AdsLibrary from './pages/AdsLibrary';
 
 function App() {
   return (
@@ -65,6 +66,7 @@ function App() {
                   <Route path="facebook-campaigns" element={<FacebookCampaigns />} />
                   <Route path="winning-ads" element={<WinningAds />} />
                   <Route path="generated-ads" element={<GeneratedAds />} />
+                  <Route path="ads-library" element={<AdsLibrary />} />
                   <Route path="brands" element={<Brands />} />
                   <Route path="products" element={<Products />} />
                   <Route path="profiles" element={<CustomerProfiles />} />

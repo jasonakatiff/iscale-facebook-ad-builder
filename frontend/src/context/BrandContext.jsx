@@ -79,11 +79,16 @@ export const BrandProvider = ({ children }) => {
                 id: crypto.randomUUID()
             };
 
-            await authFetch(`${API_URL}/brands`, {
+            const response = await authFetch(`${API_URL}/brands`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newBrand)
             });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Failed to create brand (${response.status})`);
+            }
 
             await loadData();
         } catch (error) {
@@ -94,11 +99,16 @@ export const BrandProvider = ({ children }) => {
 
     const updateBrand = async (id, updatedBrand) => {
         try {
-            await authFetch(`${API_URL}/brands/${id}`, {
+            const response = await authFetch(`${API_URL}/brands/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updatedBrand)
             });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Failed to update brand (${response.status})`);
+            }
 
             await loadData();
         } catch (error) {
@@ -180,11 +190,16 @@ export const BrandProvider = ({ children }) => {
                 id: crypto.randomUUID()
             };
 
-            await authFetch(`${API_URL}/profiles`, {
+            const response = await authFetch(`${API_URL}/profiles`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newProfile)
             });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Failed to create profile (${response.status})`);
+            }
 
             await loadData();
             return newProfile;
@@ -196,11 +211,16 @@ export const BrandProvider = ({ children }) => {
 
     const updateProfile = async (id, updatedProfile) => {
         try {
-            await authFetch(`${API_URL}/profiles/${id}`, {
+            const response = await authFetch(`${API_URL}/profiles/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updatedProfile)
             });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Failed to update profile (${response.status})`);
+            }
 
             await loadData();
         } catch (error) {
