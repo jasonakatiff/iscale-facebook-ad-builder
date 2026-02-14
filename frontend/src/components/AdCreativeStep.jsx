@@ -602,26 +602,45 @@ const AdCreativeStep = ({ onNext, onBack }) => {
             const newBodies = (data.bodies || []).filter(b => b && b.trim());
             const newHeadlines = (data.headlines || []).filter(h => h && h.trim());
 
-            setCreativeData(prev => {
-                // Keep existing non-empty entries, append new ones, cap at 6
-                const existingBodies = prev.bodies.filter(b => b && b.trim());
-                const existingHeadlines = prev.headlines.filter(h => h && h.trim());
-                const mergedBodies = [...existingBodies, ...newBodies].slice(0, 6);
-                const mergedHeadlines = [...existingHeadlines, ...newHeadlines].slice(0, 6);
-                // Ensure at least 1 slot
-                if (mergedBodies.length === 0) mergedBodies.push('');
-                if (mergedHeadlines.length === 0) mergedHeadlines.push('');
-                return { ...prev, bodies: mergedBodies, headlines: mergedHeadlines };
-            });
+            if (isPerCreative) {
+                // In per-creative mode, put copy on the specific creative
+                const idx = creativeData.creatives.findIndex(c => c.id === creative.id);
+                if (idx !== -1) {
+                    setCreativeData(prev => {
+                        const updated = [...prev.creatives];
+                        const existing = updated[idx];
+                        const existingBodies = (existing.bodies || []).filter(b => b && b.trim());
+                        const existingHeadlines = (existing.headlines || []).filter(h => h && h.trim());
+                        updated[idx] = {
+                            ...existing,
+                            bodies: [...existingBodies, ...newBodies].slice(0, 6),
+                            headlines: [...existingHeadlines, ...newHeadlines].slice(0, 6),
+                        };
+                        if (updated[idx].bodies.length === 0) updated[idx].bodies = [''];
+                        if (updated[idx].headlines.length === 0) updated[idx].headlines = [''];
+                        return { ...prev, creatives: updated };
+                    });
+                    setCurrentCreativeIndex(idx);
+                }
+            } else {
+                setCreativeData(prev => {
+                    const existingBodies = prev.bodies.filter(b => b && b.trim());
+                    const existingHeadlines = prev.headlines.filter(h => h && h.trim());
+                    const mergedBodies = [...existingBodies, ...newBodies].slice(0, 6);
+                    const mergedHeadlines = [...existingHeadlines, ...newHeadlines].slice(0, 6);
+                    if (mergedBodies.length === 0) mergedBodies.push('');
+                    if (mergedHeadlines.length === 0) mergedHeadlines.push('');
+                    return { ...prev, bodies: mergedBodies, headlines: mergedHeadlines };
+                });
 
-            // Persist merged results to localStorage
-            if (selectedAdAccount) {
-                const existingBodies = creativeData.bodies.filter(b => b && b.trim());
-                const existingHeadlines = creativeData.headlines.filter(h => h && h.trim());
-                const allBodies = [...existingBodies, ...newBodies].slice(0, 6);
-                const allHeadlines = [...existingHeadlines, ...newHeadlines].slice(0, 6);
-                localStorage.setItem(`defaultBodies_${selectedAdAccount.id}`, JSON.stringify(allBodies));
-                localStorage.setItem(`defaultHeadlines_${selectedAdAccount.id}`, JSON.stringify(allHeadlines));
+                if (selectedAdAccount) {
+                    const existingBodies = creativeData.bodies.filter(b => b && b.trim());
+                    const existingHeadlines = creativeData.headlines.filter(h => h && h.trim());
+                    const allBodies = [...existingBodies, ...newBodies].slice(0, 6);
+                    const allHeadlines = [...existingHeadlines, ...newHeadlines].slice(0, 6);
+                    localStorage.setItem(`defaultBodies_${selectedAdAccount.id}`, JSON.stringify(allBodies));
+                    localStorage.setItem(`defaultHeadlines_${selectedAdAccount.id}`, JSON.stringify(allHeadlines));
+                }
             }
 
             const providerName = provider === 'transcribe_haiku' ? 'Transcribe + Haiku' : provider === 'claude' ? 'Claude Haiku' : 'Gemini';
