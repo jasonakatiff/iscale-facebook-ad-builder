@@ -73,78 +73,7 @@ def get_stats(
     return {"total": total, "images": images, "videos": videos}
 
 
-@router.get("/{item_id}", response_model=AdLibraryItemResponse)
-def get_item(
-    item_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-):
-    item = db.query(AdLibraryItem).filter(AdLibraryItem.id == item_id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
-    return _to_response(item)
-
-
-@router.post("", response_model=AdLibraryItemResponse)
-def create_item(
-    item: AdLibraryItemCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-):
-    db_item = AdLibraryItem(**item.dict())
-    db.add(db_item)
-    db.commit()
-    db.refresh(db_item)
-    return _to_response(db_item)
-
-
-@router.put("/{item_id}", response_model=AdLibraryItemResponse)
-def update_item(
-    item_id: str,
-    item: AdLibraryItemUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-):
-    db_item = db.query(AdLibraryItem).filter(AdLibraryItem.id == item_id).first()
-    if not db_item:
-        raise HTTPException(status_code=404, detail="Item not found")
-    for key, value in item.dict(exclude_unset=True).items():
-        setattr(db_item, key, value)
-    db.commit()
-    db.refresh(db_item)
-    return _to_response(db_item)
-
-
-@router.delete("/{item_id}")
-def delete_item(
-    item_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-):
-    db_item = db.query(AdLibraryItem).filter(AdLibraryItem.id == item_id).first()
-    if not db_item:
-        raise HTTPException(status_code=404, detail="Item not found")
-
-    # Delete from R2 if configured
-    if settings.r2_enabled and db_item.media_url and settings.R2_PUBLIC_URL in db_item.media_url:
-        try:
-            import boto3
-            s3_client = boto3.client(
-                's3',
-                endpoint_url=settings.r2_endpoint_url,
-                aws_access_key_id=settings.R2_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
-                region_name='auto'
-            )
-            key = db_item.media_url.replace(f"{settings.R2_PUBLIC_URL}/", "")
-            s3_client.delete_object(Bucket=settings.R2_BUCKET_NAME, Key=key)
-        except Exception as e:
-            print(f"Error deleting from R2: {e}")
-
-    db.delete(db_item)
-    db.commit()
-    return {"message": "Item deleted"}
-
+# --- Static POST routes MUST come before /{item_id} routes ---
 
 class AiNameRequest(BaseModel):
     image_url: str
@@ -188,3 +117,79 @@ async def generate_ai_name(
         return {"name": name}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI naming failed: {str(e)}")
+
+
+@router.post("", response_model=AdLibraryItemResponse)
+def create_item(
+    item: AdLibraryItemCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    data = item.model_dump()
+    db_item = AdLibraryItem(**data)
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return _to_response(db_item)
+
+
+# --- Parameterized routes ---
+
+@router.get("/{item_id}", response_model=AdLibraryItemResponse)
+def get_item(
+    item_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    item = db.query(AdLibraryItem).filter(AdLibraryItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return _to_response(item)
+
+
+@router.put("/{item_id}", response_model=AdLibraryItemResponse)
+def update_item(
+    item_id: str,
+    item: AdLibraryItemUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    db_item = db.query(AdLibraryItem).filter(AdLibraryItem.id == item_id).first()
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    for key, value in item.model_dump(exclude_unset=True).items():
+        setattr(db_item, key, value)
+    db.commit()
+    db.refresh(db_item)
+    return _to_response(db_item)
+
+
+@router.delete("/{item_id}")
+def delete_item(
+    item_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    db_item = db.query(AdLibraryItem).filter(AdLibraryItem.id == item_id).first()
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    # Delete from R2 if configured
+    if settings.r2_enabled and db_item.media_url and settings.R2_PUBLIC_URL in db_item.media_url:
+        try:
+            import boto3
+            s3_client = boto3.client(
+                's3',
+                endpoint_url=settings.r2_endpoint_url,
+                aws_access_key_id=settings.R2_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
+                region_name='auto'
+            )
+            key = db_item.media_url.replace(f"{settings.R2_PUBLIC_URL}/", "")
+            s3_client.delete_object(Bucket=settings.R2_BUCKET_NAME, Key=key)
+        except Exception as e:
+            print(f"Error deleting from R2: {e}")
+
+    db.delete(db_item)
+    db.commit()
+    return {"message": "Item deleted"}
