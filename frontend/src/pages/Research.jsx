@@ -878,25 +878,36 @@ const Research = () => {
                                 ← Back to Searches
                             </button>
                             <h2 className="text-2xl font-bold text-gray-800">
-                                {selectedVertical.name} - All Ads
+                                {selectedSearch
+                                    ? `"${selectedSearch.query}" in ${selectedSearch.country || 'US'}`
+                                    : `${selectedVertical.name} - All Ads`}
                             </h2>
                             <p className="text-gray-600 mt-1">
-                                Grouped by page
+                                {selectedSearch
+                                    ? `${selectedSearch.ads?.length || 0} ads • Grouped by page`
+                                    : 'Grouped by page'}
                             </p>
                         </div>
                     </div>
 
                     {(() => {
-                        // Get all ads from all searches in this vertical
-                        const allAds = savedSearches
-                            .filter(s => s.vertical_id === selectedVertical.id)
-                            .flatMap(search =>
-                                (search.ads || []).map(ad => ({
-                                    ...ad,
-                                    searchQuery: search.query,
-                                    searchId: search.id
-                                }))
-                            );
+                        // If viewing a specific search, use only that search's ads
+                        // Otherwise, aggregate all searches in the vertical
+                        const allAds = selectedSearch
+                            ? (selectedSearch.ads || []).map(ad => ({
+                                ...ad,
+                                searchQuery: selectedSearch.query,
+                                searchId: selectedSearch.id
+                            }))
+                            : savedSearches
+                                .filter(s => s.vertical_id === selectedVertical.id)
+                                .flatMap(search =>
+                                    (search.ads || []).map(ad => ({
+                                        ...ad,
+                                        searchQuery: search.query,
+                                        searchId: search.id
+                                    }))
+                                );
 
                         // Filter out blacklisted pages
                         const blacklistedPageNames = blacklist.map(b => b.page_name.toLowerCase());
