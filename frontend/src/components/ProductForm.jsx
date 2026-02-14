@@ -50,11 +50,9 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
         }
     };
 
-    const handleFileUpload = async (e) => {
-        const files = Array.from(e.target.files);
+    const uploadFiles = async (files) => {
         if (files.length === 0) return;
 
-        // Client-side validation
         for (const file of files) {
             if (!ALLOWED_TYPES.includes(file.type)) {
                 showError(`Invalid file type: ${file.name}. Allowed types: JPEG, PNG, GIF, WebP`);
@@ -100,6 +98,31 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
+
+    const handleFileUpload = (e) => {
+        uploadFiles(Array.from(e.target.files));
+    };
+
+    // Paste from clipboard
+    React.useEffect(() => {
+        const handlePaste = (e) => {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+            const imageFiles = [];
+            for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                    const file = item.getAsFile();
+                    if (file) imageFiles.push(file);
+                }
+            }
+            if (imageFiles.length > 0) {
+                e.preventDefault();
+                uploadFiles(imageFiles);
+            }
+        };
+        document.addEventListener('paste', handlePaste);
+        return () => document.removeEventListener('paste', handlePaste);
+    }, [uploading]);
 
     const removeShot = (index) => {
         setFormData(prev => ({
@@ -198,7 +221,7 @@ const ProductForm = ({ onClose, onSave, initialData = null }) => {
                             onChange={handleFileUpload}
                             className="hidden"
                         />
-                        <p className="text-xs text-gray-500">Upload product images to use in ad generation.</p>
+                        <p className="text-xs text-gray-500">Upload or paste (Ctrl+V) product images to use in ad generation.</p>
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
