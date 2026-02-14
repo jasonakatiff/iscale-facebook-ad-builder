@@ -100,6 +100,21 @@ async def startup_event():
     Base.metadata.create_all(bind=engine)
     print("✅ Database tables synced")
 
+    # Add missing columns to existing tables (create_all won't ALTER)
+    with engine.connect() as conn:
+        # Add folder_id to ad_library_items if missing
+        result = conn.execute(text("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'ad_library_items' AND column_name = 'folder_id'
+        """))
+        if not result.fetchone():
+            conn.execute(text("""
+                ALTER TABLE ad_library_items
+                ADD COLUMN folder_id VARCHAR REFERENCES ad_library_folders(id) ON DELETE SET NULL
+            """))
+            conn.commit()
+            print("✅ Added folder_id column to ad_library_items")
+
 
 # Include Routers
 from app.api.v1 import brands, products, research, generated_ads, templates, facebook, uploads, dashboard, copy_generation, profiles, ad_remix, prompts, ad_styles, auth, users, video_analysis, ads_library, higgsfield, headlines
