@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../context/ToastContext';
 import { createBrandScrape, getBrandScrapes, getBrandScrape, deleteBrandScrape } from '../api/research';
-import { Search, Trash2, ChevronDown, ChevronRight, ExternalLink, Image, Video, Loader2, RefreshCw } from 'lucide-react';
+import { Search, Trash2, ChevronDown, ChevronRight, ExternalLink, Image, Video, Loader2, RefreshCw, X, Download, ChevronLeft, Play } from 'lucide-react';
 
 const BrandScrapes = () => {
     const { showSuccess, showError, showInfo } = useToast();
@@ -32,6 +32,8 @@ const BrandScrapes = () => {
     const [scrapeDetails, setScrapeDetails] = useState(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [scrapeToDelete, setScrapeToDelete] = useState(null);
+    const [selectedAd, setSelectedAd] = useState(null);
+    const [mediaIndex, setMediaIndex] = useState(0);
 
     useEffect(() => {
         fetchScrapes();
@@ -295,14 +297,24 @@ const BrandScrapes = () => {
                                                         className="bg-white rounded-lg border border-amber-200 overflow-hidden"
                                                     >
                                                         {/* Media Preview */}
-                                                        <div className="aspect-video bg-gray-100 relative">
+                                                        <div
+                                                            className="aspect-video bg-gray-100 relative cursor-pointer group"
+                                                            onClick={() => { setSelectedAd(ad); setMediaIndex(0); }}
+                                                        >
                                                             {ad.media_urls && ad.media_urls.length > 0 ? (
                                                                 ad.media_type === 'video' ? (
-                                                                    <video
-                                                                        src={ad.media_urls[0]}
-                                                                        className="w-full h-full object-cover"
-                                                                        controls
-                                                                    />
+                                                                    <>
+                                                                        <img
+                                                                            src={ad.media_urls[0]}
+                                                                            alt={ad.headline || 'Ad'}
+                                                                            className="w-full h-full object-cover"
+                                                                        />
+                                                                        <div className="absolute inset-0 flex items-center justify-center">
+                                                                            <div className="w-12 h-12 bg-black/60 rounded-full flex items-center justify-center group-hover:bg-black/80 transition-colors">
+                                                                                <Play size={24} className="text-white ml-1" fill="white" />
+                                                                            </div>
+                                                                        </div>
+                                                                    </>
                                                                 ) : (
                                                                     <img
                                                                         src={ad.media_urls[0]}
@@ -408,6 +420,130 @@ const BrandScrapes = () => {
                     </div>
                 )}
             </div>
+
+            {/* Media Viewer Modal */}
+            {selectedAd && selectedAd.media_urls && selectedAd.media_urls.length > 0 && (
+                <div
+                    className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+                    onClick={() => setSelectedAd(null)}
+                >
+                    <div className="relative w-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
+                        {/* Close button */}
+                        <button
+                            onClick={() => setSelectedAd(null)}
+                            className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors z-10"
+                        >
+                            <X size={28} />
+                        </button>
+
+                        {/* Main media display */}
+                        {(() => {
+                            const currentUrl = selectedAd.media_urls[mediaIndex];
+                            const isVideo = selectedAd.media_type === 'video' || currentUrl?.endsWith('.mp4');
+                            return isVideo ? (
+                                <video
+                                    key={currentUrl}
+                                    src={currentUrl}
+                                    controls
+                                    autoPlay
+                                    className="w-full rounded-lg max-h-[70vh] object-contain bg-black"
+                                />
+                            ) : (
+                                <img
+                                    src={currentUrl}
+                                    alt={selectedAd.headline || 'Ad'}
+                                    className="w-full rounded-lg max-h-[70vh] object-contain bg-black"
+                                />
+                            );
+                        })()}
+
+                        {/* Carousel navigation */}
+                        {selectedAd.media_urls.length > 1 && (
+                            <>
+                                <button
+                                    onClick={() => setMediaIndex((mediaIndex - 1 + selectedAd.media_urls.length) % selectedAd.media_urls.length)}
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-colors"
+                                >
+                                    <ChevronLeft size={24} />
+                                </button>
+                                <button
+                                    onClick={() => setMediaIndex((mediaIndex + 1) % selectedAd.media_urls.length)}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-colors"
+                                >
+                                    <ChevronRight size={24} />
+                                </button>
+                                <div className="text-center text-white/70 text-sm mt-2">
+                                    {mediaIndex + 1} of {selectedAd.media_urls.length}
+                                </div>
+                            </>
+                        )}
+
+                        {/* Thumbnail strip for multiple media */}
+                        {selectedAd.media_urls.length > 1 && (
+                            <div className="flex gap-2 mt-3 justify-center overflow-x-auto">
+                                {selectedAd.media_urls.map((url, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => setMediaIndex(i)}
+                                        className={`w-16 h-12 rounded overflow-hidden flex-shrink-0 border-2 transition-colors ${
+                                            i === mediaIndex ? 'border-amber-500' : 'border-transparent opacity-60 hover:opacity-100'
+                                        }`}
+                                    >
+                                        <img src={url} alt="" className="w-full h-full object-cover" />
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Ad info + download */}
+                        <div className="mt-4 bg-white/10 backdrop-blur rounded-lg p-4">
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1 min-w-0">
+                                    {selectedAd.page_name && (
+                                        <p className="text-amber-400 text-sm font-medium">{selectedAd.page_name}</p>
+                                    )}
+                                    {selectedAd.headline && (
+                                        <p className="text-white font-medium mt-1">{selectedAd.headline}</p>
+                                    )}
+                                    {selectedAd.ad_copy && (
+                                        <p className="text-white/70 text-sm mt-1">{selectedAd.ad_copy}</p>
+                                    )}
+                                    <div className="flex items-center gap-3 mt-2">
+                                        {selectedAd.cta_text && (
+                                            <span className="px-2 py-0.5 text-xs bg-amber-500/20 text-amber-300 rounded">
+                                                {selectedAd.cta_text}
+                                            </span>
+                                        )}
+                                        {selectedAd.start_date && (
+                                            <span className="text-white/50 text-xs">{selectedAd.start_date}</span>
+                                        )}
+                                        {selectedAd.ad_link && (
+                                            <a
+                                                href={selectedAd.ad_link}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-amber-400 hover:text-amber-300 text-xs flex items-center gap-1"
+                                            >
+                                                <ExternalLink size={12} /> View in Ad Library
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
+                                <a
+                                    href={selectedAd.media_urls[mediaIndex]}
+                                    download
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors flex-shrink-0"
+                                >
+                                    <Download size={16} />
+                                    Download
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Delete Confirmation Modal */}
             {showDeleteModal && scrapeToDelete && (

@@ -172,6 +172,7 @@ class BrandScraperService:
 
         ads = []
         captured_images = {}  # url -> bytes
+        captured_videos = []  # list of {url, data, content_type}
         fb_email = os.getenv("FB_SCRAPER_EMAIL")
         fb_password = os.getenv("FB_SCRAPER_PASSWORD")
 
@@ -184,8 +185,8 @@ class BrandScraperService:
                 )
                 page = await context.new_page()
 
-                # Capture images as they load
-                async def capture_image_response(response):
+                # Capture images and videos as they load
+                async def capture_media_response(response):
                     url = response.url
                     content_type = response.headers.get('content-type', '')
                     if 'image' in content_type and ('scontent' in url or 'fbcdn' in url):
@@ -195,8 +196,20 @@ class BrandScraperService:
                                 captured_images[url] = body
                         except:
                             pass
+                    elif 'video' in content_type:
+                        try:
+                            body = await response.body()
+                            if len(body) > 10000:  # Only substantial videos
+                                captured_videos.append({
+                                    'url': url,
+                                    'data': body,
+                                    'content_type': content_type
+                                })
+                                print(f"Captured video: {len(body)} bytes")
+                        except:
+                            pass
 
-                page.on('response', capture_image_response)
+                page.on('response', capture_media_response)
 
                 # Login to Facebook if credentials provided (optional - public URLs work without login)
                 if fb_email and fb_password:
@@ -317,6 +330,10 @@ class BrandScraperService:
                                 }
                             });
 
+                            // Check if this ad has a video
+                            const hasVideo = div.querySelector('video') !== null ||
+                                           text.match(/\\d+:\\d+/) !== null;
+
                             results.push({
                                 id: libraryId,
                                 page_name: pageName,
@@ -324,7 +341,8 @@ class BrandScraperService:
                                 ad_creative_link_titles: headline ? [headline] : null,
                                 ad_creative_bodies: adCopy ? [adCopy] : null,
                                 ad_creative_link_captions: ctaText ? [ctaText] : null,
-                                _image_urls: imageUrls
+                                _image_urls: imageUrls,
+                                _has_video: hasVideo
                             });
                         });
 
@@ -332,7 +350,7 @@ class BrandScraperService:
                     }
                 """)
 
-                print(f"Playwright extracted {len(ads)} ads, captured {len(captured_images)} images from network")
+                print(f"Playwright extracted {len(ads)} ads, captured {len(captured_images)} images and {len(captured_videos)} videos from network")
 
                 # Log image URL stats
                 total_img_urls = sum(len(ad.get('_image_urls', [])) for ad in ads)
@@ -353,6 +371,22 @@ class BrandScraperService:
                             matched_count += 1
 
                 print(f"Matched {matched_count} images to ads")
+
+                # Assign captured videos to ads that have video indicators
+                video_idx = 0
+                for ad in ads:
+                    if ad.get('_has_video') and video_idx < len(captured_videos):
+                        vid = captured_videos[video_idx]
+                        ad['_media_data'].append({
+                            'url': vid['url'],
+                            'type': 'video',
+                            'content_type': vid['content_type'],
+                            'data': vid['data']
+                        })
+                        video_idx += 1
+
+                if captured_videos:
+                    print(f"Assigned {video_idx} videos to ads")
 
                 # If few matches, distribute captured images to ads without media
                 if matched_count < len(ads) // 2 and captured_images:
@@ -672,6 +706,10 @@ class BrandScraperService:
         # Detect carousel
         if len(r2_urls) > 1 and media_type == "image":
             media_type = "carousel"
+
+        # Use DOM hint to classify video ads (videos don't auto-stream in Ads Library)
+        if ad_data.get("_has_video") and media_type == "image":
+            media_type = "video"
 
         # Extract page info
         page_name = ad_data.get("page_name")
