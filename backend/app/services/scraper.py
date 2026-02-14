@@ -26,7 +26,7 @@ class FacebookAdsLibraryAPI:
         self.access_token = os.getenv("FACEBOOK_ADS_LIBRARY_TOKEN") or os.getenv("VITE_FACEBOOK_ACCESS_TOKEN")
         self.db = db
 
-    async def search_ads(self, query: str, limit: int = 10, country: str = "US", offset: int = 0, exclude_ids: List[str] = None, negative_keywords: List[str] = None):
+    async def search_ads(self, query: str, limit: int = 10, country: str = "US", language: str = "", offset: int = 0, exclude_ids: List[str] = None, negative_keywords: List[str] = None):
         """
         Search Facebook Ads Library using API or fallback to scraper.
 
@@ -34,6 +34,7 @@ class FacebookAdsLibraryAPI:
             query: Search term (brand name, keyword, etc.)
             limit: Maximum number of ads to return
             country: Country code for ad_reached_countries
+            language: Language filter (e.g. 'en', 'es', 'de', 'fr'). Empty = all.
             offset: Number of "pages" to skip (controls scroll depth)
             exclude_ids: List of ad IDs to exclude (already fetched)
             negative_keywords: List of keywords to filter out from results
@@ -45,12 +46,13 @@ class FacebookAdsLibraryAPI:
             - filtered_by_keyword_blacklist: Count filtered by keywords
             - api_calls_made: Number of API calls
         """
-        print(f"Searching Facebook Ads Library for '{query}' in {country} (offset={offset}, negative_keywords={negative_keywords})")
+        lang_label = f", language={language}" if language else ""
+        print(f"Searching Facebook Ads Library for '{query}' in {country}{lang_label} (offset={offset}, negative_keywords={negative_keywords})")
 
         # Try API first if token available
         if self.access_token:
             try:
-                ads = await self._api_search(query, limit, country, offset, exclude_ids or [], negative_keywords or [])
+                ads = await self._api_search(query, limit, country, language, offset, exclude_ids or [], negative_keywords or [])
 
                 # Fall back to Chromium if:
                 # 1. API returns 0 ads (completely blocked keyword)
@@ -65,14 +67,14 @@ class FacebookAdsLibraryAPI:
                     should_fallback = True
 
                 if should_fallback:
-                    return await self._fallback_search(query, limit, country, offset, exclude_ids or [], negative_keywords or [])
+                    return await self._fallback_search(query, limit, country, language, offset, exclude_ids or [], negative_keywords or [])
 
                 return ads
             except Exception as e:
                 print(f"API search failed: {e}, falling back to scraper")
 
         # Fallback to scraper
-        return await self._fallback_search(query, limit, country, offset, exclude_ids or [], negative_keywords or [])
+        return await self._fallback_search(query, limit, country, language, offset, exclude_ids or [], negative_keywords or [])
 
     def _log_api_usage(self, query: str, api_calls: int, ads_returned: int, ads_saved: int):
         """Log API usage to database"""
@@ -93,7 +95,7 @@ class FacebookAdsLibraryAPI:
         self.db.add(log)
         self.db.commit()
 
-    async def _api_search(self, query: str, limit: int, country: str, offset: int, exclude_ids: List[str], negative_keywords: List[str]) -> List[ScrapedAdCreate]:
+    async def _api_search(self, query: str, limit: int, country: str, language: str, offset: int, exclude_ids: List[str], negative_keywords: List[str]) -> List[ScrapedAdCreate]:
         """Search using official Facebook Ads Library API."""
         ads = []
         negative_keywords_lower = [kw.lower() for kw in negative_keywords]
@@ -137,6 +139,9 @@ class FacebookAdsLibraryAPI:
                     "limit": batch_size,
                     "fields": "id,ad_creative_bodies,ad_creative_link_titles,ad_creative_link_captions,ad_snapshot_url,page_name,impressions,spend,currency,publisher_platforms,ad_delivery_start_time,ad_delivery_stop_time"
                 }
+
+                if language:
+                    params["languages"] = language
 
                 if after_cursor:
                     params["after"] = after_cursor
@@ -274,7 +279,7 @@ class FacebookAdsLibraryAPI:
             media_type=media_type
         )
 
-    async def _fallback_search(self, query: str, limit: int, country: str = "US", offset: int = 0, exclude_ids: List[str] = None, negative_keywords: List[str] = None) -> List[ScrapedAdCreate]:
+    async def _fallback_search(self, query: str, limit: int, country: str = "US", language: str = "", offset: int = 0, exclude_ids: List[str] = None, negative_keywords: List[str] = None) -> List[ScrapedAdCreate]:
         """
         Scrape Facebook Ads Library using Playwright.
         Extracts ad text data from DOM without media.
@@ -311,6 +316,8 @@ class FacebookAdsLibraryAPI:
                     "sort_data[mode]": "relevancy_monthly_grouped",
                     "media_type": "all"
                 }
+                if language:
+                    params["content_languages[0]"] = language
                 url = f"https://www.facebook.com/ads/library/?{urllib.parse.urlencode(params)}"
 
                 print(f"Scraping: {url}")

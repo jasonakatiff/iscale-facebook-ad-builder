@@ -33,6 +33,7 @@ class ResearchService:
             request.query,
             request.limit,
             request.country,
+            request.language,
             request.offset,
             request.exclude_ids,
             request.negative_keywords
@@ -184,6 +185,7 @@ class ResearchService:
             request.query,
             request.limit,
             request.country,
+            request.language,
             request.offset,
             request.exclude_ids,
             request.negative_keywords

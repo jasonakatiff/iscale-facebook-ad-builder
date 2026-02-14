@@ -7,6 +7,7 @@ class AdSearchRequest(BaseModel):
     platform: str = "facebook"
     limit: int = 10
     country: str = "US"
+    language: str = ""  # Language filter: en, es, de, fr, pt, it, etc. Empty = all
     offset: int = 0  # Pagination: controls scroll depth
     exclude_ids: List[str] = []  # IDs to skip (already fetched)
     negative_keywords: List[str] = []  # Keywords to exclude from results

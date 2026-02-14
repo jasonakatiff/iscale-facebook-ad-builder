@@ -12,6 +12,16 @@ const COUNTRIES = [
     { code: 'AU', name: 'Australia' },
 ];
 
+const LANGUAGES = [
+    { code: '', name: 'All Languages' },
+    { code: 'en', name: 'English' },
+    { code: 'es', name: 'Spanish' },
+    { code: 'de', name: 'German' },
+    { code: 'fr', name: 'French' },
+    { code: 'pt', name: 'Portuguese' },
+    { code: 'it', name: 'Italian' },
+];
+
 const LIMIT_OPTIONS = [
     { value: 100, label: '100 ads', apiCalls: 1 },
     { value: 300, label: '300 ads', apiCalls: 3 },
@@ -27,6 +37,7 @@ const Research = () => {
     const location = useLocation();
     const [query, setQuery] = useState('');
     const [country, setCountry] = useState('US');
+    const [language, setLanguage] = useState('');
     const [negativeKeywords, setNegativeKeywords] = useState('');
     const [limit, setLimit] = useState(300);
     const [savedSearches, setSavedSearches] = useState([]);
@@ -225,6 +236,7 @@ const Research = () => {
                 platform: 'facebook',
                 limit,
                 country,
+                language,
                 offset: 0,
                 exclude_ids: [],
                 negative_keywords: negativeList,
@@ -691,6 +703,17 @@ const Research = () => {
                                     {COUNTRIES.map((c) => (
                                         <option key={c.code} value={c.code}>
                                             {c.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <select
+                                    value={language}
+                                    onChange={(e) => setLanguage(e.target.value)}
+                                    className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
+                                >
+                                    {LANGUAGES.map((l) => (
+                                        <option key={l.code} value={l.code}>
+                                            {l.name}
                                         </option>
                                     ))}
                                 </select>
