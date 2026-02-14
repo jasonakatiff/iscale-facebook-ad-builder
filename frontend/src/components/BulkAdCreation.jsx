@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { ChevronRight, Plus, Trash2, Loader, Film, Image } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
 import { createCompleteAd, createFacebookCampaign, createFacebookAdSet } from '../lib/facebookApi';
+import { getClickflareStatus, generateTrackingUrl } from '../api/clickflare';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -183,6 +184,23 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                 throw err; // Stop execution
             }
 
+            // Step 2.5: Generate Clickflare tracking URL if configured
+            let effectiveWebsiteUrl = creativeData.websiteUrl;
+            try {
+                const cfStatus = await getClickflareStatus();
+                if (cfStatus.enabled && creativeData.websiteUrl) {
+                    setProgress(prev => ({ ...prev, status: 'Generating Clickflare tracking URL...' }));
+                    const cfResult = await generateTrackingUrl(
+                        campaignData.name || 'Ad Campaign',
+                        creativeData.websiteUrl,
+                    );
+                    effectiveWebsiteUrl = cfResult.tracking_url;
+                    console.log('Clickflare tracking URL:', effectiveWebsiteUrl);
+                }
+            } catch (e) {
+                console.warn('Clickflare URL generation failed, using raw URL:', e);
+            }
+
             // Step 3: Create ads
             const createdAds = [];
             for (let i = 0; i < adsData.length; i++) {
@@ -218,6 +236,7 @@ const BulkAdCreation = ({ onNext, onBack }) => {
 
                     const adSpecificCreativeData = {
                         ...creativeData,
+                        websiteUrl: effectiveWebsiteUrl,
                         mediaType: isVideo ? 'video' : 'image',
                         imageUrl: !isVideo ? (specificCreative?.imageUrl || specificCreative?.previewUrl) : undefined,
                         videoUrl: isVideo ? (specificCreative?.videoUrl || specificCreative?.previewUrl) : undefined,
@@ -272,7 +291,7 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                             headlines: adHeadlines,
                             description: adDescription,
                             cta: adCta,
-                            websiteUrl: creativeData.websiteUrl,
+                            websiteUrl: effectiveWebsiteUrl,
                             status: 'PAUSED',
                             fbAdId: result.adId,
                             fbCreativeId: result.creativeId

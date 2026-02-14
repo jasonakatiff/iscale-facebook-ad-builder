@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Plus, Sparkles, Edit, Trash2, Save, X, FileText, Code, AlertTriangle } from 'lucide-react';
+import { Settings as SettingsIcon, Plus, Sparkles, Edit, Trash2, Save, X, FileText, Code, AlertTriangle, Link, Loader2, CheckCircle, Zap } from 'lucide-react';
+import { getClickflareConfig, saveClickflareConfig, testClickflareConnection, setupTrafficSource } from '../api/clickflare';
 import { useToast } from '../context/ToastContext';
 import { adStyles as initialStyles, AD_CATEGORIES } from '../data/adStyles';
 import { PROMPT_CATEGORIES } from '../data/prompts';
@@ -57,6 +58,7 @@ export default function Settings() {
     const tabs = [
         { id: 'styles', label: 'Ad Styles', count: styles.length },
         { id: 'prompts', label: 'Prompts', count: prompts.length },
+        { id: 'clickflare', label: 'Clickflare', count: null },
         { id: 'general', label: 'General', count: null }
     ];
 
@@ -167,6 +169,9 @@ export default function Settings() {
                             onCancel={() => setEditingPrompt(null)}
                             onUpdate={(updatedPrompt) => setEditingPrompt(updatedPrompt)}
                         />
+                    )}
+                    {activeTab === 'clickflare' && (
+                        <ClickflareSettings showSuccess={showSuccess} showError={showError} />
                     )}
                     {activeTab === 'general' && (
                         <GeneralSettings />
@@ -729,6 +734,210 @@ function EditPromptForm({ prompt, onChange, onSave, onCancel }) {
                     <Save size={18} />
                     Save Changes
                 </button>
+            </div>
+        </div>
+    );
+}
+
+function ClickflareSettings({ showSuccess, showError }) {
+    const [config, setConfig] = useState({ configured: false });
+    const [apiKey, setApiKey] = useState('');
+    const [trackingDomain, setTrackingDomain] = useState('clicks.thebestchoiceadviser.com');
+    const [pixelId, setPixelId] = useState('');
+    const [testing, setTesting] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        loadConfig();
+    }, []);
+
+    const loadConfig = async () => {
+        try {
+            const data = await getClickflareConfig();
+            setConfig(data);
+            if (data.tracking_domain) setTrackingDomain(data.tracking_domain);
+            if (data.facebook_pixel_id) setPixelId(data.facebook_pixel_id);
+        } catch {
+            // Not configured yet
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSave = async () => {
+        if (!apiKey && !config.configured) {
+            showError('API Key is required');
+            return;
+        }
+        if (!trackingDomain) {
+            showError('Tracking domain is required');
+            return;
+        }
+        setSaving(true);
+        try {
+            await saveClickflareConfig({
+                api_key: apiKey || undefined,
+                tracking_domain: trackingDomain,
+                facebook_pixel_id: pixelId || null,
+            });
+            showSuccess('Clickflare settings saved');
+            setApiKey('');
+            await loadConfig();
+            try {
+                await setupTrafficSource();
+            } catch {}
+        } catch (err) {
+            showError(err?.response?.data?.detail || 'Failed to save settings');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleTestConnection = async () => {
+        setTesting(true);
+        try {
+            await testClickflareConnection();
+            showSuccess('Connected to Clickflare successfully!');
+        } catch (err) {
+            showError(`Connection failed: ${err?.response?.data?.detail || err.message}`);
+        } finally {
+            setTesting(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center py-12">
+                <Loader2 size={24} className="animate-spin text-purple-600" />
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-6">
+            {/* Connection Status */}
+            <div className={`flex items-center gap-3 p-4 rounded-lg border ${
+                config.configured
+                    ? 'bg-green-50 border-green-200'
+                    : 'bg-amber-50 border-amber-200'
+            }`}>
+                {config.configured ? (
+                    <>
+                        <CheckCircle size={20} className="text-green-600" />
+                        <span className="text-green-800 font-medium">Clickflare is configured</span>
+                        <span className="text-green-600 text-sm ml-auto">Key: {config.api_key_masked}</span>
+                    </>
+                ) : (
+                    <>
+                        <Zap size={20} className="text-amber-600" />
+                        <span className="text-amber-800 font-medium">Clickflare is not configured</span>
+                        <span className="text-amber-600 text-sm ml-auto">Enter your API key to get started</span>
+                    </>
+                )}
+            </div>
+
+            {/* Config Form */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 space-y-4">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <Link size={20} className="text-purple-600" />
+                    API Configuration
+                </h3>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        API Key (Access Key)
+                    </label>
+                    <input
+                        type="password"
+                        value={apiKey}
+                        onChange={(e) => setApiKey(e.target.value)}
+                        placeholder={config.configured ? 'Leave blank to keep current key' : 'Enter your Clickflare API key'}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                        Find this in Clickflare: Settings &gt; Security &gt; API Access
+                    </p>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Tracking Domain
+                    </label>
+                    <input
+                        type="text"
+                        value={trackingDomain}
+                        onChange={(e) => setTrackingDomain(e.target.value)}
+                        placeholder="e.g., clicks.yourdomain.com"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Facebook Pixel ID (optional)
+                    </label>
+                    <input
+                        type="text"
+                        value={pixelId}
+                        onChange={(e) => setPixelId(e.target.value)}
+                        placeholder="e.g., 123456789012345"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                        For cross-referencing with Facebook CAPI (configured in Clickflare dashboard)
+                    </p>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                    >
+                        {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                        {saving ? 'Saving...' : 'Save Settings'}
+                    </button>
+                    {config.configured && (
+                        <button
+                            onClick={handleTestConnection}
+                            disabled={testing}
+                            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+                        >
+                            {testing ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
+                            {testing ? 'Testing...' : 'Test Connection'}
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* How It Works */}
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-purple-900 mb-3">How Clickflare Integration Works</h3>
+                <ul className="text-purple-800 text-sm space-y-2">
+                    <li><strong>Tracking URLs:</strong> When you create Facebook ads, the destination URL is automatically wrapped with a Clickflare tracking link.</li>
+                    <li><strong>Performance Data:</strong> Clicks, conversions, and revenue data flow into the Reporting page.</li>
+                    <li><strong>Cost Sync:</strong> Clickflare auto-pulls Facebook ad spend every 30 minutes.</li>
+                    <li><strong>Graceful Fallback:</strong> If Clickflare is down or not configured, ads are created with the raw URL.</li>
+                </ul>
+            </div>
+
+            {/* CAPI Instructions */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-blue-900 mb-3">Facebook CAPI Integration</h3>
+                <p className="text-blue-800 text-sm mb-4">
+                    Clickflare handles Facebook Conversions API (CAPI) natively. To enable server-side conversion tracking:
+                </p>
+                <ol className="list-decimal list-inside text-blue-800 text-sm space-y-2">
+                    <li>Log into your Clickflare dashboard</li>
+                    <li>Go to <strong>Settings &gt; Integrations &gt; Conversion API &gt; Facebook</strong></li>
+                    <li>Enter your Facebook <strong>Pixel ID</strong> and <strong>Access Token</strong></li>
+                    <li>Map conversion events (Purchase, Lead, etc.)</li>
+                    <li>Clickflare will automatically send server-side events to Meta</li>
+                </ol>
+                <p className="text-blue-700 text-xs mt-4">
+                    This works regardless of iOS restrictions, ad blockers, or cookie blocking.
+                </p>
             </div>
         </div>
     );

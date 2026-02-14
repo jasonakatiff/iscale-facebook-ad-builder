@@ -540,3 +540,30 @@ class Headline(Base):
 
     brand = relationship("Brand")
     product = relationship("Product")
+
+
+class ClickflareConfig(Base):
+    __tablename__ = "clickflare_config"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    api_key = Column(String, nullable=False)
+    tracking_domain = Column(String, nullable=False)
+    facebook_traffic_source_id = Column(String, nullable=True)
+    facebook_pixel_id = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class ClickflareMapping(Base):
+    __tablename__ = "clickflare_mappings"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    facebook_ad_id = Column(String, ForeignKey("facebook_ads.id", ondelete="CASCADE"), nullable=False)
+    original_url = Column(String, nullable=False)
+    tracking_url = Column(String, nullable=False)
+    cf_offer_id = Column(String, nullable=True)
+    cf_campaign_id = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    facebook_ad = relationship("FacebookAd")

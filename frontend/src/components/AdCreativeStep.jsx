@@ -1,10 +1,11 @@
 import { useToast } from '../context/ToastContext';
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, ChevronLeft, Upload, X, Loader, Trash2, Film, Image, Sparkles, Play, FolderOpen, Check } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Upload, X, Loader, Trash2, Film, Image, Sparkles, Play, FolderOpen, Check, Link } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
 import { useAuth } from '../context/AuthContext';
 import { getPages, getPageInfo } from '../lib/facebookApi';
 import { getLibraryItems } from '../api/adsLibrary';
+import { getClickflareStatus } from '../api/clickflare';
 import { useBrands } from '../context/BrandContext';
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
@@ -41,6 +42,12 @@ const AdCreativeStep = ({ onNext, onBack }) => {
 
     // Per-creative mode
     const [currentCreativeIndex, setCurrentCreativeIndex] = useState(0);
+
+    // Clickflare status
+    const [clickflareEnabled, setClickflareEnabled] = useState(false);
+    useEffect(() => {
+        getClickflareStatus().then(s => setClickflareEnabled(s.enabled)).catch(() => {});
+    }, []);
 
     // Ads Library import
     const { brands } = useBrands();
@@ -1574,6 +1581,12 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                         placeholder="https://yourwebsite.com/landing"
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     />
+                    {clickflareEnabled && (
+                        <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                            <Link size={12} />
+                            Clickflare tracking will be applied automatically
+                        </p>
+                    )}
                 </div>
             </div>
 
