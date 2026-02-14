@@ -1295,7 +1295,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                                                         rows="3"
                                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                                                     />
-                                                    {index >= 1 && (
+                                                    {(currentCreative.bodies || ['']).length > 1 && (
                                                         <button type="button" onClick={() => removePerCreativeBody(index)}
                                                             className="absolute top-2 right-2 text-red-500 hover:text-red-700" title="Remove">
                                                             <X size={16} />
@@ -1330,7 +1330,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                                                         placeholder={`Headline ${index + 1}...`}
                                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                                                     />
-                                                    {index >= 1 && (
+                                                    {(currentCreative.headlines || ['']).length > 1 && (
                                                         <button type="button" onClick={() => removePerCreativeHeadline(index)}
                                                             className="absolute top-2 right-2 text-red-500 hover:text-red-700" title="Remove">
                                                             <X size={16} />
