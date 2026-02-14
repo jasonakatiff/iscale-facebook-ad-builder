@@ -291,6 +291,7 @@ const AdsLibrary = () => {
                 funnel_stage: '',
                 ad_format: '',
                 status: 'draft',
+                folderId: (currentFolderId && currentFolderId !== '__none__') ? currentFolderId : null,
             });
         }
 
@@ -324,6 +325,7 @@ const AdsLibrary = () => {
                     funnel_stage: '',
                     ad_format: '',
                     status: 'draft',
+                    folderId: (currentFolderId && currentFolderId !== '__none__') ? currentFolderId : null,
                 });
             } catch (error) {
                 showError(`Failed to upload ${file.name}`);
@@ -371,9 +373,10 @@ const AdsLibrary = () => {
                     ad_format: item.ad_format || null,
                     status: item.status,
                 };
-                // Auto-set folder_id if inside a folder (Level 3)
-                if (currentFolderId && currentFolderId !== '__none__') {
-                    payload.folder_id = currentFolderId;
+                // Use folder_id stamped at upload time, fallback to current nav
+                const folderId = item.folderId || ((currentFolderId && currentFolderId !== '__none__') ? currentFolderId : null);
+                if (folderId) {
+                    payload.folder_id = folderId;
                 }
                 await createLibraryItem(payload);
                 saved++;
@@ -993,12 +996,6 @@ const AdsLibrary = () => {
 
         return (
             <div className="space-y-6">
-                {/* Upload area at folder level */}
-                {renderUploadArea()}
-
-                {/* Review queue */}
-                {renderReviewQueue()}
-
                 {/* Folder grid */}
                 <div>
                     <div className="flex items-center justify-between mb-4">
