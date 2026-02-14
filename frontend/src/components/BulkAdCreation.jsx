@@ -75,12 +75,22 @@ const BulkAdCreation = ({ onNext, onBack }) => {
     }, [creativeData.creatives, creativeData.headlines, creativeData.bodies, creativeData.creativeMode]);
 
     const addAd = () => {
+        // Clone from the last ad's creative or fall back to the first creative
+        const lastAd = adsData[adsData.length - 1];
+        const creative = creativeData.creatives?.find(c => c.id === lastAd?.creativeId) || creativeData.creatives?.[0];
+        const isPerCreative = creativeData.creativeMode === 'per_creative';
+
         setAdsData(prev => [
             ...prev,
             {
                 id: `ad_${Date.now()}_${prev.length}`,
-                name: `Ad ${prev.length + 1}`,
-                useDefaultCreative: true
+                name: `${creative?.name || 'Ad'} ${prev.length + 1}`,
+                creativeId: creative?.id,
+                headlineIndex: 0,
+                bodyIndex: 0,
+                mediaType: creative?.mediaType || 'image',
+                useDefaultCreative: true,
+                ...(isPerCreative ? { perCreative: true } : {})
             }
         ]);
     };
