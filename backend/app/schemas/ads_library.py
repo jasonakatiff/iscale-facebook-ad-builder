@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import datetime
 
 
@@ -9,6 +9,7 @@ class AdLibraryItemCreate(BaseModel):
     media_type: str = "image"
     media_url: str
     thumbnail_url: Optional[str] = None
+    variants: Optional[Dict[str, str]] = None  # {"1:1": "url", "9:16": "url"}
     file_size: Optional[int] = None
     headline: Optional[str] = None
     body: Optional[str] = None
@@ -23,6 +24,9 @@ class AdLibraryItemUpdate(BaseModel):
     brand_id: Optional[str] = None
     name: Optional[str] = None
     media_type: Optional[str] = None
+    media_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    variants: Optional[Dict[str, str]] = None
     headline: Optional[str] = None
     body: Optional[str] = None
     cta: Optional[str] = None
@@ -40,6 +44,7 @@ class AdLibraryItemResponse(BaseModel):
     media_type: str
     media_url: str
     thumbnail_url: Optional[str] = None
+    variants: Optional[Dict[str, str]] = None
     file_size: Optional[int] = None
     headline: Optional[str] = None
     body: Optional[str] = None

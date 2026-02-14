@@ -489,6 +489,7 @@ class AdLibraryItem(Base):
     media_type = Column(String, nullable=False, default="image")  # 'image' or 'video'
     media_url = Column(String, nullable=False)
     thumbnail_url = Column(String, nullable=True)
+    variants = Column(JSON, nullable=True)  # {"1:1": "url_square", "9:16": "url_story"}
     file_size = Column(Integer, nullable=True)
     headline = Column(String, nullable=True)
     body = Column(Text, nullable=True)

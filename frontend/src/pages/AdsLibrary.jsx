@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '../context/ToastContext';
 import { useBrands } from '../context/BrandContext';
-import { getLibraryItems, createLibraryItem, updateLibraryItem, deleteLibraryItem, uploadFile } from '../api/adsLibrary';
-import { Upload, Image, Video, Trash2, Pencil, X, Download, ChevronLeft, ChevronRight, Play, FolderOpen, Loader2, Plus, ExternalLink, Filter, Wand2 } from 'lucide-react';
+import { getLibraryItems, createLibraryItem, updateLibraryItem, deleteLibraryItem, uploadFile, getAiName, extractVideoThumbnail, detectAspectRatio } from '../api/adsLibrary';
+import { Upload, Image, Video, Trash2, Pencil, X, Download, Play, FolderOpen, Loader2, Wand2, Layers, Plus, Filter, Sparkles } from 'lucide-react';
 import GenerateVideoModal from '../components/GenerateVideoModal';
 
 const FUNNEL_STAGES = [
@@ -56,9 +56,14 @@ const AdsLibrary = () => {
 
     // Upload
     const [uploading, setUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState('');
     const [uploadBrand, setUploadBrand] = useState('');
     const [dragActive, setDragActive] = useState(false);
     const fileInputRef = useRef(null);
+
+    // Add variant
+    const [addVariantTarget, setAddVariantTarget] = useState(null);
+    const variantInputRef = useRef(null);
 
     // Modals
     const [selectedItem, setSelectedItem] = useState(null);
@@ -107,15 +112,55 @@ const AdsLibrary = () => {
             }
 
             try {
+                setUploadProgress(`Uploading ${file.name}...`);
+
                 // Upload file to R2
                 const { url, media_type } = await uploadFile(file);
+
+                let thumbnailUrl = null;
+                let variants = null;
+                let aiName = null;
+
+                if (isVideo) {
+                    // Extract video thumbnail
+                    try {
+                        setUploadProgress(`Extracting thumbnail from ${file.name}...`);
+                        const thumbBlob = await extractVideoThumbnail(file);
+                        const thumbFile = new File([thumbBlob], `thumb_${file.name.replace(/\.[^.]+$/, '.jpg')}`, { type: 'image/jpeg' });
+                        const thumbResult = await uploadFile(thumbFile);
+                        thumbnailUrl = thumbResult.url;
+                    } catch (e) {
+                        console.warn('Thumbnail extraction failed:', e);
+                    }
+                }
+
+                if (isImage) {
+                    // Detect aspect ratio and store in variants
+                    try {
+                        const ratio = await detectAspectRatio(file);
+                        variants = { [ratio]: url };
+                    } catch (e) {
+                        console.warn('Aspect ratio detection failed:', e);
+                    }
+                }
+
+                // AI-generated name
+                try {
+                    setUploadProgress(`Naming ${file.name} with AI...`);
+                    const { name } = await getAiName(url);
+                    aiName = name;
+                } catch (e) {
+                    console.warn('AI naming failed:', e);
+                }
 
                 // Create library item
                 await createLibraryItem({
                     brand_id: uploadBrand,
-                    name: file.name.replace(/\.[^.]+$/, ''),
+                    name: aiName || file.name.replace(/\.[^.]+$/, ''),
                     media_type: media_type,
                     media_url: url,
+                    thumbnail_url: thumbnailUrl,
+                    variants: variants,
                     file_size: file.size,
                     status: 'draft',
                 });
@@ -130,6 +175,35 @@ const AdsLibrary = () => {
             fetchItems();
         }
         setUploading(false);
+        setUploadProgress('');
+    };
+
+    const handleAddVariant = async (files) => {
+        if (!addVariantTarget || !files.length) return;
+        const file = files[0];
+        if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+            showError('Only images can be added as size variants');
+            return;
+        }
+
+        setUploading(true);
+        try {
+            setUploadProgress(`Uploading variant for ${addVariantTarget.name}...`);
+            const { url } = await uploadFile(file);
+            const ratio = await detectAspectRatio(file);
+            const existingVariants = addVariantTarget.variants || {};
+            const newVariants = { ...existingVariants, [ratio]: url };
+
+            await updateLibraryItem(addVariantTarget.id, { variants: newVariants });
+            showSuccess(`Added ${ratio} variant`);
+            setAddVariantTarget(null);
+            fetchItems();
+        } catch (error) {
+            showError('Failed to add variant');
+        } finally {
+            setUploading(false);
+            setUploadProgress('');
+        }
     };
 
     const handleDrop = (e) => {
@@ -188,6 +262,28 @@ const AdsLibrary = () => {
         return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     };
 
+    const variantCount = (item) => {
+        if (!item.variants) return 0;
+        return Object.keys(item.variants).length;
+    };
+
+    const handleDownload = async (url) => {
+        try {
+            const resp = await fetch(url);
+            const blob = await resp.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = url.split('/').pop() || 'download';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(blobUrl);
+        } catch {
+            window.open(url, '_blank');
+        }
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -230,15 +326,15 @@ const AdsLibrary = () => {
                     onClick={() => fileInputRef.current?.click()}
                 >
                     {uploading ? (
-                        <div className="flex items-center justify-center gap-2 text-amber-600">
+                        <div className="flex flex-col items-center gap-2 text-amber-600">
                             <Loader2 size={24} className="animate-spin" />
-                            Uploading...
+                            <span>{uploadProgress || 'Uploading...'}</span>
                         </div>
                     ) : (
                         <>
                             <Upload size={32} className="mx-auto text-gray-400 mb-2" />
                             <p className="text-gray-600">Drag & drop images or videos here</p>
-                            <p className="text-gray-400 text-sm mt-1">or click to browse (JPG, PNG, WEBP, GIF, MP4, MOV, WEBM)</p>
+                            <p className="text-gray-400 text-sm mt-1">JPG, PNG, WEBP, GIF, MP4, MOV, WEBM &mdash; AI auto-names your ads</p>
                         </>
                     )}
                     <input
@@ -331,12 +427,17 @@ const AdsLibrary = () => {
                             >
                                 {item.media_type === 'video' ? (
                                     <>
-                                        <img
-                                            src={item.thumbnail_url || item.media_url}
-                                            alt={item.name || 'Ad'}
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => { e.target.style.display = 'none'; }}
-                                        />
+                                        {item.thumbnail_url ? (
+                                            <img
+                                                src={item.thumbnail_url}
+                                                alt={item.name || 'Video'}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                                                <Video size={32} className="text-gray-500" />
+                                            </div>
+                                        )}
                                         <div className="absolute inset-0 flex items-center justify-center">
                                             <div className="w-10 h-10 bg-black/60 rounded-full flex items-center justify-center group-hover:bg-black/80 transition-colors">
                                                 <Play size={20} className="text-white ml-0.5" fill="white" />
@@ -357,6 +458,14 @@ const AdsLibrary = () => {
                                     {item.media_type}
                                 </span>
 
+                                {/* Variants badge */}
+                                {variantCount(item) > 1 && (
+                                    <span className="absolute bottom-2 left-2 px-2 py-0.5 bg-purple-600/90 text-white text-xs rounded flex items-center gap-1">
+                                        <Layers size={10} />
+                                        {variantCount(item)} sizes
+                                    </span>
+                                )}
+
                                 {/* Status badge */}
                                 <span className={`absolute top-2 right-2 px-2 py-0.5 text-xs rounded ${STATUS_COLORS[item.status] || 'bg-gray-100 text-gray-700'}`}>
                                     {item.status}
@@ -365,13 +474,26 @@ const AdsLibrary = () => {
                                 {/* Hover actions */}
                                 <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     {item.media_type === 'image' && (
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); setVideoGenImage(item.media_url); }}
-                                            className="w-8 h-8 bg-purple-500/90 hover:bg-purple-600 rounded-full flex items-center justify-center text-white"
-                                            title="Generate Video"
-                                        >
-                                            <Wand2 size={14} />
-                                        </button>
+                                        <>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setVideoGenImage(item.media_url); }}
+                                                className="w-8 h-8 bg-purple-500/90 hover:bg-purple-600 rounded-full flex items-center justify-center text-white"
+                                                title="Generate Video"
+                                            >
+                                                <Wand2 size={14} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setAddVariantTarget(item);
+                                                    setTimeout(() => variantInputRef.current?.click(), 100);
+                                                }}
+                                                className="w-8 h-8 bg-indigo-500/90 hover:bg-indigo-600 rounded-full flex items-center justify-center text-white"
+                                                title="Add size variant"
+                                            >
+                                                <Plus size={14} />
+                                            </button>
+                                        </>
                                     )}
                                     <button
                                         onClick={(e) => { e.stopPropagation(); setEditItem({ ...item }); }}
@@ -399,6 +521,13 @@ const AdsLibrary = () => {
                                     {item.brand_name || 'No brand'}
                                 </p>
                                 <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                    {item.variants && Object.keys(item.variants).length > 0 && (
+                                        Object.keys(item.variants).map((ratio) => (
+                                            <span key={ratio} className="px-1.5 py-0.5 text-[10px] bg-indigo-100 text-indigo-700 rounded">
+                                                {ratio}
+                                            </span>
+                                        ))
+                                    )}
                                     {item.funnel_stage && (
                                         <span className="px-1.5 py-0.5 text-[10px] bg-purple-100 text-purple-700 rounded">
                                             {item.funnel_stage.toUpperCase()}
@@ -423,6 +552,18 @@ const AdsLibrary = () => {
                     ))}
                 </div>
             )}
+
+            {/* Hidden input for adding variant */}
+            <input
+                ref={variantInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                    handleAddVariant(Array.from(e.target.files));
+                    e.target.value = '';
+                }}
+            />
 
             {/* View Modal */}
             {selectedItem && (
@@ -455,6 +596,28 @@ const AdsLibrary = () => {
                                 />
                             );
                         })()}
+
+                        {/* Variant previews */}
+                        {selectedItem.variants && Object.keys(selectedItem.variants).length > 1 && (
+                            <div className="mt-3">
+                                <p className="text-white/60 text-xs mb-2">Size Variants:</p>
+                                <div className="flex gap-3">
+                                    {Object.entries(selectedItem.variants).map(([ratio, url]) => (
+                                        <div key={ratio} className="text-center">
+                                            <img
+                                                src={url}
+                                                alt={ratio}
+                                                className={`rounded border-2 transition-colors cursor-pointer ${
+                                                    selectedItem.media_url === url ? 'border-amber-500' : 'border-transparent hover:border-white/50'
+                                                } ${ratio === '9:16' || ratio === '4:5' ? 'h-24 w-auto' : 'h-16 w-auto'}`}
+                                                onClick={() => setSelectedItem({ ...selectedItem, media_url: url })}
+                                            />
+                                            <span className="text-white/70 text-xs mt-1 block">{ratio}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         <div className="mt-4 bg-white/10 backdrop-blur rounded-lg p-4">
                             <div className="flex items-start justify-between gap-4">
@@ -496,20 +659,7 @@ const AdsLibrary = () => {
                                         </button>
                                     )}
                                     <button
-                                        onClick={async () => {
-                                            try {
-                                                const resp = await fetch(selectedItem.media_url);
-                                                const blob = await resp.blob();
-                                                const url = URL.createObjectURL(blob);
-                                                const a = document.createElement('a');
-                                                a.href = url;
-                                                a.download = selectedItem.media_url.split('/').pop() || 'download';
-                                                document.body.appendChild(a);
-                                                a.click();
-                                                document.body.removeChild(a);
-                                                URL.revokeObjectURL(url);
-                                            } catch { window.open(selectedItem.media_url, '_blank'); }
-                                        }}
+                                        onClick={() => handleDownload(selectedItem.media_url)}
                                         className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors"
                                     >
                                         <Download size={16} />
@@ -536,13 +686,30 @@ const AdsLibrary = () => {
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                                <input
-                                    type="text"
-                                    value={editItem.name || ''}
-                                    onChange={(e) => setEditItem({ ...editItem, name: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                                    placeholder="Ad name"
-                                />
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={editItem.name || ''}
+                                        onChange={(e) => setEditItem({ ...editItem, name: e.target.value })}
+                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                                        placeholder="Ad name"
+                                    />
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                const { name } = await getAiName(editItem.media_url);
+                                                setEditItem({ ...editItem, name });
+                                            } catch {
+                                                showError('AI naming failed');
+                                            }
+                                        }}
+                                        className="px-3 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-sm flex items-center gap-1"
+                                        title="Generate name with AI"
+                                    >
+                                        <Sparkles size={14} />
+                                        AI
+                                    </button>
+                                </div>
                             </div>
 
                             <div>

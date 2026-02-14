@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional
+import os
 from app.database import get_db
 from app.models import AdLibraryItem, Brand, User
 from app.schemas.ads_library import AdLibraryItemCreate, AdLibraryItemUpdate, AdLibraryItemResponse
@@ -21,6 +23,7 @@ def _to_response(item: AdLibraryItem) -> dict:
         "media_type": item.media_type,
         "media_url": item.media_url,
         "thumbnail_url": item.thumbnail_url,
+        "variants": item.variants,
         "file_size": item.file_size,
         "headline": item.headline,
         "body": item.body,
@@ -141,3 +144,47 @@ def delete_item(
     db.delete(db_item)
     db.commit()
     return {"message": "Item deleted"}
+
+
+class AiNameRequest(BaseModel):
+    image_url: str
+
+
+@router.post("/ai-name")
+async def generate_ai_name(
+    request: AiNameRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """Use Gemini Flash to generate a short descriptive name for an ad image."""
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="Gemini API not configured")
+
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-2.0-flash')
+
+        # Fetch image bytes
+        import httpx
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(request.image_url, timeout=15)
+            resp.raise_for_status()
+            image_bytes = resp.content
+            content_type = resp.headers.get("content-type", "image/jpeg")
+
+        response = model.generate_content([
+            {
+                "mime_type": content_type,
+                "data": image_bytes,
+            },
+            "Look at this ad creative image. Generate a short descriptive name (3-6 words max) that describes what's shown. "
+            "Examples: 'Woman Holding Product Bottle', 'Before After Skin Results', 'Social Media Comments Collage', "
+            "'Family Beach Scene', 'Product Flat Lay White BG'. "
+            "Return ONLY the name, nothing else. No quotes, no punctuation at the end."
+        ])
+
+        name = response.text.strip().strip('"\'.')
+        return {"name": name}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI naming failed: {str(e)}")
