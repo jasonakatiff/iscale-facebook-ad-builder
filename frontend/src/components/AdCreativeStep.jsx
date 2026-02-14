@@ -1034,16 +1034,6 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                                                     {creative.mediaType === 'video' ? (
                                                         <>
                                                             <button
-                                                                onClick={() => handleAnalyzeVideo(creative, 'gemini')}
-                                                                className="w-full px-3 py-2 text-left text-sm hover:bg-amber-50 flex items-center gap-2"
-                                                            >
-                                                                <Sparkles size={14} className="text-amber-500" />
-                                                                <div>
-                                                                    <div className="font-medium text-gray-800">Gemini 2.0 Flash</div>
-                                                                    <div className="text-xs text-gray-500">Analyzes video + audio</div>
-                                                                </div>
-                                                            </button>
-                                                            <button
                                                                 onClick={() => handleAnalyzeVideo(creative, 'transcribe_haiku')}
                                                                 className="w-full px-3 py-2 text-left text-sm hover:bg-green-50 flex items-center gap-2"
                                                             >
@@ -1053,7 +1043,6 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                                                                     <div className="text-xs text-gray-500">Gemini transcribes → Haiku writes copy</div>
                                                                 </div>
                                                             </button>
-                                                            <div className="border-t border-gray-100 my-1"></div>
                                                             <button
                                                                 onClick={() => handleAnalyzeVideo(creative, 'claude')}
                                                                 className="w-full px-3 py-2 text-left text-sm hover:bg-purple-50 flex items-center gap-2"
@@ -1062,6 +1051,17 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                                                                 <div>
                                                                     <div className="font-medium text-gray-800">Claude Haiku</div>
                                                                     <div className="text-xs text-gray-500">Frames only (no audio)</div>
+                                                                </div>
+                                                            </button>
+                                                            <div className="border-t border-gray-100 my-1"></div>
+                                                            <button
+                                                                onClick={() => handleAnalyzeVideo(creative, 'gemini')}
+                                                                className="w-full px-3 py-2 text-left text-sm hover:bg-amber-50 flex items-center gap-2"
+                                                            >
+                                                                <Sparkles size={14} className="text-amber-500" />
+                                                                <div>
+                                                                    <div className="font-medium text-gray-800">Gemini 2.0 Flash</div>
+                                                                    <div className="text-xs text-gray-500">Analyzes video + audio</div>
                                                                 </div>
                                                             </button>
                                                         </>
