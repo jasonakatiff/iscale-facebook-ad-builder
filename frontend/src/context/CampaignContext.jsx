@@ -81,6 +81,7 @@ export const CampaignProvider = ({ children }) => {
     });
 
     const [adsData, setAdsData] = useState([]);
+    const [addingNewAd, setAddingNewAd] = useState(false);
 
     const [selectedAdAccount, setSelectedAdAccount] = useState(null);
 
@@ -153,6 +154,8 @@ export const CampaignProvider = ({ children }) => {
         setAdsData,
         selectedAdAccount,
         setSelectedAdAccount,
+        addingNewAd,
+        setAddingNewAd,
         resetWizard
     };
 

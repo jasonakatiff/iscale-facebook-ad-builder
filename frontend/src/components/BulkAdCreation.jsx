@@ -10,7 +10,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const BulkAdCreation = ({ onNext, onBack }) => {
     const { showWarning, showError } = useToast();
     const { authFetch } = useAuth();
-    const { campaignData, adsetData, creativeData, adsData, setAdsData, selectedAdAccount } = useCampaign();
+    const { campaignData, adsetData, creativeData, adsData, setAdsData, selectedAdAccount, setAddingNewAd } = useCampaign();
     const [loading, setLoading] = useState(false);
     const [progress, setProgress] = useState({ current: 0, total: 0, status: '' });
     const [errors, setErrors] = useState([]);
@@ -403,7 +403,7 @@ const BulkAdCreation = ({ onNext, onBack }) => {
 
                     {/* Add Ad Button — goes back to Ad Creative to add more media/copy */}
                     <button
-                        onClick={onBack}
+                        onClick={() => { setAddingNewAd(true); onBack(); }}
                         className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-amber-500 hover:text-amber-600 transition-colors flex items-center justify-center gap-2"
                     >
                         <Plus size={20} />

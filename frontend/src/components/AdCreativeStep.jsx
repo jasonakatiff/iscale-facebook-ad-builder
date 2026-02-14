@@ -28,7 +28,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const AdCreativeStep = ({ onNext, onBack }) => {
     const { showWarning, showError, showSuccess } = useToast();
     const { authFetch } = useAuth();
-    const { creativeData, setCreativeData, selectedAdAccount, selectedProduct, adsetData } = useCampaign();
+    const { creativeData, setCreativeData, selectedAdAccount, selectedProduct, adsetData, addingNewAd, setAddingNewAd } = useCampaign();
     const [pages, setPages] = useState([]);
     const [loadingPages, setLoadingPages] = useState(false);
     const [analyzingVideoId, setAnalyzingVideoId] = useState(null);
@@ -50,6 +50,14 @@ const AdCreativeStep = ({ onNext, onBack }) => {
     const [libraryFilterBrand, setLibraryFilterBrand] = useState('');
     const [libraryFilterMediaType, setLibraryFilterMediaType] = useState('');
     const [selectedLibraryItems, setSelectedLibraryItems] = useState(new Set());
+
+    // When coming from "Add Another Ad", auto-open library modal
+    useEffect(() => {
+        if (addingNewAd) {
+            setShowLibraryModal(true);
+            setAddingNewAd(false);
+        }
+    }, [addingNewAd]);
 
     const handleDragEnter = (e) => {
         e.preventDefault();
