@@ -1,6 +1,6 @@
 import { useToast } from '../context/ToastContext';
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, Upload, X, Loader, Trash2, Film, Image, Sparkles, Play, FolderOpen, Check } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Upload, X, Loader, Trash2, Film, Image, Sparkles, Play, FolderOpen, Check } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
 import { useAuth } from '../context/AuthContext';
 import { getPages } from '../lib/facebookApi';
@@ -38,6 +38,9 @@ const AdCreativeStep = ({ onNext, onBack }) => {
     const [manualPageEntry, setManualPageEntry] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [playingVideo, setPlayingVideo] = useState(null);
+
+    // Per-creative mode
+    const [currentCreativeIndex, setCurrentCreativeIndex] = useState(0);
 
     // Ads Library import
     const { brands } = useBrands();
@@ -394,6 +397,75 @@ const AdCreativeStep = ({ onNext, onBack }) => {
         }
     };
 
+    // Per-creative mode helpers
+    const isPerCreative = creativeData.creativeMode === 'per_creative';
+    const currentCreative = creativeData.creatives?.[currentCreativeIndex];
+
+    const updateCreativeField = (creativeIndex, field, value) => {
+        setCreativeData(prev => {
+            const newCreatives = [...prev.creatives];
+            newCreatives[creativeIndex] = { ...newCreatives[creativeIndex], [field]: value };
+            return { ...prev, creatives: newCreatives };
+        });
+    };
+
+    const handlePerCreativeBodyChange = (bodyIndex, value) => {
+        const bodies = [...(currentCreative?.bodies || [''])];
+        bodies[bodyIndex] = value;
+        updateCreativeField(currentCreativeIndex, 'bodies', bodies);
+    };
+
+    const handlePerCreativeHeadlineChange = (headlineIndex, value) => {
+        const headlines = [...(currentCreative?.headlines || [''])];
+        headlines[headlineIndex] = value;
+        updateCreativeField(currentCreativeIndex, 'headlines', headlines);
+    };
+
+    const addPerCreativeBody = () => {
+        const bodies = currentCreative?.bodies || [''];
+        if (bodies.length < 6) {
+            updateCreativeField(currentCreativeIndex, 'bodies', [...bodies, '']);
+        }
+    };
+
+    const addPerCreativeHeadline = () => {
+        const headlines = currentCreative?.headlines || [''];
+        if (headlines.length < 6) {
+            updateCreativeField(currentCreativeIndex, 'headlines', [...headlines, '']);
+        }
+    };
+
+    const removePerCreativeBody = (index) => {
+        const bodies = currentCreative?.bodies || [''];
+        if (bodies.length > 1) {
+            updateCreativeField(currentCreativeIndex, 'bodies', bodies.filter((_, i) => i !== index));
+        }
+    };
+
+    const removePerCreativeHeadline = (index) => {
+        const headlines = currentCreative?.headlines || [''];
+        if (headlines.length > 1) {
+            updateCreativeField(currentCreativeIndex, 'headlines', headlines.filter((_, i) => i !== index));
+        }
+    };
+
+    // Initialize per-creative fields when switching to per-creative mode
+    React.useEffect(() => {
+        if (isPerCreative && creativeData.creatives.length > 0) {
+            let needsInit = false;
+            const updated = creativeData.creatives.map(c => {
+                if (!c.headlines) {
+                    needsInit = true;
+                    return { ...c, headlines: [''], bodies: [''], description: '', cta: 'LEARN_MORE' };
+                }
+                return c;
+            });
+            if (needsInit) {
+                setCreativeData(prev => ({ ...prev, creatives: updated }));
+            }
+        }
+    }, [isPerCreative, creativeData.creatives.length]);
+
     const handleMediaUpload = (e) => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
@@ -494,16 +566,33 @@ const AdCreativeStep = ({ onNext, onBack }) => {
             return;
         }
 
-        // Validate primary text
-        if (!creativeData.bodies[0] || !creativeData.bodies[0].trim()) {
-            showWarning('Please provide primary text');
-            return;
-        }
-
-        // Validate headline
-        if (!creativeData.headlines[0] || !creativeData.headlines[0].trim()) {
-            showWarning('Please provide a headline');
-            return;
+        if (isPerCreative) {
+            // Per-creative mode: each creative must have at least 1 non-empty headline and body
+            for (let i = 0; i < creativeData.creatives.length; i++) {
+                const c = creativeData.creatives[i];
+                const hasBody = (c.bodies || []).some(b => b && b.trim());
+                const hasHeadline = (c.headlines || []).some(h => h && h.trim());
+                if (!hasBody) {
+                    setCurrentCreativeIndex(i);
+                    showWarning(`Creative ${i + 1} ("${c.name}") needs at least one primary text`);
+                    return;
+                }
+                if (!hasHeadline) {
+                    setCurrentCreativeIndex(i);
+                    showWarning(`Creative ${i + 1} ("${c.name}") needs at least one headline`);
+                    return;
+                }
+            }
+        } else {
+            // Standard mode: validate global copy fields
+            if (!creativeData.bodies[0] || !creativeData.bodies[0].trim()) {
+                showWarning('Please provide primary text');
+                return;
+            }
+            if (!creativeData.headlines[0] || !creativeData.headlines[0].trim()) {
+                showWarning('Please provide a headline');
+                return;
+            }
         }
 
         if (!creativeData.websiteUrl) {
@@ -538,9 +627,36 @@ const AdCreativeStep = ({ onNext, onBack }) => {
 
     return (
         <div>
-            <h2 className="text-2xl font-bold mb-6">Ad Creative - Standard Ads</h2>
+            <h2 className="text-2xl font-bold mb-4">Ad Creative</h2>
+
+            {/* Mode Toggle */}
+            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg mb-6 w-fit">
+                <button
+                    onClick={() => setCreativeData(prev => ({ ...prev, creativeMode: 'standard' }))}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                        !isPerCreative
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                >
+                    Standard (Bulk)
+                </button>
+                <button
+                    onClick={() => setCreativeData(prev => ({ ...prev, creativeMode: 'per_creative' }))}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                        isPerCreative
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                >
+                    Per Creative
+                </button>
+            </div>
+
             <p className="text-gray-600 mb-6">
-                Create standard ads with a single primary text and headline. We will create one ad for each image you upload.
+                {isPerCreative
+                    ? 'Each image/video gets its own dedicated copy. Step through creatives one at a time.'
+                    : 'Create standard ads with shared copy across all media. We will create permutations of each image × headline × body.'}
             </p>
 
             <div className="space-y-6">
@@ -857,158 +973,363 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                     </div>
                 </div>
 
-                {/* Body Text */}
-                <div>
-                    <div className="flex items-center justify-between mb-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                            Primary Text *
-                        </label>
-                        {creativeData.bodies.length < 6 && (
-                            <button
-                                type="button"
-                                onClick={addBodyField}
-                                className="text-sm text-amber-600 hover:text-amber-700 font-medium flex items-center gap-1"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                                Add Body Copy
-                            </button>
-                        )}
-                    </div>
-                    <div className="space-y-3">
-                        {creativeData.bodies.map((body, index) => (
-                            <div key={index} className="relative">
-                                <textarea
-                                    value={body}
-                                    onChange={(e) => handleBodyChange(index, e.target.value)}
-                                    placeholder={`Body copy ${index + 1}...`}
-                                    rows="3"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                                />
-                                {index >= 1 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => removeBodyField(index)}
-                                        className="absolute top-2 right-2 text-red-500 hover:text-red-700"
-                                        title="Remove this body copy"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                )}
+                {/* Copy Fields - Standard or Per Creative */}
+                {isPerCreative ? (
+                    /* ===== PER CREATIVE MODE ===== */
+                    creativeData.creatives.length > 0 ? (
+                        <div className="border border-gray-200 rounded-xl overflow-hidden">
+                            {/* Creative Navigation Header */}
+                            <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-b border-gray-200">
+                                <button
+                                    onClick={() => setCurrentCreativeIndex(Math.max(0, currentCreativeIndex - 1))}
+                                    disabled={currentCreativeIndex === 0}
+                                    className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg disabled:opacity-30 disabled:cursor-not-allowed text-gray-700 hover:bg-gray-200 transition-colors"
+                                >
+                                    <ChevronLeft size={16} /> Previous
+                                </button>
+                                <span className="text-sm font-semibold text-gray-800">
+                                    Creative {currentCreativeIndex + 1} of {creativeData.creatives.length}
+                                </span>
+                                <button
+                                    onClick={() => setCurrentCreativeIndex(Math.min(creativeData.creatives.length - 1, currentCreativeIndex + 1))}
+                                    disabled={currentCreativeIndex === creativeData.creatives.length - 1}
+                                    className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg disabled:opacity-30 disabled:cursor-not-allowed text-gray-700 hover:bg-gray-200 transition-colors"
+                                >
+                                    Next <ChevronRight size={16} />
+                                </button>
                             </div>
-                        ))}
-                    </div>
-                </div>
 
-                {/* Headline */}
-                <div>
-                    <div className="flex items-center justify-between mb-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                            Headline *
-                        </label>
-                        {creativeData.headlines.length < 6 && (
-                            <button
-                                type="button"
-                                onClick={addHeadlineField}
-                                className="text-sm text-amber-600 hover:text-amber-700 font-medium flex items-center gap-1"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                                Add Headline
-                            </button>
-                        )}
-                    </div>
-                    <div className="space-y-3">
-                        {creativeData.headlines.map((headline, index) => (
-                            <div key={index} className="relative">
-                                <input
-                                    type="text"
-                                    value={headline}
-                                    onChange={(e) => handleHeadlineChange(index, e.target.value)}
-                                    placeholder={`Headline ${index + 1}...`}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                                />
-                                {index >= 1 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => removeHeadlineField(index)}
-                                        className="absolute top-2 right-2 text-red-500 hover:text-red-700"
-                                        title="Remove this headline"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Description */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Description
-                    </label>
-                    <input
-                        type="text"
-                        value={creativeData.description}
-                        onChange={(e) => handleInputChange('description', e.target.value)}
-                        placeholder="Shop now and save!"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                    />
-                </div>
-
-                {/* Ad Permutation Counter */}
-                {creativeData.creatives && creativeData.creatives.length > 0 && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                        <div className="flex items-center gap-2 text-amber-800">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span className="font-medium">
-                                {(() => {
-                                    const validHeadlines = creativeData.headlines.filter(h => h && h.trim() !== '').length;
-                                    const validBodies = creativeData.bodies.filter(b => b && b.trim() !== '').length;
-                                    const totalAds = creativeData.creatives.length * validHeadlines * validBodies;
-                                    const imageCount = creativeData.creatives.filter(c => c.mediaType !== 'video').length;
-                                    const videoCount = creativeData.creatives.filter(c => c.mediaType === 'video').length;
-                                    const mediaDesc = [];
-                                    if (imageCount > 0) mediaDesc.push(`${imageCount} image${imageCount !== 1 ? 's' : ''}`);
-                                    if (videoCount > 0) mediaDesc.push(`${videoCount} video${videoCount !== 1 ? 's' : ''}`);
+                            {/* Creative dots / tabs */}
+                            <div className="bg-gray-50 px-6 pb-3 flex items-center gap-2 flex-wrap">
+                                {creativeData.creatives.map((c, idx) => {
+                                    const hasBody = (c.bodies || []).some(b => b && b.trim());
+                                    const hasHeadline = (c.headlines || []).some(h => h && h.trim());
+                                    const isComplete = hasBody && hasHeadline;
                                     return (
-                                        <>
-                                            {totalAds} ad{totalAds !== 1 ? 's' : ''} will be created
-                                            <span className="text-sm font-normal ml-2">
-                                                ({mediaDesc.join(' + ')} × {validHeadlines} headline{validHeadlines !== 1 ? 's' : ''} × {validBodies} bod{validBodies !== 1 ? 'ies' : 'y'})
-                                            </span>
-                                        </>
+                                        <button
+                                            key={c.id}
+                                            onClick={() => setCurrentCreativeIndex(idx)}
+                                            className={`w-8 h-8 rounded-full text-xs font-bold transition-all ${
+                                                idx === currentCreativeIndex
+                                                    ? 'bg-amber-600 text-white scale-110 shadow'
+                                                    : isComplete
+                                                        ? 'bg-green-100 text-green-700 border border-green-300'
+                                                        : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
+                                            }`}
+                                            title={c.name}
+                                        >
+                                            {idx + 1}
+                                        </button>
                                     );
-                                })()}
-                            </span>
-                        </div>
-                    </div>
-                )}
+                                })}
+                            </div>
 
-                {/* Call to Action */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Call to Action *
-                    </label>
-                    <select
-                        value={creativeData.cta}
-                        onChange={(e) => handleInputChange('cta', e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                    >
-                        {CTA_OPTIONS.map(cta => (
-                            <option key={cta} value={cta}>{cta.replace(/_/g, ' ')}</option>
-                        ))}
-                    </select>
-                </div>
+                            {/* Current Creative Preview + Fields */}
+                            {currentCreative && (
+                                <div className="p-6 space-y-5">
+                                    {/* Thumbnail + Name */}
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                                            {currentCreative.mediaType === 'video' ? (
+                                                currentCreative.thumbnailUrl ? (
+                                                    <img src={currentCreative.thumbnailUrl} alt={currentCreative.name} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <video src={currentCreative.previewUrl} className="w-full h-full object-cover" muted />
+                                                )
+                                            ) : (
+                                                <img src={currentCreative.previewUrl} alt={currentCreative.name} className="w-full h-full object-cover" />
+                                            )}
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-gray-900">{currentCreative.name}</p>
+                                            <span className={`text-xs px-2 py-0.5 rounded ${currentCreative.mediaType === 'video' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                {currentCreative.mediaType === 'video' ? 'Video' : 'Image'}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Per-creative Primary Text */}
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <label className="block text-sm font-medium text-gray-700">Primary Text *</label>
+                                            {(currentCreative.bodies || ['']).length < 6 && (
+                                                <button type="button" onClick={addPerCreativeBody}
+                                                    className="text-sm text-amber-600 hover:text-amber-700 font-medium flex items-center gap-1">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                                    </svg>
+                                                    Add Body Copy
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="space-y-3">
+                                            {(currentCreative.bodies || ['']).map((body, index) => (
+                                                <div key={index} className="relative">
+                                                    <textarea
+                                                        value={body}
+                                                        onChange={(e) => handlePerCreativeBodyChange(index, e.target.value)}
+                                                        placeholder={`Body copy ${index + 1}...`}
+                                                        rows="3"
+                                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                                    />
+                                                    {index >= 1 && (
+                                                        <button type="button" onClick={() => removePerCreativeBody(index)}
+                                                            className="absolute top-2 right-2 text-red-500 hover:text-red-700" title="Remove">
+                                                            <X size={16} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Per-creative Headlines */}
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <label className="block text-sm font-medium text-gray-700">Headline *</label>
+                                            {(currentCreative.headlines || ['']).length < 6 && (
+                                                <button type="button" onClick={addPerCreativeHeadline}
+                                                    className="text-sm text-amber-600 hover:text-amber-700 font-medium flex items-center gap-1">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                                    </svg>
+                                                    Add Headline
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="space-y-3">
+                                            {(currentCreative.headlines || ['']).map((headline, index) => (
+                                                <div key={index} className="relative">
+                                                    <input
+                                                        type="text"
+                                                        value={headline}
+                                                        onChange={(e) => handlePerCreativeHeadlineChange(index, e.target.value)}
+                                                        placeholder={`Headline ${index + 1}...`}
+                                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                                    />
+                                                    {index >= 1 && (
+                                                        <button type="button" onClick={() => removePerCreativeHeadline(index)}
+                                                            className="absolute top-2 right-2 text-red-500 hover:text-red-700" title="Remove">
+                                                            <X size={16} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Per-creative Description */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                                        <input
+                                            type="text"
+                                            value={currentCreative.description || ''}
+                                            onChange={(e) => updateCreativeField(currentCreativeIndex, 'description', e.target.value)}
+                                            placeholder="Shop now and save!"
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                        />
+                                    </div>
+
+                                    {/* Per-creative CTA */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Call to Action *</label>
+                                        <select
+                                            value={currentCreative.cta || creativeData.cta}
+                                            onChange={(e) => updateCreativeField(currentCreativeIndex, 'cta', e.target.value)}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                        >
+                                            {CTA_OPTIONS.map(cta => (
+                                                <option key={cta} value={cta}>{cta.replace(/_/g, ' ')}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Per-creative Ad Counter */}
+                            <div className="px-6 pb-4">
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                    <div className="flex items-center gap-2 text-amber-800">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <span className="font-medium">
+                                            {(() => {
+                                                let totalAds = 0;
+                                                creativeData.creatives.forEach(c => {
+                                                    const h = (c.headlines || []).filter(x => x && x.trim()).length || 1;
+                                                    const b = (c.bodies || []).filter(x => x && x.trim()).length || 1;
+                                                    totalAds += h * b;
+                                                });
+                                                return `${totalAds} ad${totalAds !== 1 ? 's' : ''} will be created (1 per creative × headlines × bodies)`;
+                                            })()}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
+                            Upload media above, then configure copy for each creative here.
+                        </div>
+                    )
+                ) : (
+                    /* ===== STANDARD (BULK) MODE ===== */
+                    <>
+                        {/* Body Text */}
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Primary Text *
+                                </label>
+                                {creativeData.bodies.length < 6 && (
+                                    <button
+                                        type="button"
+                                        onClick={addBodyField}
+                                        className="text-sm text-amber-600 hover:text-amber-700 font-medium flex items-center gap-1"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        Add Body Copy
+                                    </button>
+                                )}
+                            </div>
+                            <div className="space-y-3">
+                                {creativeData.bodies.map((body, index) => (
+                                    <div key={index} className="relative">
+                                        <textarea
+                                            value={body}
+                                            onChange={(e) => handleBodyChange(index, e.target.value)}
+                                            placeholder={`Body copy ${index + 1}...`}
+                                            rows="3"
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                        />
+                                        {index >= 1 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => removeBodyField(index)}
+                                                className="absolute top-2 right-2 text-red-500 hover:text-red-700"
+                                                title="Remove this body copy"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Headline */}
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Headline *
+                                </label>
+                                {creativeData.headlines.length < 6 && (
+                                    <button
+                                        type="button"
+                                        onClick={addHeadlineField}
+                                        className="text-sm text-amber-600 hover:text-amber-700 font-medium flex items-center gap-1"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        Add Headline
+                                    </button>
+                                )}
+                            </div>
+                            <div className="space-y-3">
+                                {creativeData.headlines.map((headline, index) => (
+                                    <div key={index} className="relative">
+                                        <input
+                                            type="text"
+                                            value={headline}
+                                            onChange={(e) => handleHeadlineChange(index, e.target.value)}
+                                            placeholder={`Headline ${index + 1}...`}
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                        />
+                                        {index >= 1 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => removeHeadlineField(index)}
+                                                className="absolute top-2 right-2 text-red-500 hover:text-red-700"
+                                                title="Remove this headline"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Description */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Description
+                            </label>
+                            <input
+                                type="text"
+                                value={creativeData.description}
+                                onChange={(e) => handleInputChange('description', e.target.value)}
+                                placeholder="Shop now and save!"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                            />
+                        </div>
+
+                        {/* Ad Permutation Counter */}
+                        {creativeData.creatives && creativeData.creatives.length > 0 && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                <div className="flex items-center gap-2 text-amber-800">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span className="font-medium">
+                                        {(() => {
+                                            const validHeadlines = creativeData.headlines.filter(h => h && h.trim() !== '').length;
+                                            const validBodies = creativeData.bodies.filter(b => b && b.trim() !== '').length;
+                                            const totalAds = creativeData.creatives.length * validHeadlines * validBodies;
+                                            const imageCount = creativeData.creatives.filter(c => c.mediaType !== 'video').length;
+                                            const videoCount = creativeData.creatives.filter(c => c.mediaType === 'video').length;
+                                            const mediaDesc = [];
+                                            if (imageCount > 0) mediaDesc.push(`${imageCount} image${imageCount !== 1 ? 's' : ''}`);
+                                            if (videoCount > 0) mediaDesc.push(`${videoCount} video${videoCount !== 1 ? 's' : ''}`);
+                                            return (
+                                                <>
+                                                    {totalAds} ad{totalAds !== 1 ? 's' : ''} will be created
+                                                    <span className="text-sm font-normal ml-2">
+                                                        ({mediaDesc.join(' + ')} × {validHeadlines} headline{validHeadlines !== 1 ? 's' : ''} × {validBodies} bod{validBodies !== 1 ? 'ies' : 'y'})
+                                                    </span>
+                                                </>
+                                            );
+                                        })()}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Call to Action */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Call to Action *
+                            </label>
+                            <select
+                                value={creativeData.cta}
+                                onChange={(e) => handleInputChange('cta', e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                            >
+                                {CTA_OPTIONS.map(cta => (
+                                    <option key={cta} value={cta}>{cta.replace(/_/g, ' ')}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </>
+                )}
 
                 {/* Website URL */}
                 <div>

@@ -18,39 +18,61 @@ const BulkAdCreation = ({ onNext, onBack }) => {
     // Initialize ads based on creatives - generate all permutations
     React.useEffect(() => {
         if (creativeData.creatives && creativeData.creatives.length > 0) {
-            // Filter out empty headlines and bodies
-            const validHeadlines = creativeData.headlines.filter(h => h && h.trim() !== '');
-            const validBodies = creativeData.bodies.filter(b => b && b.trim() !== '');
-
-            // Generate all permutations: media × headlines × bodies
             const permutations = [];
-            creativeData.creatives.forEach((creative, creativeIndex) => {
-                validHeadlines.forEach((headline, hIndex) => {
-                    validBodies.forEach((body, bIndex) => {
-                        const isVideo = creative.mediaType === 'video';
-                        const mediaLabel = isVideo ? 'Video' : 'Image';
-                        permutations.push({
-                            id: `ad_${Date.now()}_${creativeIndex}_${hIndex}_${bIndex}`,
-                            name: `${creative.name || `${mediaLabel} ${creativeIndex + 1}`} - H${hIndex + 1}B${bIndex + 1}`,
-                            creativeId: creative.id,
-                            headlineIndex: hIndex,
-                            bodyIndex: bIndex,
-                            mediaType: creative.mediaType || 'image',
-                            useDefaultCreative: true
+
+            if (creativeData.creativeMode === 'per_creative') {
+                // Per-creative mode: each creative has its own headlines/bodies
+                creativeData.creatives.forEach((creative, creativeIndex) => {
+                    const validHeadlines = (creative.headlines || ['']).filter(h => h && h.trim() !== '');
+                    const validBodies = (creative.bodies || ['']).filter(b => b && b.trim() !== '');
+                    const isVideo = creative.mediaType === 'video';
+                    const mediaLabel = isVideo ? 'Video' : 'Image';
+
+                    validHeadlines.forEach((headline, hIndex) => {
+                        validBodies.forEach((body, bIndex) => {
+                            permutations.push({
+                                id: `ad_${Date.now()}_${creativeIndex}_${hIndex}_${bIndex}`,
+                                name: `${creative.name || `${mediaLabel} ${creativeIndex + 1}`}${validHeadlines.length > 1 || validBodies.length > 1 ? ` - H${hIndex + 1}B${bIndex + 1}` : ''}`,
+                                creativeId: creative.id,
+                                headlineIndex: hIndex,
+                                bodyIndex: bIndex,
+                                mediaType: creative.mediaType || 'image',
+                                useDefaultCreative: true,
+                                perCreative: true
+                            });
                         });
                     });
                 });
-            });
+            } else {
+                // Standard mode: shared headlines/bodies across all creatives
+                const validHeadlines = creativeData.headlines.filter(h => h && h.trim() !== '');
+                const validBodies = creativeData.bodies.filter(b => b && b.trim() !== '');
+
+                creativeData.creatives.forEach((creative, creativeIndex) => {
+                    validHeadlines.forEach((headline, hIndex) => {
+                        validBodies.forEach((body, bIndex) => {
+                            const isVideo = creative.mediaType === 'video';
+                            const mediaLabel = isVideo ? 'Video' : 'Image';
+                            permutations.push({
+                                id: `ad_${Date.now()}_${creativeIndex}_${hIndex}_${bIndex}`,
+                                name: `${creative.name || `${mediaLabel} ${creativeIndex + 1}`} - H${hIndex + 1}B${bIndex + 1}`,
+                                creativeId: creative.id,
+                                headlineIndex: hIndex,
+                                bodyIndex: bIndex,
+                                mediaType: creative.mediaType || 'image',
+                                useDefaultCreative: true
+                            });
+                        });
+                    });
+                });
+            }
 
             setAdsData(permutations);
-            const imageCount = creativeData.creatives.filter(c => c.mediaType !== 'video').length;
-            const videoCount = creativeData.creatives.filter(c => c.mediaType === 'video').length;
-            console.log(`Generated ${permutations.length} ad permutations (${imageCount} images + ${videoCount} videos × ${validHeadlines.length} headlines × ${validBodies.length} bodies)`);
+            console.log(`Generated ${permutations.length} ad permutations (${creativeData.creativeMode} mode)`);
         } else {
-            // Fallback if no creatives (shouldn't happen due to validation)
             setAdsData([]);
         }
-    }, [creativeData.creatives, creativeData.headlines, creativeData.bodies]);
+    }, [creativeData.creatives, creativeData.headlines, creativeData.bodies, creativeData.creativeMode]);
 
     const addAd = () => {
         setAdsData(prev => [
@@ -167,6 +189,23 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                     const isVideo = specificCreative?.mediaType === 'video';
 
                     // Construct creative data for this specific ad with specific headline and body
+                    let adHeadlines, adBodies, adDescription, adCta;
+                    if (ad.perCreative && specificCreative) {
+                        // Per-creative mode: pull copy from the creative object
+                        const cHeadlines = (specificCreative.headlines || []).filter(h => h && h.trim());
+                        const cBodies = (specificCreative.bodies || []).filter(b => b && b.trim());
+                        adHeadlines = [cHeadlines[ad.headlineIndex] || cHeadlines[0]];
+                        adBodies = [cBodies[ad.bodyIndex] || cBodies[0]];
+                        adDescription = specificCreative.description || creativeData.description;
+                        adCta = specificCreative.cta || creativeData.cta;
+                    } else {
+                        // Standard mode: pull from global copy fields
+                        adHeadlines = [creativeData.headlines[ad.headlineIndex]];
+                        adBodies = [creativeData.bodies[ad.bodyIndex]];
+                        adDescription = creativeData.description;
+                        adCta = creativeData.cta;
+                    }
+
                     const adSpecificCreativeData = {
                         ...creativeData,
                         mediaType: isVideo ? 'video' : 'image',
@@ -174,9 +213,10 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                         videoUrl: isVideo ? (specificCreative?.videoUrl || specificCreative?.previewUrl) : undefined,
                         imageFile: !isVideo && specificCreative ? specificCreative.file : null,
                         videoFile: isVideo && specificCreative ? specificCreative.file : null,
-                        // Use specific headline and body for this ad permutation
-                        headlines: [creativeData.headlines[ad.headlineIndex]],
-                        bodies: [creativeData.bodies[ad.bodyIndex]]
+                        headlines: adHeadlines,
+                        bodies: adBodies,
+                        description: adDescription,
+                        cta: adCta
                     };
 
                     if (!creativeData.pageId) {
@@ -218,10 +258,10 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                             videoUrl: adSpecificCreativeData.videoUrl,
                             videoId: result.videoId,
                             thumbnailUrl: result.thumbnailUrl,
-                            bodies: creativeData.bodies.filter(b => b.trim() !== ''),
-                            headlines: creativeData.headlines.filter(h => h.trim() !== ''),
-                            description: creativeData.description,
-                            cta: creativeData.cta,
+                            bodies: adBodies,
+                            headlines: adHeadlines,
+                            description: adDescription,
+                            cta: adCta,
                             websiteUrl: creativeData.websiteUrl,
                             status: 'PAUSED',
                             fbAdId: result.adId,
@@ -290,7 +330,7 @@ const BulkAdCreation = ({ onNext, onBack }) => {
                             return parts.join(', ') || '0 files';
                         })()}
                     </div>
-                    <div><strong>Ad Copy:</strong> Standard (Single Body & Headline)</div>
+                    <div><strong>Ad Copy:</strong> {creativeData.creativeMode === 'per_creative' ? 'Per Creative (unique copy per media)' : 'Standard (shared copy across all media)'}</div>
                 </div>
             </div>
 
