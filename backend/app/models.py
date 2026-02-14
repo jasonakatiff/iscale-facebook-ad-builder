@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Text, JSON, Table, Boolean
+from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Text, JSON, Table, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -501,7 +501,29 @@ class AdLibraryItem(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    folder_id = Column(String, ForeignKey("ad_library_folders.id", ondelete="SET NULL"), nullable=True)
+
     brand = relationship("Brand")
+    folder = relationship("AdLibraryFolder", back_populates="items")
+
+
+class AdLibraryFolder(Base):
+    __tablename__ = "ad_library_folders"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    brand_id = Column(String, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False)
+    media_type = Column(String, nullable=False, default="image")  # 'image' or 'video'
+    name = Column(String, nullable=False)
+    position = Column(Integer, nullable=True, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    brand = relationship("Brand")
+    items = relationship("AdLibraryItem", back_populates="folder")
+
+    __table_args__ = (
+        UniqueConstraint('brand_id', 'media_type', 'name', name='uq_folder_brand_media_name'),
+    )
 
 
 class Headline(Base):

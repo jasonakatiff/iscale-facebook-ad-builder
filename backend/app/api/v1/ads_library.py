@@ -5,8 +5,11 @@ from sqlalchemy import func
 from typing import List, Optional
 import os
 from app.database import get_db
-from app.models import AdLibraryItem, Brand, User
-from app.schemas.ads_library import AdLibraryItemCreate, AdLibraryItemUpdate, AdLibraryItemResponse
+from app.models import AdLibraryItem, AdLibraryFolder, Brand, User
+from app.schemas.ads_library import (
+    AdLibraryItemCreate, AdLibraryItemUpdate, AdLibraryItemResponse,
+    AdLibraryFolderCreate, AdLibraryFolderUpdate, AdLibraryFolderResponse,
+)
 from app.core.deps import get_current_active_user
 from app.core.config import settings
 
@@ -14,11 +17,13 @@ router = APIRouter()
 
 
 def _to_response(item: AdLibraryItem) -> dict:
-    """Convert model to response dict with brand_name."""
+    """Convert model to response dict with brand_name and folder_name."""
     data = {
         "id": item.id,
         "brand_id": item.brand_id,
         "brand_name": item.brand.name if item.brand else None,
+        "folder_id": item.folder_id,
+        "folder_name": item.folder.name if item.folder else None,
         "name": item.name,
         "media_type": item.media_type,
         "media_url": item.media_url,
@@ -42,6 +47,7 @@ def _to_response(item: AdLibraryItem) -> dict:
 def list_items(
     brand_id: Optional[str] = None,
     media_type: Optional[str] = None,
+    folder_id: Optional[str] = None,
     funnel_stage: Optional[str] = None,
     status: Optional[str] = None,
     skip: int = 0,
@@ -54,6 +60,10 @@ def list_items(
         query = query.filter(AdLibraryItem.brand_id == brand_id)
     if media_type:
         query = query.filter(AdLibraryItem.media_type == media_type)
+    if folder_id == "__none__":
+        query = query.filter(AdLibraryItem.folder_id.is_(None))
+    elif folder_id:
+        query = query.filter(AdLibraryItem.folder_id == folder_id)
     if funnel_stage:
         query = query.filter(AdLibraryItem.funnel_stage == funnel_stage)
     if status:
@@ -64,13 +74,146 @@ def list_items(
 
 @router.get("/stats")
 def get_stats(
+    brand_id: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    total = db.query(func.count(AdLibraryItem.id)).scalar()
-    images = db.query(func.count(AdLibraryItem.id)).filter(AdLibraryItem.media_type == "image").scalar()
-    videos = db.query(func.count(AdLibraryItem.id)).filter(AdLibraryItem.media_type == "video").scalar()
+    query = db.query(AdLibraryItem)
+    if brand_id:
+        query = query.filter(AdLibraryItem.brand_id == brand_id)
+    total = query.count()
+    images = query.filter(AdLibraryItem.media_type == "image").count()
+    videos = query.filter(AdLibraryItem.media_type == "video").count()
     return {"total": total, "images": images, "videos": videos}
+
+
+# --- Folder endpoints (BEFORE parameterized /{item_id} routes) ---
+
+@router.get("/folders", response_model=List[AdLibraryFolderResponse])
+def list_folders(
+    brand_id: Optional[str] = None,
+    media_type: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    query = db.query(AdLibraryFolder)
+    if brand_id:
+        query = query.filter(AdLibraryFolder.brand_id == brand_id)
+    if media_type:
+        query = query.filter(AdLibraryFolder.media_type == media_type)
+    folders = query.order_by(AdLibraryFolder.position, AdLibraryFolder.name).all()
+
+    results = []
+    for folder in folders:
+        count = db.query(func.count(AdLibraryItem.id)).filter(
+            AdLibraryItem.folder_id == folder.id
+        ).scalar()
+        results.append({
+            "id": folder.id,
+            "brand_id": folder.brand_id,
+            "media_type": folder.media_type,
+            "name": folder.name,
+            "position": folder.position or 0,
+            "item_count": count,
+            "created_at": folder.created_at,
+            "updated_at": folder.updated_at,
+        })
+    return results
+
+
+@router.post("/folders", response_model=AdLibraryFolderResponse)
+def create_folder(
+    folder: AdLibraryFolderCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    existing = db.query(AdLibraryFolder).filter(
+        AdLibraryFolder.brand_id == folder.brand_id,
+        AdLibraryFolder.media_type == folder.media_type,
+        AdLibraryFolder.name == folder.name,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="A folder with this name already exists")
+
+    db_folder = AdLibraryFolder(**folder.model_dump())
+    db.add(db_folder)
+    db.commit()
+    db.refresh(db_folder)
+    return {
+        "id": db_folder.id,
+        "brand_id": db_folder.brand_id,
+        "media_type": db_folder.media_type,
+        "name": db_folder.name,
+        "position": db_folder.position or 0,
+        "item_count": 0,
+        "created_at": db_folder.created_at,
+        "updated_at": db_folder.updated_at,
+    }
+
+
+@router.put("/folders/{folder_id}", response_model=AdLibraryFolderResponse)
+def update_folder(
+    folder_id: str,
+    folder: AdLibraryFolderUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    db_folder = db.query(AdLibraryFolder).filter(AdLibraryFolder.id == folder_id).first()
+    if not db_folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    for key, value in folder.model_dump(exclude_unset=True).items():
+        setattr(db_folder, key, value)
+    db.commit()
+    db.refresh(db_folder)
+    count = db.query(func.count(AdLibraryItem.id)).filter(
+        AdLibraryItem.folder_id == folder_id
+    ).scalar()
+    return {
+        "id": db_folder.id,
+        "brand_id": db_folder.brand_id,
+        "media_type": db_folder.media_type,
+        "name": db_folder.name,
+        "position": db_folder.position or 0,
+        "item_count": count,
+        "created_at": db_folder.created_at,
+        "updated_at": db_folder.updated_at,
+    }
+
+
+@router.delete("/folders/{folder_id}")
+def delete_folder(
+    folder_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    db_folder = db.query(AdLibraryFolder).filter(AdLibraryFolder.id == folder_id).first()
+    if not db_folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    # Items become uncategorized via ON DELETE SET NULL
+    db.delete(db_folder)
+    db.commit()
+    return {"message": "Folder deleted"}
+
+
+class MoveItemsRequest(BaseModel):
+    item_ids: List[str]
+
+
+@router.post("/folders/{folder_id}/move-items")
+def move_items_to_folder(
+    folder_id: str,
+    request: MoveItemsRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    folder = db.query(AdLibraryFolder).filter(AdLibraryFolder.id == folder_id).first()
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    updated = db.query(AdLibraryItem).filter(
+        AdLibraryItem.id.in_(request.item_ids)
+    ).update({"folder_id": folder_id}, synchronize_session="fetch")
+    db.commit()
+    return {"message": f"Moved {updated} items to folder"}
 
 
 # --- Static POST routes MUST come before /{item_id} routes ---

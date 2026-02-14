@@ -13,8 +13,35 @@ export const getLibraryItems = async (filters = {}) => {
     return response.data;
 };
 
-export const getLibraryStats = async () => {
-    const response = await axios.get(`${API_URL}/stats`, { headers: authHeaders() });
+export const getLibraryStats = async (filters = {}) => {
+    const response = await axios.get(`${API_URL}/stats`, { params: filters, headers: authHeaders() });
+    return response.data;
+};
+
+// --- Folder API ---
+
+export const getFolders = async (filters = {}) => {
+    const response = await axios.get(`${API_URL}/folders`, { params: filters, headers: authHeaders() });
+    return response.data;
+};
+
+export const createFolder = async (folder) => {
+    const response = await axios.post(`${API_URL}/folders`, folder, { headers: authHeaders() });
+    return response.data;
+};
+
+export const updateFolder = async (folderId, data) => {
+    const response = await axios.put(`${API_URL}/folders/${folderId}`, data, { headers: authHeaders() });
+    return response.data;
+};
+
+export const deleteFolder = async (folderId) => {
+    const response = await axios.delete(`${API_URL}/folders/${folderId}`, { headers: authHeaders() });
+    return response.data;
+};
+
+export const moveItemsToFolder = async (folderId, itemIds) => {
+    const response = await axios.post(`${API_URL}/folders/${folderId}/move-items`, { item_ids: itemIds }, { headers: authHeaders() });
     return response.data;
 };
 
