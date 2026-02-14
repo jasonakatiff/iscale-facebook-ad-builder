@@ -397,7 +397,7 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                 localStorage.setItem(`defaultHeadlines_${selectedAdAccount.id}`, JSON.stringify(allHeadlines));
             }
 
-            const providerName = provider === 'claude' ? 'Claude Haiku' : 'Gemini';
+            const providerName = provider === 'transcribe_haiku' ? 'Transcribe + Haiku' : provider === 'claude' ? 'Claude Haiku' : 'Gemini';
             showSuccess(`${providerName} ad copy appended (${newBodies.length} bodies, ${newHeadlines.length} headlines)`);
         } catch (error) {
             console.error('Video analysis error:', error);
@@ -643,13 +643,24 @@ const AdCreativeStep = ({ onNext, onBack }) => {
                                                             </div>
                                                         </button>
                                                         <button
+                                                            onClick={() => handleAnalyzeVideo(creative, 'transcribe_haiku')}
+                                                            className="w-full px-3 py-2 text-left text-sm hover:bg-green-50 flex items-center gap-2"
+                                                        >
+                                                            <Sparkles size={14} className="text-green-500" />
+                                                            <div>
+                                                                <div className="font-medium text-gray-800">Transcribe + Haiku</div>
+                                                                <div className="text-xs text-gray-500">Gemini transcribes → Haiku writes copy</div>
+                                                            </div>
+                                                        </button>
+                                                        <div className="border-t border-gray-100 my-1"></div>
+                                                        <button
                                                             onClick={() => handleAnalyzeVideo(creative, 'claude')}
                                                             className="w-full px-3 py-2 text-left text-sm hover:bg-purple-50 flex items-center gap-2"
                                                         >
                                                             <Sparkles size={14} className="text-purple-500" />
                                                             <div>
                                                                 <div className="font-medium text-gray-800">Claude Haiku</div>
-                                                                <div className="text-xs text-gray-500">Analyzes video frames</div>
+                                                                <div className="text-xs text-gray-500">Frames only (no audio)</div>
                                                             </div>
                                                         </button>
                                                     </div>
@@ -683,14 +694,34 @@ const AdCreativeStep = ({ onNext, onBack }) => {
 
                     {/* AI Video Analysis Loading Banner */}
                     {analyzingVideoId && (
-                        <div className={`flex items-center gap-3 ${analyzingProvider === 'claude' ? 'bg-purple-50 border-purple-200' : 'bg-amber-50 border-amber-200'} border rounded-lg p-4 mb-4`}>
-                            <Loader className={`animate-spin ${analyzingProvider === 'claude' ? 'text-purple-600' : 'text-amber-600'}`} size={20} />
+                        <div className={`flex items-center gap-3 ${
+                            analyzingProvider === 'transcribe_haiku' ? 'bg-green-50 border-green-200'
+                            : analyzingProvider === 'claude' ? 'bg-purple-50 border-purple-200'
+                            : 'bg-amber-50 border-amber-200'
+                        } border rounded-lg p-4 mb-4`}>
+                            <Loader className={`animate-spin ${
+                                analyzingProvider === 'transcribe_haiku' ? 'text-green-600'
+                                : analyzingProvider === 'claude' ? 'text-purple-600'
+                                : 'text-amber-600'
+                            }`} size={20} />
                             <div>
-                                <p className={`${analyzingProvider === 'claude' ? 'text-purple-800' : 'text-amber-800'} font-medium`}>
-                                    Analyzing video with {analyzingProvider === 'claude' ? 'Claude Haiku' : 'Gemini 2.0 Flash'}...
+                                <p className={`${
+                                    analyzingProvider === 'transcribe_haiku' ? 'text-green-800'
+                                    : analyzingProvider === 'claude' ? 'text-purple-800'
+                                    : 'text-amber-800'
+                                } font-medium`}>
+                                    {analyzingProvider === 'transcribe_haiku'
+                                        ? 'Transcribing audio + generating copy with Haiku...'
+                                        : `Analyzing video with ${analyzingProvider === 'claude' ? 'Claude Haiku' : 'Gemini 2.0 Flash'}...`}
                                 </p>
-                                <p className={`${analyzingProvider === 'claude' ? 'text-purple-600' : 'text-amber-600'} text-sm`}>
-                                    {analyzingProvider === 'claude'
+                                <p className={`${
+                                    analyzingProvider === 'transcribe_haiku' ? 'text-green-600'
+                                    : analyzingProvider === 'claude' ? 'text-purple-600'
+                                    : 'text-amber-600'
+                                } text-sm`}>
+                                    {analyzingProvider === 'transcribe_haiku'
+                                        ? 'Step 1: Gemini transcribes audio → Step 2: Haiku writes DR copy. This may take 60-90 seconds.'
+                                        : analyzingProvider === 'claude'
                                         ? 'Extracting key frames and generating ad copy. This may take 30-60 seconds.'
                                         : 'Watching your video and generating ad copy. This may take 30-60 seconds.'}
                                 </p>
