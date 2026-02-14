@@ -71,6 +71,10 @@ class BrandScrapeCreate(BaseModel):
     page_url: str  # Facebook Ads Library URL with view_all_page_id
 
 
+class BrandScrapeUpdate(BaseModel):
+    brand_name: Optional[str] = None
+
+
 class BrandScrapedAdResponse(BaseModel):
     id: str
     external_id: str

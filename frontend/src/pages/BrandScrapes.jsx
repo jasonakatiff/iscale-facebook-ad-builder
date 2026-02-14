@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../context/ToastContext';
-import { createBrandScrape, getBrandScrapes, getBrandScrape, deleteBrandScrape } from '../api/research';
-import { Search, Trash2, ChevronDown, ChevronRight, ExternalLink, Image, Video, Loader2, RefreshCw, X, Download, ChevronLeft, Wand2 } from 'lucide-react';
+import { createBrandScrape, getBrandScrapes, getBrandScrape, deleteBrandScrape, updateBrandScrape, refreshBrandScrape } from '../api/research';
+import { Search, Trash2, ChevronDown, ChevronRight, ExternalLink, Image, Video, Loader2, RefreshCw, X, Download, ChevronLeft, Wand2, Pencil, Check } from 'lucide-react';
 import GenerateVideoModal from '../components/GenerateVideoModal';
+
+const VIDEO_PLACEHOLDER = 'https://pub-11870393a7f1464a9a0bf4fce09be525.r2.dev/placeholders/video_ad.png';
 
 const BrandScrapes = () => {
     const { showSuccess, showError, showInfo } = useToast();
@@ -36,6 +38,9 @@ const BrandScrapes = () => {
     const [selectedAd, setSelectedAd] = useState(null);
     const [mediaIndex, setMediaIndex] = useState(0);
     const [videoGenImage, setVideoGenImage] = useState(null);
+    const [editingScrapeId, setEditingScrapeId] = useState(null);
+    const [editName, setEditName] = useState('');
+    const [refreshingScrapeId, setRefreshingScrapeId] = useState(null);
 
     const handleDownload = async (url) => {
         try {
@@ -142,6 +147,35 @@ const BrandScrapes = () => {
             fetchScrapes();
         } catch (error) {
             showError('Failed to delete brand scrape');
+        }
+    };
+
+    const handleRename = async (scrapeId) => {
+        if (!editName.trim()) {
+            showError('Name cannot be empty');
+            return;
+        }
+        try {
+            await updateBrandScrape(scrapeId, { brand_name: editName.trim() });
+            showSuccess('Brand scrape renamed');
+            setEditingScrapeId(null);
+            fetchScrapes();
+        } catch (error) {
+            showError('Failed to rename brand scrape');
+        }
+    };
+
+    const handleRefresh = async (scrape) => {
+        setRefreshingScrapeId(scrape.id);
+        try {
+            await refreshBrandScrape(scrape.id);
+            showSuccess(`Re-scraping ${scrape.brand_name}...`);
+            fetchScrapes();
+        } catch (error) {
+            const msg = error.response?.data?.detail || 'Failed to refresh';
+            showError(msg);
+        } finally {
+            setRefreshingScrapeId(null);
         }
     };
 
@@ -268,7 +302,37 @@ const BrandScrapes = () => {
                                             )}
                                         </button>
                                         <div>
-                                            <h3 className="font-medium text-gray-900">{scrape.brand_name}</h3>
+                                            {editingScrapeId === scrape.id ? (
+                                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                    <input
+                                                        type="text"
+                                                        value={editName}
+                                                        onChange={(e) => setEditName(e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') handleRename(scrape.id);
+                                                            if (e.key === 'Escape') setEditingScrapeId(null);
+                                                        }}
+                                                        className="px-2 py-1 border border-amber-300 rounded text-sm font-medium focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                                                        autoFocus
+                                                    />
+                                                    <button
+                                                        onClick={() => handleRename(scrape.id)}
+                                                        className="p-1 text-green-600 hover:bg-green-50 rounded"
+                                                        title="Save"
+                                                    >
+                                                        <Check size={16} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setEditingScrapeId(null)}
+                                                        className="p-1 text-gray-400 hover:bg-gray-100 rounded"
+                                                        title="Cancel"
+                                                    >
+                                                        <X size={16} />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <h3 className="font-medium text-gray-900">{scrape.brand_name}</h3>
+                                            )}
                                             <p className="text-sm text-gray-500">
                                                 {scrape.page_name || `Page ID: ${scrape.page_id}`}
                                             </p>
@@ -287,6 +351,28 @@ const BrandScrapes = () => {
                                         <span className="text-xs text-gray-400">
                                             {formatDate(scrape.created_at)}
                                         </span>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setEditingScrapeId(scrape.id);
+                                                setEditName(scrape.brand_name);
+                                            }}
+                                            className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"
+                                            title="Rename"
+                                        >
+                                            <Pencil size={16} />
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleRefresh(scrape);
+                                            }}
+                                            disabled={refreshingScrapeId === scrape.id || scrape.status === 'scraping'}
+                                            className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg disabled:opacity-50"
+                                            title="Re-scrape current ads"
+                                        >
+                                            <RefreshCw size={16} className={refreshingScrapeId === scrape.id ? 'animate-spin' : ''} />
+                                        </button>
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -322,9 +408,9 @@ const BrandScrapes = () => {
                                                         >
                                                             {ad.media_urls && ad.media_urls.length > 0 ? (
                                                                 <img
-                                                                    src={ad.media_urls[0]}
+                                                                    src={ad.media_type === 'video' ? VIDEO_PLACEHOLDER : ad.media_urls[0]}
                                                                     alt={ad.headline || 'Ad'}
-                                                                    className="w-full h-full object-cover"
+                                                                    className={`w-full h-full ${ad.media_type === 'video' ? 'object-contain bg-gray-900' : 'object-cover'}`}
                                                                 />
                                                             ) : (
                                                                 <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -440,6 +526,7 @@ const BrandScrapes = () => {
                         {(() => {
                             const currentUrl = selectedAd.media_urls[mediaIndex];
                             const isActualVideo = currentUrl?.match(/\.(mp4|webm|mov)(\?|$)/i);
+                            const displayUrl = selectedAd.media_type === 'video' ? VIDEO_PLACEHOLDER : currentUrl;
                             return isActualVideo ? (
                                 <video
                                     key={currentUrl}
@@ -450,7 +537,7 @@ const BrandScrapes = () => {
                                 />
                             ) : (
                                 <img
-                                    src={currentUrl}
+                                    src={displayUrl}
                                     alt={selectedAd.headline || 'Ad'}
                                     className="w-full rounded-lg max-h-[70vh] object-contain bg-black"
                                 />

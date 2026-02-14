@@ -4,7 +4,7 @@ from typing import List, Tuple
 from app.database import get_db
 from app.schemas.research import (
     AdSearchRequest, ScrapedAdResponse, ScrapedAdCreate, ScrapedAdSearchResult, SavedSearchResponse,
-    BrandScrapeCreate, BrandScrapeResponse, BrandScrapeListResponse
+    BrandScrapeCreate, BrandScrapeUpdate, BrandScrapeResponse, BrandScrapeListResponse
 )
 from app.services.research_service import ResearchService
 from app.services.rate_limiter import rate_limiter
@@ -489,6 +489,77 @@ def get_brand_scrape(scrape_id: str, db: Session = Depends(get_db)):
     scrape = db.query(BrandScrape).filter(BrandScrape.id == scrape_id).first()
     if not scrape:
         raise HTTPException(status_code=404, detail="Brand scrape not found")
+
+    return scrape
+
+
+@router.patch("/brand-scrapes/{scrape_id}", response_model=BrandScrapeListResponse)
+def update_brand_scrape(
+    scrape_id: str,
+    request: BrandScrapeUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update a brand scrape (e.g. rename)."""
+    from app.models import BrandScrape
+
+    scrape = db.query(BrandScrape).filter(BrandScrape.id == scrape_id).first()
+    if not scrape:
+        raise HTTPException(status_code=404, detail="Brand scrape not found")
+
+    if request.brand_name is not None:
+        scrape.brand_name = request.brand_name
+
+    db.commit()
+    db.refresh(scrape)
+    return scrape
+
+
+@router.post("/brand-scrapes/{scrape_id}/refresh", response_model=BrandScrapeListResponse)
+async def refresh_brand_scrape(
+    scrape_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """Re-scrape a brand's ads (deletes old ads, re-runs scraper)."""
+    from app.models import BrandScrape, BrandScrapedAd
+    from app.services.brand_scraper import BrandScraperService
+
+    scrape = db.query(BrandScrape).filter(BrandScrape.id == scrape_id).first()
+    if not scrape:
+        raise HTTPException(status_code=404, detail="Brand scrape not found")
+
+    if scrape.status == "scraping":
+        raise HTTPException(status_code=409, detail="Scrape already in progress")
+
+    # Delete old ads
+    db.query(BrandScrapedAd).filter(BrandScrapedAd.brand_scrape_id == scrape_id).delete()
+    scrape.status = "pending"
+    scrape.total_ads = 0
+    scrape.media_downloaded = 0
+    scrape.error_message = None
+    db.commit()
+    db.refresh(scrape)
+
+    # Re-run scrape in background
+    async def run_scrape():
+        from app.database import SessionLocal
+        scrape_db = SessionLocal()
+        try:
+            scraper = BrandScraperService(scrape_db)
+            scrape_record = scrape_db.query(BrandScrape).filter(BrandScrape.id == scrape_id).first()
+            if scrape_record:
+                await scraper.scrape_brand(scrape_record)
+        except Exception as e:
+            print(f"Background refresh scrape error: {e}")
+            scrape_record = scrape_db.query(BrandScrape).filter(BrandScrape.id == scrape_id).first()
+            if scrape_record:
+                scrape_record.status = "failed"
+                scrape_record.error_message = str(e)[:500]
+                scrape_db.commit()
+        finally:
+            scrape_db.close()
+
+    background_tasks.add_task(run_scrape)
 
     return scrape
 

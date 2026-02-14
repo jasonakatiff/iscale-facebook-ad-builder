@@ -30,7 +30,6 @@ export default function Layout() {
                 { label: 'Settings', path: '/research/settings' }
             ]
         },
-        { icon: Wand2, label: 'Build Creatives', path: '/build-creatives' },
         {
             icon: ShoppingBag,
             label: 'Brands',
@@ -40,9 +39,10 @@ export default function Layout() {
                 { label: 'Customer Profiles', path: '/profiles' }
             ]
         },
+        { icon: FolderOpen, label: 'Ads Library', path: '/ads-library' },
+        { icon: Wand2, label: 'Build Creatives', path: '/build-creatives' },
         { icon: Image, label: 'Winning Ads', path: '/winning-ads' },
         { icon: FileImage, label: 'BreadWinner Ads', path: '/generated-ads' },
-        { icon: FolderOpen, label: 'Ads Library', path: '/ads-library' },
         { icon: Target, label: 'Facebook Campaigns', path: '/facebook-campaigns' },
     ];
 

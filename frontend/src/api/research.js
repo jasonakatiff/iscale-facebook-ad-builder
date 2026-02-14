@@ -215,6 +215,26 @@ export const getBrandScrape = async (scrapeId) => {
     }
 };
 
+export const updateBrandScrape = async (scrapeId, data) => {
+    try {
+        const response = await axios.patch(`${API_URL}/brand-scrapes/${scrapeId}`, data);
+        return response.data;
+    } catch (error) {
+        console.error('Error updating brand scrape:', error);
+        throw error;
+    }
+};
+
+export const refreshBrandScrape = async (scrapeId) => {
+    try {
+        const response = await axios.post(`${API_URL}/brand-scrapes/${scrapeId}/refresh`);
+        return response.data;
+    } catch (error) {
+        console.error('Error refreshing brand scrape:', error);
+        throw error;
+    }
+};
+
 export const deleteBrandScrape = async (scrapeId) => {
     try {
         const response = await axios.delete(`${API_URL}/brand-scrapes/${scrapeId}`);
