@@ -6,6 +6,9 @@ import react from '@vitejs/plugin-react'
 // API calls should be made from a backend server, not the frontend
 export default defineConfig({
   plugins: [react()],
+  preview: {
+    allowedHosts: ['frontend-production-9f4d.up.railway.app'],
+  },
   server: {
     proxy: {
       '/api': {
