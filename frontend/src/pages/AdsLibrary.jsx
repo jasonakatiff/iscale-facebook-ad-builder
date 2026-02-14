@@ -102,65 +102,136 @@ const AdsLibrary = () => {
         setUploading(true);
         let uploaded = 0;
 
+        // Separate images and videos
+        const imageFiles = [];
+        const videoFiles = [];
         for (const file of files) {
-            const isImage = ALLOWED_IMAGE_TYPES.includes(file.type);
-            const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type);
+            if (ALLOWED_IMAGE_TYPES.includes(file.type)) imageFiles.push(file);
+            else if (ALLOWED_VIDEO_TYPES.includes(file.type)) videoFiles.push(file);
+            else showError(`${file.name}: Unsupported file type`);
+        }
 
-            if (!isImage && !isVideo) {
-                showError(`${file.name}: Unsupported file type`);
-                continue;
-            }
-
+        // Phase 1: Upload all image files and detect ratios
+        const imageUploads = []; // { file, url, ratio }
+        for (const file of imageFiles) {
             try {
                 setUploadProgress(`Uploading ${file.name}...`);
-
-                // Upload file to R2
-                const { url, media_type } = await uploadFile(file);
-
-                let thumbnailUrl = null;
-                let variants = null;
-                let aiName = null;
-
-                if (isVideo) {
-                    // Extract video thumbnail
-                    try {
-                        setUploadProgress(`Extracting thumbnail from ${file.name}...`);
-                        const thumbBlob = await extractVideoThumbnail(file);
-                        const thumbFile = new File([thumbBlob], `thumb_${file.name.replace(/\.[^.]+$/, '.jpg')}`, { type: 'image/jpeg' });
-                        const thumbResult = await uploadFile(thumbFile);
-                        thumbnailUrl = thumbResult.url;
-                    } catch (e) {
-                        console.warn('Thumbnail extraction failed:', e);
-                    }
-                }
-
-                if (isImage) {
-                    // Detect aspect ratio and store in variants
-                    try {
-                        const ratio = await detectAspectRatio(file);
-                        variants = { [ratio]: url };
-                    } catch (e) {
-                        console.warn('Aspect ratio detection failed:', e);
-                    }
-                }
-
-                // AI-generated name
+                const { url } = await uploadFile(file);
+                let ratio = 'unknown';
                 try {
-                    setUploadProgress(`Naming ${file.name} with AI...`);
-                    const { name } = await getAiName(url);
+                    ratio = await detectAspectRatio(file);
+                } catch (e) {
+                    console.warn('Aspect ratio detection failed:', e);
+                }
+                imageUploads.push({ file, url, ratio, size: file.size });
+            } catch (error) {
+                showError(`Failed to upload ${file.name}`);
+            }
+        }
+
+        // Phase 2: Group images by ratio pairs (e.g., 1:1 + 9:16 → one entry)
+        const groups = []; // each group = array of { url, ratio, size }
+        const used = new Set();
+
+        // Try to pair images with different ratios
+        for (let i = 0; i < imageUploads.length; i++) {
+            if (used.has(i)) continue;
+            const a = imageUploads[i];
+            let paired = false;
+
+            // Look for a partner with a different ratio
+            for (let j = i + 1; j < imageUploads.length; j++) {
+                if (used.has(j)) continue;
+                const b = imageUploads[j];
+                if (a.ratio !== b.ratio && a.ratio !== 'unknown' && b.ratio !== 'unknown') {
+                    // Pair them
+                    groups.push([a, b]);
+                    used.add(i);
+                    used.add(j);
+                    paired = true;
+                    break;
+                }
+            }
+            if (!paired) {
+                groups.push([a]);
+                used.add(i);
+            }
+        }
+
+        // Phase 3: Create library items for each group
+        for (const group of groups) {
+            try {
+                const primary = group[0];
+                const variants = {};
+                let totalSize = 0;
+                for (const item of group) {
+                    variants[item.ratio] = item.url;
+                    totalSize += item.size;
+                }
+
+                // AI name from primary image
+                let aiName = null;
+                try {
+                    setUploadProgress(`Naming with AI...`);
+                    const { name } = await getAiName(primary.url);
                     aiName = name;
                 } catch (e) {
                     console.warn('AI naming failed:', e);
                 }
 
-                // Create library item
+                const ratioLabel = group.length > 1
+                    ? ` (${group.map(g => g.ratio).join(' + ')})`
+                    : '';
+
+                await createLibraryItem({
+                    brand_id: uploadBrand,
+                    name: aiName || primary.file.name.replace(/\.[^.]+$/, '') + ratioLabel,
+                    media_type: 'image',
+                    media_url: primary.url,
+                    variants,
+                    file_size: totalSize,
+                    status: 'draft',
+                });
+                uploaded++;
+            } catch (error) {
+                showError('Failed to create library item');
+            }
+        }
+
+        // Phase 4: Handle video files
+        for (const file of videoFiles) {
+            try {
+                setUploadProgress(`Uploading ${file.name}...`);
+                const { url } = await uploadFile(file);
+
+                let thumbnailUrl = null;
+                try {
+                    setUploadProgress(`Extracting thumbnail...`);
+                    const thumbBlob = await extractVideoThumbnail(file);
+                    const thumbFile = new File([thumbBlob], `thumb_${file.name.replace(/\.[^.]+$/, '.jpg')}`, { type: 'image/jpeg' });
+                    const thumbResult = await uploadFile(thumbFile);
+                    thumbnailUrl = thumbResult.url;
+                } catch (e) {
+                    console.warn('Thumbnail extraction failed:', e);
+                }
+
+                let aiName = null;
+                if (thumbnailUrl) {
+                    try {
+                        setUploadProgress(`Naming with AI...`);
+                        const { name } = await getAiName(thumbnailUrl);
+                        aiName = name;
+                    } catch (e) {
+                        console.warn('AI naming failed:', e);
+                    }
+                }
+
                 await createLibraryItem({
                     brand_id: uploadBrand,
                     name: aiName || file.name.replace(/\.[^.]+$/, ''),
-                    media_type: media_type,
+                    media_type: 'video',
                     media_url: url,
                     thumbnail_url: thumbnailUrl,
-                    variants: variants,
                     file_size: file.size,
                     status: 'draft',
                 });
@@ -171,7 +242,7 @@ const AdsLibrary = () => {
         }
 
         if (uploaded > 0) {
-            showSuccess(`Uploaded ${uploaded} file${uploaded > 1 ? 's' : ''}`);
+            showSuccess(`Uploaded ${uploaded} item${uploaded > 1 ? 's' : ''}`);
             fetchItems();
         }
         setUploading(false);
