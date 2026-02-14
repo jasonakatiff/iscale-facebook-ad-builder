@@ -97,7 +97,7 @@ async def startup_event():
 
 
 # Include Routers
-from app.api.v1 import brands, products, research, generated_ads, templates, facebook, uploads, dashboard, copy_generation, profiles, ad_remix, prompts, ad_styles, auth, users, video_analysis, ads_library, higgsfield
+from app.api.v1 import brands, products, research, generated_ads, templates, facebook, uploads, dashboard, copy_generation, profiles, ad_remix, prompts, ad_styles, auth, users, video_analysis, ads_library, higgsfield, headlines
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
@@ -117,6 +117,7 @@ app.include_router(ad_styles.router, prefix="/api/v1/ad-styles", tags=["ad-style
 app.include_router(video_analysis.router, prefix="/api/v1/video-analysis", tags=["video-analysis"])
 app.include_router(ads_library.router, prefix="/api/v1/ads-library", tags=["ads-library"])
 app.include_router(higgsfield.router, prefix="/api/v1/higgsfield", tags=["higgsfield"])
+app.include_router(headlines.router, prefix="/api/v1/headlines", tags=["headlines"])
 
 # Mount static files for uploads
 import os

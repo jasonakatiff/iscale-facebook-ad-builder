@@ -502,3 +502,19 @@ class AdLibraryItem(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     brand = relationship("Brand")
+
+
+class Headline(Base):
+    __tablename__ = "headlines"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    brand_id = Column(String, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False)
+    product_id = Column(String, ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
+    text = Column(Text, nullable=False)
+    category = Column(String, nullable=True)  # curiosity, urgency, benefit, social_proof, fomo
+    source = Column(String, default="ai")     # ai or manual
+    research_doc_url = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    brand = relationship("Brand")
+    product = relationship("Product")

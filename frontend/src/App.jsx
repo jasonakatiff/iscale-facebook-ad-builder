@@ -35,6 +35,7 @@ import Settings from './pages/Settings';
 import Login from './pages/Login';
 import UserManagement from './pages/UserManagement';
 import AdsLibrary from './pages/AdsLibrary';
+import Headlines from './pages/Headlines';
 
 function App() {
   return (
@@ -67,6 +68,7 @@ function App() {
                   <Route path="winning-ads" element={<WinningAds />} />
                   <Route path="generated-ads" element={<GeneratedAds />} />
                   <Route path="ads-library" element={<AdsLibrary />} />
+                  <Route path="headlines" element={<Headlines />} />
                   <Route path="brands" element={<Brands />} />
                   <Route path="products" element={<Products />} />
                   <Route path="profiles" element={<CustomerProfiles />} />

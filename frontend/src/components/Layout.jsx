@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, Users, Video, Wand2, Settings, LogOut, Image, ShoppingBag, Target, ChevronLeft, ChevronRight, FileImage, Search, ChevronDown, UserCog, FolderOpen } from 'lucide-react';
+import { LayoutDashboard, Package, Users, Video, Wand2, Settings, LogOut, Image, ShoppingBag, Target, ChevronLeft, ChevronRight, FileImage, Search, ChevronDown, UserCog, FolderOpen, Type } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
@@ -40,6 +40,7 @@ export default function Layout() {
             ]
         },
         { icon: FolderOpen, label: 'Ads Library', path: '/ads-library' },
+        { icon: Type, label: 'Headlines', path: '/headlines' },
         { icon: Wand2, label: 'Build Creatives', path: '/build-creatives' },
         { icon: Image, label: 'Winning Ads', path: '/winning-ads' },
         { icon: FileImage, label: 'BreadWinner Ads', path: '/generated-ads' },
