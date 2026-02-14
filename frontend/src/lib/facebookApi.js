@@ -140,6 +140,15 @@ export async function getPages(adAccountId) {
 }
 
 
+export async function getPageInfo(pageId) {
+    const response = await authFetch(`${API_BASE_URL}/pages/${pageId}`);
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || 'Failed to fetch page info');
+    }
+    return response.json();
+}
+
 export const getAdSets = async (campaignId, adAccountId) => {
     try {
         let url = `${API_BASE_URL}/adsets?`;

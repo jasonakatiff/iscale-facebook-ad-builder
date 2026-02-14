@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft, Upload, X, Loader, Trash2, Film, Image, Sparkles, Play, FolderOpen, Check } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
 import { useAuth } from '../context/AuthContext';
-import { getPages } from '../lib/facebookApi';
+import { getPages, getPageInfo } from '../lib/facebookApi';
 import { getLibraryItems } from '../api/adsLibrary';
 import { useBrands } from '../context/BrandContext';
 
@@ -233,20 +233,33 @@ const AdCreativeStep = ({ onNext, onBack }) => {
         } catch { return []; }
     };
 
-    const mergePages = (fetchedPages) => {
+    const mergePages = async (fetchedPages) => {
         const savedPages = loadSavedManualPages();
         const fetchedIds = new Set(fetchedPages.map(p => p.id));
 
-        // Update saved pages with real names from API if they had generic names
+        // Update saved pages with real names - from fetched list or individual lookup
         let needsSave = false;
-        const updatedSaved = savedPages.map(sp => {
+        const updatedSaved = await Promise.all(savedPages.map(async (sp) => {
+            if (!sp.name.startsWith('Page ')) return sp; // already has real name
+
+            // Check fetched pages first
             const fetched = fetchedPages.find(fp => fp.id === sp.id);
-            if (fetched && sp.name.startsWith('Page ')) {
+            if (fetched) {
                 needsSave = true;
                 return { ...sp, name: fetched.name };
             }
+
+            // Look up individually via Graph API
+            try {
+                const info = await getPageInfo(sp.id);
+                if (info?.name) {
+                    needsSave = true;
+                    return { ...sp, name: info.name };
+                }
+            } catch (e) { /* keep generic name */ }
             return sp;
-        });
+        }));
+
         if (needsSave) {
             localStorage.setItem('savedManualPages', JSON.stringify(updatedSaved));
         }
@@ -264,14 +277,14 @@ const AdCreativeStep = ({ onNext, onBack }) => {
             return;
         }
 
-        // Try to fetch the page name from the API
+        // Fetch the real page name from Facebook Graph API
         let pageName = `Page ${pageId}`;
         try {
-            const fetchedPages = await getPages(selectedAdAccount?.id);
-            const match = fetchedPages.find(p => p.id === pageId);
-            if (match?.name) pageName = match.name;
+            const pageInfo = await getPageInfo(pageId);
+            if (pageInfo?.name) pageName = pageInfo.name;
         } catch (e) {
-            // Silently fall back to generic name
+            // Fall back to generic name if lookup fails
+            console.warn('Could not look up page name:', e);
         }
 
         const updated = [...savedPages, { id: pageId, name: pageName }];
@@ -280,14 +293,14 @@ const AdCreativeStep = ({ onNext, onBack }) => {
             if (prev.some(p => p.id === pageId)) return prev;
             return [...prev, { id: pageId, name: pageName }];
         });
-        showSuccess('Page ID saved to dropdown list');
+        showSuccess(`Saved: ${pageName}`);
     };
 
     const fetchPages = async () => {
         setLoadingPages(true);
         try {
             const fetchedPages = await getPages(selectedAdAccount.id);
-            const combined = mergePages(fetchedPages);
+            const combined = await mergePages(fetchedPages);
             setPages(combined);
 
             // If no page is selected and we have pages, select the first one (or the last used one if it exists in the list)

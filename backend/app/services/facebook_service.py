@@ -180,6 +180,14 @@ class FacebookService:
         pages = me.get_accounts(fields=fields)
         return [dict(page) for page in pages]
 
+    def get_page_info(self, page_id: str):
+        """Fetch a single Facebook Page's name by ID."""
+        from facebook_business.adobjects.page import Page
+
+        page = Page(fbid=page_id, api=self.api)
+        page.api_get(fields=[Page.Field.id, Page.Field.name])
+        return {"id": page[Page.Field.id], "name": page[Page.Field.name]}
+
     def get_adsets(self, ad_account_id=None, campaign_id=None):
         """Fetch all ad sets."""
         fields = [

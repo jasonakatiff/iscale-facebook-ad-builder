@@ -80,6 +80,18 @@ def read_pages(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/pages/{page_id}")
+def read_page_info(
+    page_id: str,
+    service: FacebookService = Depends(get_facebook_service),
+    current_user: User = Depends(get_current_active_user)
+):
+    try:
+        return service.get_page_info(page_id)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Could not find page: {str(e)}")
+
+
 @router.get("/adsets")
 def read_adsets(
     ad_account_id: Optional[str] = None,
