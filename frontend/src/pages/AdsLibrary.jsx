@@ -78,6 +78,7 @@ const AdsLibrary = () => {
     // ── Upload ──
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState('');
+    const [uploadFiles, setUploadFiles] = useState([]); // [{id, name, progress, status}]
     const [dragActive, setDragActive] = useState(false);
     const fileInputRef = useRef(null);
 
@@ -196,9 +197,21 @@ const AdsLibrary = () => {
     const STANDARD_RATIOS = ['1:1', '9:16', '4:5'];
 
     // ── Upload handlers — now populates review queue instead of creating items immediately ──
-    const handleFiles = async (files) => {
-        setUploading(true);
+    // Concurrency-limited parallel executor
+    const runParallel = async (tasks, concurrency = 3) => {
+        const results = [];
+        let idx = 0;
+        const run = async () => {
+            while (idx < tasks.length) {
+                const i = idx++;
+                results[i] = await tasks[i]();
+            }
+        };
+        await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, run));
+        return results;
+    };
 
+    const handleFiles = async (files) => {
         // Separate images and videos
         const imageFiles = [];
         const videoFiles = [];
@@ -219,23 +232,45 @@ const AdsLibrary = () => {
             showError('Only image files are accepted in the Images section');
         }
 
-        // Phase 1: Upload all image files and detect ratios
+        const allFiles = [...relevantImages, ...relevantVideos];
+        if (allFiles.length === 0) return;
+
+        // Build per-file tracker
+        const fileTrackers = allFiles.map((file, i) => ({
+            id: `upload_${Date.now()}_${i}`,
+            name: file.name,
+            progress: 0,
+            status: 'pending', // pending | uploading | processing | done | error
+        }));
+        setUploadFiles(fileTrackers);
+        setUploading(true);
+
+        const updateTracker = (id, updates) => {
+            setUploadFiles(prev => prev.map(f => f.id === id ? { ...f, ...updates } : f));
+        };
+
+        const capturedFolderId = (currentFolderId && currentFolderId !== '__none__') ? currentFolderId : null;
+
+        // Phase 1: Upload all images in parallel (max 3 concurrent)
         const imageUploads = [];
-        for (const file of relevantImages) {
+        const imageTasks = relevantImages.map((file, i) => () => (async () => {
+            const tracker = fileTrackers[i];
+            updateTracker(tracker.id, { status: 'uploading', progress: 0 });
             try {
-                setUploadProgress(`Uploading ${file.name}...`);
-                const { url } = await uploadFile(file);
+                const { url } = await uploadFile(file, (pct) => {
+                    updateTracker(tracker.id, { progress: pct });
+                });
+                updateTracker(tracker.id, { status: 'processing', progress: 100 });
                 let ratio = 'unknown';
-                try {
-                    ratio = await detectAspectRatio(file);
-                } catch (e) {
-                    console.warn('Aspect ratio detection failed:', e);
-                }
+                try { ratio = await detectAspectRatio(file); } catch {}
+                updateTracker(tracker.id, { status: 'done' });
                 imageUploads.push({ file, url, ratio, size: file.size });
-            } catch (error) {
+            } catch {
+                updateTracker(tracker.id, { status: 'error' });
                 showError(`Failed to upload ${file.name}`);
             }
-        }
+        })());
+        await runParallel(imageTasks, 3);
 
         // Phase 2: Group images by ratio pairs
         const groups = [];
@@ -261,9 +296,7 @@ const AdsLibrary = () => {
             }
         }
 
-        // Phase 3: Build review queue items for images
-        const newQueueItems = [];
-
+        // Phase 3: Add image items to review queue immediately
         for (const group of groups) {
             const tempId = `review_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             const primary = group[0];
@@ -273,11 +306,10 @@ const AdsLibrary = () => {
                 variants[item.ratio] = item.url;
                 totalSize += item.size;
             }
-
             const uploadedRatios = Object.keys(variants);
             const missingRatios = STANDARD_RATIOS.filter(r => !uploadedRatios.includes(r));
 
-            newQueueItems.push({
+            const queueItem = {
                 id: tempId,
                 mediaType: 'image',
                 primaryUrl: primary.url,
@@ -291,31 +323,42 @@ const AdsLibrary = () => {
                 funnel_stage: '',
                 ad_format: '',
                 status: 'draft',
-                folderId: (currentFolderId && currentFolderId !== '__none__') ? currentFolderId : null,
-            });
+                folderId: capturedFolderId,
+            };
+            setReviewQueue(prev => [...prev, queueItem]);
+
+            // AI naming in background
+            getAiName(queueItem.primaryUrl)
+                .then(({ name }) => {
+                    setReviewQueue(prev => prev.map(q =>
+                        q.id === tempId ? { ...q, name, nameLoading: false } : q
+                    ));
+                })
+                .catch(() => {
+                    setReviewQueue(prev => prev.map(q =>
+                        q.id === tempId ? { ...q, nameLoading: false } : q
+                    ));
+                });
         }
 
-        // Phase 4: Handle video files — upload + extract thumbnail, add to queue
-        for (const file of relevantVideos) {
+        // Phase 4: Upload videos in parallel (max 3), stream each to queue as it finishes
+        const videoTasks = relevantVideos.map((file, vi) => () => (async () => {
+            const tracker = fileTrackers[relevantImages.length + vi];
+            updateTracker(tracker.id, { status: 'uploading', progress: 0 });
             try {
-                setUploadProgress(`Uploading ${file.name}...`);
-                const { url } = await uploadFile(file);
+                const { url } = await uploadFile(file, (pct) => {
+                    updateTracker(tracker.id, { progress: pct });
+                });
+                updateTracker(tracker.id, { status: 'processing', progress: 100 });
 
-                let thumbnailUrl = null;
-                try {
-                    setUploadProgress(`Extracting thumbnail...`);
-                    const { thumbnail_url } = await getVideoThumbnail(url);
-                    thumbnailUrl = thumbnail_url;
-                } catch (e) {
-                    console.warn('Server thumbnail extraction failed:', e?.message || e);
-                }
-
+                // Add to review queue immediately (thumbnail will fill in later)
                 const tempId = `review_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                newQueueItems.push({
+                const queueItem = {
                     id: tempId,
                     mediaType: 'video',
                     primaryUrl: url,
-                    thumbnailUrl,
+                    thumbnailUrl: null,
+                    thumbnailLoading: true,
                     variants: {},
                     totalSize: file.size,
                     name: file.name.replace(/\.[^.]+$/, ''),
@@ -325,31 +368,35 @@ const AdsLibrary = () => {
                     funnel_stage: '',
                     ad_format: '',
                     status: 'draft',
-                    folderId: (currentFolderId && currentFolderId !== '__none__') ? currentFolderId : null,
-                });
-            } catch (error) {
+                    folderId: capturedFolderId,
+                };
+                setReviewQueue(prev => [...prev, queueItem]);
+
+                // Extract thumbnail in background — fills in when ready
+                getVideoThumbnail(url)
+                    .then(({ thumbnail_url }) => {
+                        setReviewQueue(prev => prev.map(q =>
+                            q.id === tempId ? { ...q, thumbnailUrl: thumbnail_url, thumbnailLoading: false } : q
+                        ));
+                    })
+                    .catch(() => {
+                        setReviewQueue(prev => prev.map(q =>
+                            q.id === tempId ? { ...q, thumbnailLoading: false } : q
+                        ));
+                    });
+
+                updateTracker(tracker.id, { status: 'done' });
+            } catch {
+                updateTracker(tracker.id, { status: 'error' });
                 showError(`Failed to upload ${file.name}`);
             }
-        }
+        })());
+        await runParallel(videoTasks, 3);
 
-        setReviewQueue(prev => [...prev, ...newQueueItems]);
         setUploading(false);
         setUploadProgress('');
-
-        // Kick off AI naming in parallel for image items
-        for (const item of newQueueItems.filter(i => i.mediaType === 'image')) {
-            getAiName(item.primaryUrl)
-                .then(({ name }) => {
-                    setReviewQueue(prev => prev.map(q =>
-                        q.id === item.id ? { ...q, name, nameLoading: false } : q
-                    ));
-                })
-                .catch(() => {
-                    setReviewQueue(prev => prev.map(q =>
-                        q.id === item.id ? { ...q, nameLoading: false } : q
-                    ));
-                });
-        }
+        // Clear file trackers after a short delay so user sees final state
+        setTimeout(() => setUploadFiles([]), 2000);
     };
 
     // Save all review queue items to the library
@@ -709,18 +756,41 @@ const AdsLibrary = () => {
                 </h2>
 
                 <div
-                    className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
-                        dragActive ? 'border-amber-500 bg-amber-50' : 'border-gray-300 hover:border-amber-400'
-                    }`}
-                    onDrop={handleDrop}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onClick={() => fileInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
+                        uploading ? '' : 'cursor-pointer'
+                    } ${dragActive ? 'border-amber-500 bg-amber-50' : 'border-gray-300 hover:border-amber-400'}`}
+                    onDrop={!uploading ? handleDrop : undefined}
+                    onDragOver={!uploading ? handleDragOver : undefined}
+                    onDragLeave={!uploading ? handleDragLeave : undefined}
+                    onClick={!uploading ? () => fileInputRef.current?.click() : undefined}
                 >
-                    {uploading ? (
-                        <div className="flex flex-col items-center gap-2 text-amber-600">
-                            <Loader2 size={24} className="animate-spin" />
-                            <span>{uploadProgress || 'Uploading...'}</span>
+                    {uploadFiles.length > 0 ? (
+                        <div className="space-y-2 text-left max-w-md mx-auto">
+                            {uploadFiles.map(f => (
+                                <div key={f.id} className="flex items-center gap-3">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm text-gray-700 truncate">{f.name}</p>
+                                        <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                                            <div
+                                                className={`h-2 rounded-full transition-all duration-300 ${
+                                                    f.status === 'error' ? 'bg-red-500' :
+                                                    f.status === 'done' ? 'bg-green-500' :
+                                                    f.status === 'processing' ? 'bg-blue-500' :
+                                                    'bg-amber-500'
+                                                }`}
+                                                style={{ width: `${f.progress}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <span className="text-xs text-gray-500 flex-shrink-0 w-20 text-right">
+                                        {f.status === 'error' ? 'Failed' :
+                                         f.status === 'done' ? 'Done' :
+                                         f.status === 'processing' ? 'Processing' :
+                                         f.status === 'uploading' ? `${f.progress}%` :
+                                         'Waiting'}
+                                    </span>
+                                </div>
+                            ))}
                         </div>
                     ) : (
                         <>
@@ -783,7 +853,11 @@ const AdsLibrary = () => {
                                         <img src={qItem.thumbnailUrl} alt="" className="w-full h-full object-cover" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center bg-gray-800">
-                                            <Video size={24} className="text-gray-500" />
+                                            {qItem.thumbnailLoading ? (
+                                                <Loader2 size={20} className="text-gray-400 animate-spin" />
+                                            ) : (
+                                                <Video size={24} className="text-gray-500" />
+                                            )}
                                         </div>
                                     )
                                 ) : (

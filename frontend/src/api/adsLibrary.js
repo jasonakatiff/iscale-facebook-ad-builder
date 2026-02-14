@@ -60,10 +60,15 @@ export const deleteLibraryItem = async (itemId) => {
     return response.data;
 };
 
-export const uploadFile = async (file) => {
+export const uploadFile = async (file, onProgress) => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await axios.post(`${API_BASE}/uploads/`, formData, { headers: authHeaders() });
+    const response = await axios.post(`${API_BASE}/uploads/`, formData, {
+        headers: authHeaders(),
+        onUploadProgress: onProgress
+            ? (e) => onProgress(Math.round((e.loaded * 100) / (e.total || e.loaded)))
+            : undefined,
+    });
     return response.data;
 };
 
