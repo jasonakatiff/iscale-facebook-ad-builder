@@ -111,7 +111,6 @@ import os
 import asyncio
 import uuid
 import httpx
-from pathlib import Path
 from app.core.config import settings
 
 try:
@@ -119,36 +118,56 @@ try:
 except ImportError:
     fal_client = None
 
-# Setup uploads directory
-UPLOAD_DIR = Path(__file__).parent.parent.parent.parent / "uploads"
-UPLOAD_DIR = UPLOAD_DIR.resolve()
-os.makedirs(UPLOAD_DIR, mode=0o755, exist_ok=True)
+# Images are uploaded to R2 storage (no local filesystem)
+
+def get_fal_aspect_ratio(width: int, height: int) -> str:
+    """Map width/height to closest fal.ai aspect ratio string."""
+    ratio = width / height
+    ratios = [
+        (1.0, "1:1"),
+        (0.8, "4:5"),
+        (0.5625, "9:16"),
+        (0.75, "3:4"),
+        (1.333, "4:3"),
+        (1.778, "16:9"),
+        (2.333, "21:9"),
+    ]
+    closest = min(ratios, key=lambda r: abs(r[0] - ratio))
+    return closest[1]
 
 async def download_and_save_image(image_url: str, prefix: str = "generated") -> str:
     """
-    Download image from external URL and save it locally.
-    Returns the local URL path.
+    Download image from external URL and upload to R2 storage.
+    Falls back to returning original URL if R2 is not configured.
     """
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(image_url, timeout=30.0)
-            response.raise_for_status()
+    for attempt in range(2):
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(image_url, timeout=30.0)
+                response.raise_for_status()
 
-            # Generate unique filename
-            unique_id = str(uuid.uuid4())
-            filename = f"{prefix}_{unique_id}.png"
-            file_path = UPLOAD_DIR / filename
+                unique_id = str(uuid.uuid4())
+                filename = f"{prefix}_{unique_id}.png"
 
-            # Save image
-            with open(file_path, "wb") as f:
-                f.write(response.content)
+                if settings.r2_enabled:
+                    from app.api.v1.uploads import get_s3_client
+                    s3 = get_s3_client()
+                    if s3:
+                        s3.put_object(
+                            Bucket=settings.R2_BUCKET_NAME,
+                            Key=filename,
+                            Body=response.content,
+                            ContentType="image/png"
+                        )
+                        return f"{settings.R2_PUBLIC_URL}/{filename}"
 
-            # Return local URL
-            return f"/uploads/{filename}"
-    except Exception as e:
-        print(f"Error downloading image: {e}")
-        # Return original URL as fallback
-        return image_url
+                # R2 not available — return original fal.ai URL (not local path)
+                return image_url
+        except Exception as e:
+            print(f"Error downloading image (attempt {attempt + 1}): {e}")
+            if attempt == 1:
+                return image_url
+    return image_url
 
 @router.post("/generate-image")
 async def generate_image(
@@ -210,10 +229,7 @@ async def generate_image(
                         
                         arguments = {
                             "prompt": prompt,
-                            "image_size": {
-                                "width": width,
-                                "height": height
-                            }
+                            "aspect_ratio": get_fal_aspect_ratio(width, height),
                         }
                     
                     # Submit to Fal.ai
@@ -224,7 +240,7 @@ async def generate_image(
                     # Download and save image locally
                     print(f"Downloading image from Fal.ai: {external_url[:50]}...")
                     image_url = await download_and_save_image(external_url, prefix="generated")
-                    print(f"Saved locally as: {image_url}")
+                    print(f"Saved image: {image_url}")
 
                 except Exception as e:
                     print(f"Fal.ai generation failed: {e}")
