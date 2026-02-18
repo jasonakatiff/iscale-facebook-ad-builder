@@ -405,4 +405,7 @@ def batch_save_ads(
         return {"message": f"Saved {len(saved_ads)} ads", "count": len(saved_ads)}
     except Exception as e:
         db.rollback()
+        import traceback
+        print(f"Batch save error: {e}")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
