@@ -38,6 +38,28 @@ def parse_search_query_from_url(url: str) -> Optional[str]:
         return None
 
 
+def parse_url_filters(url: Optional[str]) -> Tuple[str, str]:
+    """Extract (country, active_status) from an Ads Library URL.
+
+    Defaults to ("US", "active") to preserve prior behavior when filters are absent.
+    """
+    country = "US"
+    active_status = "active"
+    if not url:
+        return country, active_status
+    try:
+        params = parse_qs(urlparse(url).query)
+        c = (params.get("country") or [None])[0]
+        if c:
+            country = c.upper()
+        s = (params.get("active_status") or [None])[0]
+        if s:
+            active_status = s.lower()
+    except Exception:
+        pass
+    return country, active_status
+
+
 def sanitize_folder_name(name: str) -> str:
     """Sanitize brand name for use as R2 folder name."""
     # Remove special chars, replace spaces with underscores
@@ -68,8 +90,12 @@ class BrandScraperService:
             brand_scrape.status = "scraping"
             self.db.commit()
 
-            # Fetch ads from Facebook - pass brand_name for better video capture
-            ads_data = await self._fetch_page_ads(brand_scrape.page_id, brand_name=brand_scrape.brand_name)
+            # Fetch ads from Facebook - pass brand_name + page_url for filter propagation
+            ads_data = await self._fetch_page_ads(
+                brand_scrape.page_id,
+                brand_name=brand_scrape.brand_name,
+                page_url=brand_scrape.page_url,
+            )
 
             if not ads_data:
                 brand_scrape.status = "completed"
@@ -109,22 +135,28 @@ class BrandScraperService:
             self.db.commit()
             raise
 
-    async def _fetch_page_ads(self, page_id: str, limit: int = 500, brand_name: str = None) -> List[dict]:
+    async def _fetch_page_ads(self, page_id: str, limit: int = 500, brand_name: str = None, page_url: Optional[str] = None) -> List[dict]:
         """Fetch all ads from a specific Facebook page or search query."""
         ads = []
+
+        country, active_status = parse_url_filters(page_url)
 
         # Check if page_id is actually a search query (non-numeric)
         is_search_query = not page_id.isdigit()
 
         # Use Playwright for search queries (gets more results than API)
         if is_search_query:
-            print(f"Using Playwright for search query: {page_id}")
-            return await self._playwright_scrape_ads(page_id, limit, is_search=True)
+            print(f"Using Playwright for search query: {page_id} (country={country})")
+            return await self._playwright_scrape_ads(
+                page_id, limit, is_search=True, country=country, active_status=active_status,
+            )
 
         # Use API for page-specific scrapes if we have a token
         if not self.access_token:
-            print("No FB token, using Playwright for page scrape")
-            return await self._playwright_scrape_ads(page_id, limit, is_search=False)
+            print(f"No FB token, using Playwright for page scrape (country={country})")
+            return await self._playwright_scrape_ads(
+                page_id, limit, is_search=False, country=country, active_status=active_status,
+            )
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             after_cursor = None
@@ -133,7 +165,7 @@ class BrandScraperService:
                 params = {
                     "access_token": self.access_token,
                     "ad_active_status": "ALL",
-                    "ad_reached_countries": "US",
+                    "ad_reached_countries": country,
                     "limit": min(300, limit - len(ads)),
                     "fields": "id,ad_creative_bodies,ad_creative_link_titles,ad_creative_link_captions,ad_snapshot_url,page_id,page_name,publisher_platforms,ad_delivery_start_time",
                     "search_page_ids": page_id
@@ -165,7 +197,14 @@ class BrandScraperService:
 
         return ads
 
-    async def _playwright_scrape_ads(self, query: str, limit: int = 500, is_search: bool = True) -> List[dict]:
+    async def _playwright_scrape_ads(
+        self,
+        query: str,
+        limit: int = 500,
+        is_search: bool = True,
+        country: str = "US",
+        active_status: str = "active",
+    ) -> List[dict]:
         """Scrape ads using Playwright browser automation with response interception for media."""
         from playwright.async_api import async_playwright
         import urllib.parse
@@ -222,12 +261,13 @@ class BrandScraperService:
                 # Build URL
                 if is_search:
                     search_query = urllib.parse.quote(query)
-                    url = f"https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=US&media_type=all&q={search_query}"
+                    url = f"https://www.facebook.com/ads/library/?active_status={active_status}&ad_type=all&country={country}&media_type=all&q={search_query}"
                 else:
-                    url = f"https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=US&view_all_page_id={query}"
+                    url = f"https://www.facebook.com/ads/library/?active_status={active_status}&ad_type=all&country={country}&view_all_page_id={query}"
 
                 print(f"Playwright navigating to: {url}")
-                await page.goto(url, timeout=60000, wait_until="networkidle")
+                await page.goto(url, timeout=120000, wait_until="domcontentloaded")
+                await page.wait_for_timeout(4000)  # give FB's hydration a beat
 
                 # Wait for ads to load
                 try:
@@ -378,7 +418,7 @@ class BrandScraperService:
 
         return ads[:limit]
 
-    async def _fallback_fetch_page_ads(self, page_id: str, limit: int = 500, brand_name: str = None, is_search: bool = False) -> List[dict]:
+    async def _fallback_fetch_page_ads(self, page_id: str, limit: int = 500, brand_name: str = None, is_search: bool = False, country: str = "US", active_status: str = "active") -> List[dict]:
         """Fallback to Playwright for scraping when API unavailable. Captures both images and videos."""
         from playwright.async_api import async_playwright
 
@@ -436,18 +476,19 @@ class BrandScraperService:
                 if is_search:
                     # Use the search query directly
                     search_query = urllib.parse.quote(page_id)  # page_id contains the search term
-                    url = f"https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=US&media_type=all&q={search_query}"
+                    url = f"https://www.facebook.com/ads/library/?active_status={active_status}&ad_type=all&country={country}&media_type=all&q={search_query}"
                     print(f"Searching for '{page_id}'...")
                 elif brand_name:
                     # Search by brand name - videos autoplay in search results
                     search_query = urllib.parse.quote(brand_name)
-                    url = f"https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=US&media_type=video&q={search_query}"
+                    url = f"https://www.facebook.com/ads/library/?active_status={active_status}&ad_type=all&country={country}&media_type=video&q={search_query}"
                     print(f"Searching for '{brand_name}' videos...")
                 else:
-                    url = f"https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=US&view_all_page_id={page_id}&media_type=all"
+                    url = f"https://www.facebook.com/ads/library/?active_status={active_status}&ad_type=all&country={country}&view_all_page_id={page_id}&media_type=all"
                     print(f"Scraping page ID: {page_id}")
 
-                await page.goto(url, timeout=60000, wait_until="networkidle")
+                await page.goto(url, timeout=120000, wait_until="domcontentloaded")
+                await page.wait_for_timeout(4000)
 
                 try:
                     await page.wait_for_selector('text=Library ID:', timeout=15000)
