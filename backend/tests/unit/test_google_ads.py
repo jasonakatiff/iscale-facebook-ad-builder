@@ -103,3 +103,79 @@ class TestGoogleAdsNotConfigured:
         monkeypatch.setattr("app.api.v1.google_ads.settings.GOOGLE_ADS_CLIENT_ID", "")
         response = client.get("/api/v1/google-ads/oauth/start", headers=auth_headers, follow_redirects=False)
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+class TestGoogleAdsWriteRoutesRequireAuth:
+    """Same auth-gate guarantee as the read routes (TestGoogleAdsAuthGate)."""
+
+    def test_create_campaign_requires_auth(self, client):
+        response = client.post("/api/v1/google-ads/campaigns", json={"name": "x", "daily_budget_micros": 1000000, "confirm": True})
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_pause_campaign_requires_auth(self, client):
+        response = client.post("/api/v1/google-ads/campaigns/123/pause", json={"confirm": True})
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_enable_campaign_requires_auth(self, client):
+        response = client.post("/api/v1/google-ads/campaigns/123/enable", json={"confirm": True})
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_negative_keywords_requires_auth(self, client):
+        response = client.post("/api/v1/google-ads/campaigns/123/negative-keywords", json={"keywords": ["x"], "confirm": True})
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+class TestGoogleAdsWriteConfirmationGuard:
+    """Every write action must reject silently-unconfirmed requests with 400
+    BEFORE doing anything else (including looking up a connection) — this is
+    the core Sprint 2 safety requirement: no write ever happens without an
+    explicit confirm=true from a caller that has already shown the user a
+    preview of the change."""
+
+    def test_create_campaign_without_confirm_is_400(self, client, auth_headers):
+        response = client.post(
+            "/api/v1/google-ads/campaigns",
+            headers=auth_headers,
+            json={"name": "Test Campaign", "daily_budget_micros": 5_000_000},
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "confirm" in response.json()["detail"].lower()
+
+    def test_create_campaign_with_confirm_false_is_400(self, client, auth_headers):
+        response = client.post(
+            "/api/v1/google-ads/campaigns",
+            headers=auth_headers,
+            json={"name": "Test Campaign", "daily_budget_micros": 5_000_000, "confirm": False},
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_pause_campaign_without_confirm_is_400(self, client, auth_headers):
+        response = client.post("/api/v1/google-ads/campaigns/123/pause", headers=auth_headers, json={})
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_enable_campaign_without_confirm_is_400(self, client, auth_headers):
+        response = client.post("/api/v1/google-ads/campaigns/123/enable", headers=auth_headers, json={})
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_negative_keywords_without_confirm_is_400(self, client, auth_headers):
+        response = client.post(
+            "/api/v1/google-ads/campaigns/123/negative-keywords",
+            headers=auth_headers,
+            json={"keywords": ["competitor brand"]},
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_create_campaign_confirmed_but_no_connection_is_404(self, client, auth_headers):
+        """Once confirmed, the guard passes and the route proceeds to the
+        next real check (an active connection must exist) -- proving the
+        confirm gate isn't masking every other code path."""
+        response = client.post(
+            "/api/v1/google-ads/campaigns",
+            headers=auth_headers,
+            json={"name": "Test Campaign", "daily_budget_micros": 5_000_000, "confirm": True},
+        )
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_pause_campaign_confirmed_but_no_connection_is_404(self, client, auth_headers):
+        response = client.post("/api/v1/google-ads/campaigns/123/pause", headers=auth_headers, json={"confirm": True})
+        assert response.status_code == status.HTTP_404_NOT_FOUND

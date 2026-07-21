@@ -210,3 +210,128 @@ async def get_ad_performance(refresh_token: str, customer_id: str, campaign_id: 
             existing["conversions"] += row.metrics.conversions
 
     return list(ads.values())
+
+
+# --------------------------------------------------------------------------
+# Write actions (Sprint 2). Every campaign-creating call defaults to PAUSED —
+# matches the safety convention established in Sprint 0 for FacebookService
+# (a new campaign must never start spending without an explicit human
+# decision to activate it). Callers (the API routes) are responsible for
+# enforcing the confirm=true gate before invoking any of these.
+# --------------------------------------------------------------------------
+
+async def create_campaign(
+    refresh_token: str,
+    customer_id: str,
+    name: str,
+    daily_budget_micros: int,
+    keywords: Optional[list[str]] = None,
+) -> dict:
+    """Create a Search campaign with a dedicated budget, PAUSED by default.
+
+    `keywords` (if given) are added as broad-match positive keywords on a
+    single ad group created alongside the campaign — enough for a minimal
+    working campaign, not a full-featured campaign builder.
+    """
+    client = _build_client(refresh_token)
+    customer_id = normalize_login_customer_id(customer_id)
+
+    budget_service = client.get_service("CampaignBudgetService")
+    budget_operation = client.get_type("CampaignBudgetOperation")
+    budget = budget_operation.create
+    budget.name = f"{name} budget"
+    budget.amount_micros = daily_budget_micros
+    budget.delivery_method = client.enums.BudgetDeliveryMethodEnum.STANDARD
+    budget_response = budget_service.mutate_campaign_budgets(customer_id=customer_id, operations=[budget_operation])
+    budget_resource_name = budget_response.results[0].resource_name
+
+    campaign_service = client.get_service("CampaignService")
+    campaign_operation = client.get_type("CampaignOperation")
+    campaign = campaign_operation.create
+    campaign.name = name
+    campaign.advertising_channel_type = client.enums.AdvertisingChannelTypeEnum.SEARCH
+    campaign.status = client.enums.CampaignStatusEnum.PAUSED
+    campaign.campaign_budget = budget_resource_name
+    campaign.manual_cpc.enhanced_cpc_enabled = False
+    campaign.network_settings.target_google_search = True
+    campaign.network_settings.target_search_network = True
+    campaign.network_settings.target_content_network = False
+    campaign.network_settings.target_partner_search_network = False
+    campaign_response = campaign_service.mutate_campaigns(customer_id=customer_id, operations=[campaign_operation])
+    campaign_resource_name = campaign_response.results[0].resource_name
+    campaign_id = campaign_resource_name.split("/")[-1]
+
+    ad_group_id = None
+    if keywords:
+        ad_group_service = client.get_service("AdGroupService")
+        ad_group_operation = client.get_type("AdGroupOperation")
+        ad_group = ad_group_operation.create
+        ad_group.name = f"{name} - Ad Group 1"
+        ad_group.campaign = campaign_resource_name
+        ad_group.status = client.enums.AdGroupStatusEnum.PAUSED
+        ad_group.type_ = client.enums.AdGroupTypeEnum.SEARCH_STANDARD
+        ad_group_response = ad_group_service.mutate_ad_groups(customer_id=customer_id, operations=[ad_group_operation])
+        ad_group_resource_name = ad_group_response.results[0].resource_name
+        ad_group_id = ad_group_resource_name.split("/")[-1]
+
+        criterion_service = client.get_service("AdGroupCriterionService")
+        operations = []
+        for keyword in keywords:
+            operation = client.get_type("AdGroupCriterionOperation")
+            criterion = operation.create
+            criterion.ad_group = ad_group_resource_name
+            criterion.status = client.enums.AdGroupCriterionStatusEnum.ENABLED
+            criterion.keyword.text = keyword
+            criterion.keyword.match_type = client.enums.KeywordMatchTypeEnum.BROAD
+            operations.append(operation)
+        if operations:
+            criterion_service.mutate_ad_group_criteria(customer_id=customer_id, operations=operations)
+
+    return {"campaign_id": campaign_id, "ad_group_id": ad_group_id, "status": "PAUSED"}
+
+
+async def _set_campaign_status(refresh_token: str, customer_id: str, campaign_id: str, status_enum_name: str) -> dict:
+    from google.api_core import protobuf_helpers
+
+    client = _build_client(refresh_token)
+    customer_id = normalize_login_customer_id(customer_id)
+    campaign_service = client.get_service("CampaignService")
+    operation = client.get_type("CampaignOperation")
+    campaign = operation.update
+    campaign.resource_name = campaign_service.campaign_path(customer_id, campaign_id)
+    campaign.status = getattr(client.enums.CampaignStatusEnum, status_enum_name)
+    client.copy_from(operation.update_mask, protobuf_helpers.field_mask(None, campaign._pb))
+    campaign_service.mutate_campaigns(customer_id=customer_id, operations=[operation])
+    return {"campaign_id": campaign_id, "status": status_enum_name}
+
+
+async def pause_campaign(refresh_token: str, customer_id: str, campaign_id: str) -> dict:
+    return await _set_campaign_status(refresh_token, customer_id, campaign_id, "PAUSED")
+
+
+async def enable_campaign(refresh_token: str, customer_id: str, campaign_id: str) -> dict:
+    return await _set_campaign_status(refresh_token, customer_id, campaign_id, "ENABLED")
+
+
+async def add_negative_keywords(refresh_token: str, customer_id: str, campaign_id: str, keywords: list[str]) -> dict:
+    """Add campaign-level negative keywords (applies to the whole campaign,
+    not a single ad group)."""
+    client = _build_client(refresh_token)
+    customer_id = normalize_login_customer_id(customer_id)
+    campaign_service = client.get_service("CampaignService")
+    campaign_resource_name = campaign_service.campaign_path(customer_id, campaign_id)
+
+    criterion_service = client.get_service("CampaignCriterionService")
+    operations = []
+    for keyword in keywords:
+        operation = client.get_type("CampaignCriterionOperation")
+        criterion = operation.create
+        criterion.campaign = campaign_resource_name
+        criterion.negative = True
+        criterion.keyword.text = keyword
+        criterion.keyword.match_type = client.enums.KeywordMatchTypeEnum.BROAD
+        operations.append(operation)
+    if operations:
+        criterion_service.mutate_campaign_criteria(customer_id=customer_id, operations=operations)
+    return {"campaign_id": campaign_id, "negative_keywords_added": len(keywords)}
+

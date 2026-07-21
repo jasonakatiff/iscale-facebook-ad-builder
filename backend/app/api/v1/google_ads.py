@@ -1,7 +1,10 @@
 """Google Ads OAuth connect flow + read-only campaign/ad performance routes."""
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from google.ads.googleads.errors import GoogleAdsException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -27,6 +30,10 @@ from app.services.google_ads_service import (
     get_campaign_performance,
     get_ad_performance,
     get_valid_access_token,
+    create_campaign as create_google_campaign,
+    pause_campaign as pause_google_campaign,
+    enable_campaign as enable_google_campaign,
+    add_negative_keywords as add_google_negative_keywords,
     GoogleAdsNotConfigured,
     GoogleAdsConnectionError,
 )
@@ -34,6 +41,30 @@ from app.services.google_ads_service import (
 router = APIRouter()
 
 PROVIDER = "google-ads"
+
+
+class CreateCampaignRequest(BaseModel):
+    name: str
+    daily_budget_micros: int
+    keywords: Optional[List[str]] = None
+    confirm: bool = False
+
+
+class NegativeKeywordsRequest(BaseModel):
+    keywords: List[str]
+    confirm: bool = False
+
+
+class ConfirmOnlyRequest(BaseModel):
+    confirm: bool = False
+
+
+def _require_confirmed(confirm: bool) -> None:
+    if not confirm:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This action requires explicit confirmation. Set confirm=true after showing the user a preview.",
+        )
 
 
 def _require_configured():
@@ -265,3 +296,111 @@ async def get_campaign_ads(
     except GoogleAdsException as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=_clean_google_ads_error(exc))
     return {"campaign_id": campaign_id, "ads": ads}
+
+
+# --------------------------------------------------------------------------
+# Write actions (Sprint 2). Every route requires an explicit confirm=true in
+# the request body -- there is no silent-write path. The frontend is expected
+# to show a preview of exactly what will happen before sending confirm=true
+# (see GoogleAdsCampaigns.jsx's confirmation modal).
+# --------------------------------------------------------------------------
+
+@router.post("/campaigns", status_code=status.HTTP_201_CREATED)
+async def create_campaign(
+    body: CreateCampaignRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Create a new Search campaign. Always created PAUSED -- activating it
+    is a separate, explicit action (see /campaigns/{id}/enable)."""
+    _require_configured()
+    _require_confirmed(body.confirm)
+    connection = _get_active_connection(db, current_user.id)
+    try:
+        refresh_token = decrypt_token(connection.encrypted_refresh_token)
+        await get_valid_access_token(db, connection)
+        result = await create_google_campaign(
+            refresh_token,
+            connection.customer_id,
+            name=body.name,
+            daily_budget_micros=body.daily_budget_micros,
+            keywords=body.keywords,
+        )
+    except GoogleAdsConnectionError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+    except GoogleAdsNotConfigured as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+    except GoogleAdsException as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=_clean_google_ads_error(exc))
+    return result
+
+
+@router.post("/campaigns/{campaign_id}/pause")
+async def pause_campaign(
+    campaign_id: str,
+    body: ConfirmOnlyRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    _require_configured()
+    _require_confirmed(body.confirm)
+    connection = _get_active_connection(db, current_user.id)
+    try:
+        refresh_token = decrypt_token(connection.encrypted_refresh_token)
+        await get_valid_access_token(db, connection)
+        result = await pause_google_campaign(refresh_token, connection.customer_id, campaign_id)
+    except GoogleAdsConnectionError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+    except GoogleAdsNotConfigured as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+    except GoogleAdsException as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=_clean_google_ads_error(exc))
+    return result
+
+
+@router.post("/campaigns/{campaign_id}/enable")
+async def enable_campaign(
+    campaign_id: str,
+    body: ConfirmOnlyRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Activate a campaign -- the one write action that starts real spend.
+    Requires confirm=true like every other write action here."""
+    _require_configured()
+    _require_confirmed(body.confirm)
+    connection = _get_active_connection(db, current_user.id)
+    try:
+        refresh_token = decrypt_token(connection.encrypted_refresh_token)
+        await get_valid_access_token(db, connection)
+        result = await enable_google_campaign(refresh_token, connection.customer_id, campaign_id)
+    except GoogleAdsConnectionError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+    except GoogleAdsNotConfigured as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+    except GoogleAdsException as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=_clean_google_ads_error(exc))
+    return result
+
+
+@router.post("/campaigns/{campaign_id}/negative-keywords")
+async def add_negative_keywords(
+    campaign_id: str,
+    body: NegativeKeywordsRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    _require_configured()
+    _require_confirmed(body.confirm)
+    connection = _get_active_connection(db, current_user.id)
+    try:
+        refresh_token = decrypt_token(connection.encrypted_refresh_token)
+        await get_valid_access_token(db, connection)
+        result = await add_google_negative_keywords(refresh_token, connection.customer_id, campaign_id, body.keywords)
+    except GoogleAdsConnectionError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+    except GoogleAdsNotConfigured as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+    except GoogleAdsException as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=_clean_google_ads_error(exc))
+    return result
