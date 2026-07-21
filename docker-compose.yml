@@ -29,6 +29,10 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql://ads_studio:ads_studio_dev_password@postgres:5432/ads_studio_dev
+      ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      FRONTEND_URL: http://localhost:5173
+      GOOGLE_ADS_OAUTH_REDIRECT_URI: http://localhost:8010/api/v1/google-ads/oauth/callback
+      TIKTOK_ADS_OAUTH_REDIRECT_URI: http://localhost:8010/api/v1/tiktok-ads/oauth/callback
     volumes:
       - ./backend:/app
     ports:

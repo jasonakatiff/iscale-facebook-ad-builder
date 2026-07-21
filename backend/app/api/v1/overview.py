@@ -122,14 +122,18 @@ async def _fetch_tiktok_rows(db: Session, user_id: str, date_preset: str) -> Lis
     ]
 
 
-@router.get("")
-async def get_overview(
-    ad_account_id: Optional[str] = None,
+async def build_overview(
+    db: Session,
+    user_id: str,
     date_preset: str = "last_30d",
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    ad_account_id: Optional[str] = None,
 ):
-    """Combined Meta + Google Ads campaign performance for the logged-in user."""
+    """Build normalized cross-platform performance data for one owner.
+
+    Used by the authenticated dashboard and the separately scoped bot API.
+    Callers decide authentication; this function never receives provider OAuth
+    tokens or exposes them in its result.
+    """
     rows: List[Dict[str, Any]] = []
     errors: Dict[str, str] = {}
 
@@ -139,7 +143,7 @@ async def get_overview(
         errors["meta"] = str(exc)
 
     try:
-        rows.extend(await _fetch_google_rows(db, current_user.id, date_preset))
+        rows.extend(await _fetch_google_rows(db, user_id, date_preset))
     except GoogleAdsConnectionError as exc:
         errors["google"] = str(exc)
     except GoogleAdsNotConfigured as exc:
@@ -153,7 +157,7 @@ async def get_overview(
         errors["google"] = str(exc)
 
     try:
-        rows.extend(await _fetch_tiktok_rows(db, current_user.id, date_preset))
+        rows.extend(await _fetch_tiktok_rows(db, user_id, date_preset))
     except (TikTokAdsApiError, TikTokAdsNotConfigured) as exc:
         errors["tiktok"] = str(exc)
     except Exception as exc:
@@ -161,3 +165,14 @@ async def get_overview(
 
     rows.sort(key=lambda row: row["spend"], reverse=True)
     return {"campaigns": rows, "errors": errors}
+
+
+@router.get("")
+async def get_overview(
+    ad_account_id: Optional[str] = None,
+    date_preset: str = "last_30d",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Combined Meta + Google Ads campaign performance for the logged-in user."""
+    return await build_overview(db, current_user.id, date_preset, ad_account_id)

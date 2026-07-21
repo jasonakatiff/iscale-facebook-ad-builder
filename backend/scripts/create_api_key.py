@@ -26,6 +26,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--name", required=True, help="Human-readable label, e.g. the Hermes profile name")
     parser.add_argument(
+        "--created-by-user-id",
+        help="Required for keys that must read one owner's Ads Studio overview (e.g. the Hermes bot).",
+    )
+    parser.add_argument(
         "--scopes",
         nargs="+",
         required=True,
@@ -39,7 +43,12 @@ def main() -> None:
 
     db = SessionLocal()
     try:
-        api_key = ApiKey(name=args.name, key_hash=key_hash, scopes=list(args.scopes))
+        api_key = ApiKey(
+            name=args.name,
+            key_hash=key_hash,
+            scopes=list(args.scopes),
+            created_by_user_id=args.created_by_user_id,
+        )
         db.add(api_key)
         db.commit()
         db.refresh(api_key)
