@@ -36,6 +36,7 @@ import Login from './pages/Login';
 import UserManagement from './pages/UserManagement';
 import GoogleAdsCampaigns from './pages/GoogleAdsCampaigns';
 import Overview from './pages/Overview';
+import TikTokAdsCampaigns from './pages/TikTokAdsCampaigns';
 
 function App() {
   return (
@@ -67,6 +68,7 @@ function App() {
                   <Route path="video-ads" element={<VideoAds />} />
                   <Route path="facebook-campaigns" element={<FacebookCampaigns />} />
                   <Route path="google-ads" element={<GoogleAdsCampaigns />} />
+                  <Route path="tiktok-ads" element={<TikTokAdsCampaigns />} />
                   <Route path="winning-ads" element={<WinningAds />} />
                   <Route path="generated-ads" element={<GeneratedAds />} />
                   <Route path="brands" element={<Brands />} />

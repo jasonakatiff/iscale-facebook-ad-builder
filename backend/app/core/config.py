@@ -48,6 +48,19 @@ class Settings:
     def google_ads_enabled(self) -> bool:
         return bool(self.GOOGLE_ADS_CLIENT_ID and self.GOOGLE_ADS_CLIENT_SECRET and self.GOOGLE_ADS_DEVELOPER_TOKEN)
 
+    # TikTok Marketing API OAuth. Credentials are issued after the developer
+    # app has been approved for Marketing API access in TikTok for Business.
+    TIKTOK_ADS_APP_ID: str = os.getenv("TIKTOK_ADS_APP_ID", "")
+    TIKTOK_ADS_APP_SECRET: str = os.getenv("TIKTOK_ADS_APP_SECRET", "")
+    TIKTOK_ADS_OAUTH_REDIRECT_URI: str = os.getenv("TIKTOK_ADS_OAUTH_REDIRECT_URI", "")
+    TIKTOK_ADS_API_BASE_URL: str = os.getenv(
+        "TIKTOK_ADS_API_BASE_URL", "https://business-api.tiktok.com/open_api/v1.3"
+    )
+
+    @property
+    def tiktok_ads_enabled(self) -> bool:
+        return bool(self.TIKTOK_ADS_APP_ID and self.TIKTOK_ADS_APP_SECRET)
+
     # Auth settings - SECRET_KEY is required
     SECRET_KEY: str = os.getenv("SECRET_KEY", "")
     if not SECRET_KEY or SECRET_KEY == "your-secret-key-change-in-production":

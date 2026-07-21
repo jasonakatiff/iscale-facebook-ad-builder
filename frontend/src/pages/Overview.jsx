@@ -10,11 +10,13 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const PLATFORM_COLORS = {
     meta: '#1877F2',
     google: '#F59E0B',
+    tiktok: '#111827',
 };
 
 const PLATFORM_LABELS = {
     meta: 'Meta',
     google: 'Google Ads',
+    tiktok: 'TikTok Ads',
 };
 
 const OVERVIEW_COLUMNS = [

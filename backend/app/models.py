@@ -516,3 +516,22 @@ class GoogleAdsConnection(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     user = relationship("User")
+
+
+class TikTokAdsConnection(Base):
+    """One TikTok Marketing API advertiser connection, with OAuth tokens
+    encrypted at rest through app.core.token_encryption."""
+    __tablename__ = "tiktok_ads_connections"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    advertiser_id = Column(String, nullable=False)
+    account_name = Column(String, nullable=True)
+    encrypted_refresh_token = Column(Text, nullable=False)
+    encrypted_access_token = Column(Text, nullable=True)
+    access_token_expires_at = Column(DateTime(timezone=True), nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User")
