@@ -6,7 +6,10 @@ load_dotenv()
 class Settings:
     PROJECT_NAME: str = "Facebook Ad Automation App"
     API_V1_STR: str = "/api/v1"
-    
+
+    # Where to send the browser after a successful OAuth connect flow
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
     # Database - PostgreSQL Required
     DATABASE_URL: str = os.getenv("DATABASE_URL")
     
@@ -31,6 +34,19 @@ class Settings:
     FAL_AI_API_KEY: str = os.getenv("FAL_AI_API_KEY", "")
     KIE_AI_API_KEY: str = os.getenv("KIE_AI_API_KEY", "")
     FACEBOOK_ACCESS_TOKEN: str = os.getenv("FACEBOOK_ACCESS_TOKEN", "")
+
+    # Google Ads OAuth (blank until connected — routes return a clear 500 with
+    # a config-missing message rather than crashing app startup, since not
+    # every deployment needs Google Ads on day one)
+    GOOGLE_ADS_CLIENT_ID: str = os.getenv("GOOGLE_ADS_CLIENT_ID", "")
+    GOOGLE_ADS_CLIENT_SECRET: str = os.getenv("GOOGLE_ADS_CLIENT_SECRET", "")
+    GOOGLE_ADS_DEVELOPER_TOKEN: str = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN", "")
+    GOOGLE_ADS_LOGIN_CUSTOMER_ID: str = os.getenv("GOOGLE_ADS_LOGIN_CUSTOMER_ID", "")
+    GOOGLE_ADS_OAUTH_REDIRECT_URI: str = os.getenv("GOOGLE_ADS_OAUTH_REDIRECT_URI", "")
+
+    @property
+    def google_ads_enabled(self) -> bool:
+        return bool(self.GOOGLE_ADS_CLIENT_ID and self.GOOGLE_ADS_CLIENT_SECRET and self.GOOGLE_ADS_DEVELOPER_TOKEN)
 
     # Auth settings - SECRET_KEY is required
     SECRET_KEY: str = os.getenv("SECRET_KEY", "")

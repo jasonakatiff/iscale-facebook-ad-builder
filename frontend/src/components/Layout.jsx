@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, Users, Video, Wand2, Settings, LogOut, Image, ShoppingBag, Target, ChevronLeft, ChevronRight, FileImage, Search, ChevronDown, UserCog } from 'lucide-react';
+import { LayoutDashboard, Package, Users, Video, Wand2, Settings, LogOut, Image, ShoppingBag, Target, ChevronLeft, ChevronRight, FileImage, Search, ChevronDown, UserCog, TrendingUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
@@ -43,6 +43,7 @@ export default function Layout() {
         { icon: Image, label: 'Winning Ads', path: '/winning-ads' },
         { icon: FileImage, label: 'Generated Ads', path: '/generated-ads' },
         { icon: Target, label: 'Facebook Campaigns', path: '/facebook-campaigns' },
+        { icon: TrendingUp, label: 'Google Ads', path: '/google-ads' },
     ];
 
     const toggleMenu = (label) => {

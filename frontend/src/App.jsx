@@ -34,6 +34,7 @@ import AdRemix from './pages/AdRemix';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import UserManagement from './pages/UserManagement';
+import GoogleAdsCampaigns from './pages/GoogleAdsCampaigns';
 
 function App() {
   return (
@@ -63,6 +64,7 @@ function App() {
                   <Route path="image-ads" element={<ImageAds />} />
                   <Route path="video-ads" element={<VideoAds />} />
                   <Route path="facebook-campaigns" element={<FacebookCampaigns />} />
+                  <Route path="google-ads" element={<GoogleAdsCampaigns />} />
                   <Route path="winning-ads" element={<WinningAds />} />
                   <Route path="generated-ads" element={<GeneratedAds />} />
                   <Route path="brands" element={<Brands />} />
