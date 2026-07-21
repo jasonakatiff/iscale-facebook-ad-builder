@@ -31,6 +31,7 @@ export default function PerformanceTable({
     datePreset,
     onDatePresetChange,
     emptyMessage = 'No campaigns yet. Connect an account to see performance data.',
+    renderActions,
 }) {
     const [sortKey, setSortKey] = useState(columns.find((c) => c.numeric)?.key ?? columns[0].key);
     const [sortDir, setSortDir] = useState('desc');
@@ -92,12 +93,13 @@ export default function PerformanceTable({
                                 </span>
                             </th>
                         ))}
+                        {renderActions && <th className="px-4 py-3 font-medium text-right">Actions</th>}
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                     {loading && (
                         <tr>
-                            <td colSpan={columns.length} className="px-4 py-10 text-center text-gray-400">
+                            <td colSpan={columns.length + (renderActions ? 1 : 0)} className="px-4 py-10 text-center text-gray-400">
                                 <Loader2 size={20} className="animate-spin inline-block mr-2" />
                                 Loading…
                             </td>
@@ -105,7 +107,7 @@ export default function PerformanceTable({
                     )}
                     {!loading && sortedRows.length === 0 && (
                         <tr>
-                            <td colSpan={columns.length} className="px-4 py-10 text-center text-gray-400">
+                            <td colSpan={columns.length + (renderActions ? 1 : 0)} className="px-4 py-10 text-center text-gray-400">
                                 <Inbox size={24} className="inline-block mb-2" />
                                 <p>{emptyMessage}</p>
                             </td>
@@ -119,6 +121,11 @@ export default function PerformanceTable({
                                         {col.format ? col.format(row[col.key]) : row[col.key]}
                                     </td>
                                 ))}
+                                {renderActions && (
+                                    <td className="px-4 py-3 text-right">
+                                        {renderActions(row)}
+                                    </td>
+                                )}
                             </tr>
                         ))}
                 </tbody>

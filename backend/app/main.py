@@ -66,6 +66,7 @@ app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=[trusted_proxies] if tr
 # CORS origins from env var or defaults
 default_origins = [
     "http://localhost:5173",
+    "http://127.0.0.1:5173",
     "http://localhost:3000",
 ]
 extra_origins = os.getenv("ALLOWED_ORIGINS", "").split(",")

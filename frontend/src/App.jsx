@@ -35,6 +35,7 @@ import Settings from './pages/Settings';
 import Login from './pages/Login';
 import UserManagement from './pages/UserManagement';
 import GoogleAdsCampaigns from './pages/GoogleAdsCampaigns';
+import Overview from './pages/Overview';
 
 function App() {
   return (
@@ -56,7 +57,8 @@ function App() {
                     </PrivateRoute>
                   }
                 >
-                  <Route index element={<Dashboard />} />
+                  <Route index element={<Overview />} />
+                  <Route path="dashboard" element={<Dashboard />} />
                   <Route path="research" element={<Research />} />
                   <Route path="research/brand-scrapes" element={<BrandScrapes />} />
                   <Route path="research/settings" element={<ResearchSettings />} />
