@@ -60,13 +60,17 @@ def verify_oauth_state(token: str, provider: str) -> str:
     return user_id
 
 
-def set_oauth_state_cookie(response: Response, token: str) -> None:
+def set_oauth_state_cookie(response: Response, token: str, secure: bool = True) -> None:
+    """`secure=False` must be passed for local HTTP dev — browsers silently
+    refuse to store a cookie with the Secure attribute on a non-HTTPS origin,
+    which otherwise makes the callback fail with "Missing OAuth state cookie"
+    even though /oauth/start appeared to succeed."""
     response.set_cookie(
         key=_COOKIE_NAME,
         value=token,
         max_age=_STATE_TTL_MINUTES * 60,
         httponly=True,
-        secure=True,
+        secure=secure,
         samesite="lax",
         path="/",
     )

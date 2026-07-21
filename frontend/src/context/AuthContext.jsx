@@ -225,6 +225,12 @@ export const AuthProvider = ({ children }) => {
         const makeRequest = async (authToken) => {
             const response = await fetch(url, {
                 ...options,
+                // Needed so the browser stores/sends the oauth_state cookie
+                // (Sprint 0's OAuth CSRF mechanism) across the cross-origin
+                // fetch between the frontend (5173) and backend (8010) — the
+                // default fetch credentials mode ('same-origin') silently
+                // drops Set-Cookie on cross-origin responses.
+                credentials: 'include',
                 headers: {
                     ...options.headers,
                     'Authorization': `Bearer ${authToken}`,

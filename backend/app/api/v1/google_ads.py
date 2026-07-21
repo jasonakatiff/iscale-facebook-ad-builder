@@ -1,6 +1,7 @@
 """Google Ads OAuth connect flow + read-only campaign/ad performance routes."""
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
+from google.ads.googleads.errors import GoogleAdsException
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -45,6 +46,7 @@ def _require_configured():
 
 @router.get("/oauth/start")
 async def start_oauth(
+    request: Request,
     response: Response,
     current_user: User = Depends(get_current_active_user),
 ):
@@ -58,7 +60,7 @@ async def start_oauth(
     """
     _require_configured()
     state = create_oauth_state(current_user.id, PROVIDER)
-    set_oauth_state_cookie(response, state)
+    set_oauth_state_cookie(response, state, secure=request.url.scheme == "https")
     return {
         "oauth_url": build_oauth_url(
             client_id=settings.GOOGLE_ADS_CLIENT_ID,
@@ -72,25 +74,36 @@ async def start_oauth(
 async def oauth_callback(
     request: Request,
     code: str = None,
+    state: str = None,
     error: str = None,
     db: Session = Depends(get_db),
 ):
     """Public callback — Google redirects the browser here directly, so there's
-    no Authorization header. Identity is recovered from the signed state
-    cookie set in /oauth/start (app.core.oauth_state), not a JWT."""
+    no Authorization header. Identity is recovered from the signed `state`
+    query parameter Google echoes back (app.core.oauth_state), which is
+    itself a JWT signed with our SECRET_KEY — self-verifying (signature +
+    expiry + provider binding), so it doesn't depend on the browser actually
+    round-tripping the oauth_state cookie set in /oauth/start. The cookie is
+    validated as a defense-in-depth match ONLY when present; some browser/dev
+    setups (e.g. cross-port localhost during local development) don't reliably
+    persist it, so its absence alone must never fail an otherwise-valid,
+    signed state."""
     if error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Google OAuth error: {error}")
     if not code:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing authorization code")
+    if not state:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing OAuth state parameter")
 
     state_cookie = request.cookies.get(get_oauth_state_cookie_name())
-    if not state_cookie:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing OAuth state cookie")
+    if state_cookie and state_cookie != state:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OAuth state mismatch between cookie and callback parameter")
 
     try:
-        user_id = verify_oauth_state(state_cookie, PROVIDER)
+        user_id = verify_oauth_state(state, PROVIDER)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
 
     try:
         tokens = await exchange_code_for_tokens(
@@ -196,6 +209,20 @@ def _get_active_connection(db: Session, user_id: str) -> GoogleAdsConnection:
     return connection
 
 
+def _clean_google_ads_error(exc: Exception) -> str:
+    """Extract a human-readable message from a GoogleAdsException instead of
+    leaking its raw repr (RPC status, debug_error_string, request_id, etc.)
+    to the client."""
+    try:
+        failure = exc.failure  # type: ignore[attr-defined]
+        messages = [e.message for e in failure.errors if e.message]
+        if messages:
+            return "; ".join(messages)
+    except AttributeError:
+        pass
+    return "Google Ads API request failed."
+
+
 @router.get("/campaigns")
 async def get_campaigns(
     date_preset: str = "last_30d",
@@ -213,6 +240,8 @@ async def get_campaigns(
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
     except GoogleAdsNotConfigured as exc:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+    except GoogleAdsException as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=_clean_google_ads_error(exc))
     return {"customer_id": connection.customer_id, "campaigns": campaigns}
 
 
@@ -233,4 +262,6 @@ async def get_campaign_ads(
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
     except GoogleAdsNotConfigured as exc:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+    except GoogleAdsException as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=_clean_google_ads_error(exc))
     return {"campaign_id": campaign_id, "ads": ads}
