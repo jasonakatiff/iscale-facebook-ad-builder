@@ -573,10 +573,63 @@ class FacebookService:
             Ad.Field.name: ad_data.get('name'),
             Ad.Field.adset_id: ad_data.get('adset_id'),
             Ad.Field.creative: {'creative_id': ad_data.get('creative_id')},
-            Ad.Field.status: ad_data.get('status', 'ACTIVE'),  # Changed from PAUSED to ACTIVE
+            # PAUSED by default (deliberate deviation from upstream, which had
+            # this defaulting to ACTIVE) — matches the safety convention used for
+            # Google Ads and TikTok Ads: new ads must never auto-spend without an
+            # explicit human decision to activate them.
+            Ad.Field.status: ad_data.get('status', 'PAUSED'),
         }
 
         return account.create_ad(params=params)
+
+    def get_campaign_insights(self, campaign_id, date_preset='last_30d', since=None, until=None):
+        """Fetch spend/impressions/clicks/conversions for a single campaign via
+        the Graph API `insights` edge. The plain campaign list only returns
+        metadata (name, status, budget) — this is what the cross-platform
+        Overview page needs for the Meta side."""
+        campaign = Campaign(campaign_id, api=self.api)
+
+        fields = [
+            'spend',
+            'impressions',
+            'clicks',
+            'ctr',
+            'cpc',
+            'actions',
+        ]
+        params = {}
+        if since and until:
+            params['time_range'] = {'since': since, 'until': until}
+        else:
+            params['date_preset'] = date_preset
+
+        insights = campaign.get_insights(fields=fields, params=params)
+        if not insights:
+            return {
+                'campaign_id': campaign_id,
+                'spend': 0.0,
+                'impressions': 0,
+                'clicks': 0,
+                'ctr': 0.0,
+                'cpc': 0.0,
+                'conversions': 0,
+            }
+
+        row = insights[0]
+        conversions = 0
+        for action in row.get('actions', []) or []:
+            if action.get('action_type') in ('offsite_conversion.fb_pixel_purchase', 'purchase', 'lead'):
+                conversions += int(action.get('value', 0))
+
+        return {
+            'campaign_id': campaign_id,
+            'spend': float(row.get('spend', 0) or 0),
+            'impressions': int(row.get('impressions', 0) or 0),
+            'clicks': int(row.get('clicks', 0) or 0),
+            'ctr': float(row.get('ctr', 0) or 0),
+            'cpc': float(row.get('cpc', 0) or 0),
+            'conversions': conversions,
+        }
 
     def search_locations(self, query, location_type='city', limit=10, ad_account_id=None):
         """Search for targeting locations."""

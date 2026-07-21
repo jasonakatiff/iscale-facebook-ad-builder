@@ -478,3 +478,41 @@ class BrandScrapedAd(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     brand_scrape = relationship("BrandScrape", back_populates="ads")
+
+
+class ApiKey(Base):
+    """Machine-to-machine key (e.g. the Hermes Telegram bot). Hashed at rest —
+    the plaintext key is shown once at creation time and never stored or logged."""
+    __tablename__ = "api_keys"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    name = Column(String, nullable=False)
+    key_hash = Column(String, unique=True, nullable=False, index=True)
+    # Allowed values: "ads:read", "ads:draft". "ads:publish" / "ads:spend" do not
+    # exist as scopes for bot keys — enforced in app.core.deps, not just policy text.
+    scopes = Column(JSON, nullable=False, default=list)
+    created_by_user_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+
+    created_by = relationship("User")
+
+
+class GoogleAdsConnection(Base):
+    """One connected Google Ads account, tokens encrypted at rest via Fernet
+    (see app.core.token_encryption)."""
+    __tablename__ = "google_ads_connections"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    customer_id = Column(String, nullable=False)  # Google Ads customer ID (no dashes)
+    account_name = Column(String, nullable=True)
+    encrypted_refresh_token = Column(Text, nullable=False)
+    encrypted_access_token = Column(Text, nullable=True)
+    access_token_expires_at = Column(DateTime(timezone=True), nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User")

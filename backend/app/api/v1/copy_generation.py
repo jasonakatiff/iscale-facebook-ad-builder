@@ -1,9 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import google.generativeai as genai
 import os
 import json
+from app.models import User
+from app.core.deps import get_current_active_user
 
 router = APIRouter()
 
@@ -31,7 +33,7 @@ class FieldRegenerationRequest(BaseModel):
     campaignDetails: Dict[str, str]
 
 @router.post("/generate")
-async def generate_copy(request: CopyGenerationRequest):
+async def generate_copy(request: CopyGenerationRequest, current_user: User = Depends(get_current_active_user)):
     """Generate ad copy variations using Gemini AI"""
     
     if not GEMINI_API_KEY:
@@ -131,7 +133,7 @@ Return ONLY valid JSON in this exact format:
         raise HTTPException(status_code=500, detail=f"Copy generation failed: {str(e)}")
 
 @router.post("/regenerate-field")
-async def regenerate_field(request: FieldRegenerationRequest):
+async def regenerate_field(request: FieldRegenerationRequest, current_user: User = Depends(get_current_active_user)):
     """Regenerate a specific field (headline, body, or cta)"""
     
     if not GEMINI_API_KEY:

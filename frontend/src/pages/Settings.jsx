@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, Plus, Sparkles, Edit, Trash2, Save, X, FileText, Code, AlertTriangle } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import { adStyles as initialStyles, AD_CATEGORIES } from '../data/adStyles';
 import { PROMPT_CATEGORIES } from '../data/prompts';
 
@@ -8,6 +9,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export default function Settings() {
     const { showSuccess, showError } = useToast();
+    const { authFetch } = useAuth();
     const [activeTab, setActiveTab] = useState('styles');
     const [styles, setStyles] = useState([]);
     const [prompts, setPrompts] = useState([]);
@@ -28,8 +30,8 @@ export default function Settings() {
         setLoading(true);
         try {
             const [promptsRes, stylesRes] = await Promise.all([
-                fetch(`${API_BASE}/prompts`),
-                fetch(`${API_BASE}/ad-styles`)
+                authFetch(`${API_BASE}/prompts`),
+                authFetch(`${API_BASE}/ad-styles`)
             ]);
 
             if (promptsRes.ok) {

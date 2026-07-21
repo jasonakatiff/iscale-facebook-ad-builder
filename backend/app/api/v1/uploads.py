@@ -1,9 +1,11 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 import os
 import uuid
 from typing import Dict
 from pathlib import Path
 from app.core.config import settings
+from app.models import User
+from app.core.deps import get_current_active_user
 
 router = APIRouter()
 
@@ -63,7 +65,7 @@ async def upload_to_local(file_content: bytes, filename: str) -> str:
 
 
 @router.post("/", response_model=Dict[str, str])
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(file: UploadFile = File(...), current_user: User = Depends(get_current_active_user)):
     try:
         # Security: Sanitize filename to prevent path traversal
         safe_filename = os.path.basename(file.filename)
