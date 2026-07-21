@@ -125,20 +125,25 @@ here only so the plan structure stays compatible with the orchestration skill.
 
 | Sprint | Scope | Status |
 |---|---|---|
-| 1 | Google Ads integration (read-only: OAuth + campaign/ad performance) | 🔜 Starting |
-| 2 | Google Ads write actions + cross-platform Overview page | ⬜ Not started |
-| 3 | TikTok Ads integration (research + read + write) | ⬜ Not started |
-| 4 | Deploy to `ads.nalar.army` (Docker/Caddy/cloudflared) + **required** Hermes Telegram bot (`ads-studio-agent`) | ⬜ Not started |
-| 5 | Hardening: tests, security review, docs, handoff | ⬜ Not started |
+| 1 | Google Ads integration (read-only: OAuth + campaign/ad performance) | ✅ Implemented; OAuth verified end-to-end |
+| 2 | Google Ads write actions + cross-platform Overview page | ✅ Implemented; preview + explicit confirmation safety guard |
+| 3 | TikTok Ads integration (research + read + write) | ✅ Implemented fail-closed; awaiting TikTok developer app approval |
+| 4 | Deploy to `ads.nalar.army` (Docker/Caddy/cloudflared) + **required** Hermes Telegram bot (`ads-studio-agent`) | 🟨 Site live; read-only bot API/profile ready, awaiting dedicated BotFather token |
+| 5 | Hardening: tests, security review, docs, handoff | ✅ Code/tests/docs completed; external provider prerequisites remain |
 
 ## 8. Current State
 
-(2026-07-21) Meta module is the only working platform (inherited from the fork,
-Standard Access token, no Business Verification needed — confirmed against Meta's
-official docs). Google Cloud project `nalarin-500102` already has the Google Ads API
-enabled (reused from `apps/optima` in the nalarin monorepo, which has a working
-Google Ads OAuth flow in TypeScript — used here as the reference pattern, ported to
-Python/FastAPI). No Google or TikTok code exists yet in this repo. Starting Sprint 1.
+(2026-07-21) The standalone production app is live at `https://ads.nalar.army`
+through Docker Compose, Caddy, and cloudflared. Public root and health return 200;
+unauthenticated data APIs return 401. Google Ads OAuth was verified through real
+Google consent and persists encrypted OAuth tokens, but the currently connected
+customer reports `CUSTOMER_NOT_ENABLED` until Google API/developer-token/account
+access is enabled. TikTok OAuth/reporting/campaign implementation is present but
+intentionally returns a clear unconfigured response until a TikTok for Business
+developer app receives Marketing API approval. The dedicated `ads-studio-agent`
+Hermes profile is isolated from MedSos/GitHub credentials and has an owner-bound
+`ads:read` key only; its live API reports `can_spend=false` and exposes no write
+route. It awaits a dedicated BotFather token before its Telegram gateway starts.
 
 ## 9. Security Rules
 

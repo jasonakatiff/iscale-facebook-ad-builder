@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="frontend/public/breadwinner_logo.png" alt="Facebook Ad Builder" width="120" />
+  <img src="frontend/public/breadwinner_logo.png" alt="NALARIN Ads Studio" width="120" />
 </p>
 
-<h1 align="center">Facebook Ad Builder</h1>
+<h1 align="center">NALARIN Ads Studio</h1>
 
 <p align="center">
-  <strong>AI-powered Facebook ad automation platform</strong><br>
-  From competitor research to ad generation and campaign management
+  <strong>Secure multi-platform paid ads operations workspace</strong><br>
+  From competitor research to creative generation, campaign review, and cross-platform reporting
 </p>
 
 <p align="center">
@@ -34,7 +34,7 @@
 
 ## Overview
 
-Facebook Ad Builder is a full-stack application that streamlines the entire Facebook advertising workflow. Use AI to research competitors, generate compelling ad copy and images, and manage campaigns—all from one platform.
+NALARIN Ads Studio is a standalone, login-protected application for reviewing and managing paid advertising workflows across Meta, Google Ads, and TikTok Ads. Use AI to research competitors, generate creative concepts, review campaign changes before they can spend, and compare performance from one workspace.
 
 ### Key Capabilities
 
@@ -42,7 +42,9 @@ Facebook Ad Builder is a full-stack application that streamlines the entire Face
 - **AI Content Generation** — Create ad copy and images using Google Gemini and Fal.ai
 - **Brand Management** — Maintain consistent brand voice, colors, and assets
 - **Template System** — Deconstruct winning ads into reusable blueprints
-- **Campaign Management** — Create and manage Facebook campaigns via API
+- **Cross-Platform Overview** — Compare normalized Meta, Google Ads, and TikTok campaign performance
+- **Guarded Campaign Actions** — Google/TikTok campaign creation defaults to paused and requires an explicit confirmation
+- **Read-Only Hermes Surface** — A scoped bot API can report performance but cannot spend, publish, or change campaigns
 
 ---
 
@@ -71,11 +73,26 @@ Build a library of proven ad structures:
 - Track performance by template type
 
 ### 📊 Campaign Management
-Manage Facebook campaigns directly:
+Manage paid-campaign workflows with explicit safety controls:
 - Create campaigns, ad sets, and ads
 - Upload creative assets
 - Monitor campaign status
 - Sync with Facebook Ads Manager
+- Connect Google Ads through OAuth for campaign reporting and guarded actions
+- Prepare TikTok Marketing API campaigns only after developer-app approval
+- Review cross-platform spend, clicks, conversions, and CPA from **Overview**
+
+> **Safety:** Platform writes are never silent. Google and TikTok campaign create
+> flows present a preview and require `confirm=true`; new campaigns are created
+> paused. The production bot API is read-only and has no spend or publish route.
+
+### Platform Integration Status
+
+| Platform | Status | Notes |
+|----------|--------|-------|
+| Meta | Available when a Marketing API token and ad account are configured | Inherited campaign/research workflow |
+| Google Ads | OAuth connection implemented | Connected account requires Google Ads API access; production reporting may be blocked until the developer token/account is enabled |
+| TikTok Ads | OAuth/API implementation ready | Requires TikTok for Business developer-app Marketing API approval and credentials |
 
 ---
 
