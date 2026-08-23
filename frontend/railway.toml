@@ -1,0 +1,11 @@
+# Railway configuration for the frontend service.
+#
+# Set this service's root directory to /frontend and its config file path to
+# /frontend/railway.toml in Railway service settings.
+
+[build]
+builder = "RAILPACK"
+buildCommand = "npm ci && npm run build"
+
+[deploy]
+startCommand = "npm run preview -- --host 0.0.0.0 --port $PORT"

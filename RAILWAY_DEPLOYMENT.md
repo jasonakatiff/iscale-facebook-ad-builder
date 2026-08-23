@@ -32,7 +32,14 @@ Railway will host:
 
 ## Step 3: Configure Backend Service
 
-Railway should automatically detect your backend service from `railway.toml`.
+Railway config-as-code applies to one service at a time. Configure the backend service as follows:
+
+- Root directory: `/` (the repository root)
+- Config file path: `/railway.toml`
+- Builder: Dockerfile
+- Dockerfile path: `backend/Dockerfile`
+
+Keeping the backend root at `/` is required because the Dockerfile copies files using paths such as `backend/requirements.txt`.
 
 ### Set Environment Variables
 
@@ -68,6 +75,13 @@ After the first deployment:
 > Alternatively, you can run `python init_db.py` using Railway's CLI or by connecting to the service shell.
 
 ## Step 4: Configure Frontend Service
+
+Configure the frontend as a separate Railway service:
+
+- Root directory: `/frontend`
+- Config file path: `/frontend/railway.toml`
+
+The frontend config uses Railpack to run `npm ci && npm run build`, then serves the Vite build with `npm run preview`.
 
 ### Set Environment Variables
 

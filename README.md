@@ -405,7 +405,7 @@ Deploy to [Railway](https://railway.app) in minutes:
 6. Set `ALLOWED_ORIGINS` to your frontend URL
 7. Deploy!
 
-> **Tip:** Railway auto-detects the `railway.toml` config and creates both backend and frontend services.
+> **Tip:** Railway config-as-code files configure one service at a time. For this monorepo, configure the backend service with the root `railway.toml`, keep its root directory at `/`, and configure the frontend service with `/frontend/railway.toml` and root directory `/frontend`.
 
 📖 **[Full Deployment Guide →](./RAILWAY_DEPLOYMENT.md)**
 

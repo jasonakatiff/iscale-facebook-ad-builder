@@ -1,31 +1,16 @@
-# Railway configuration for monorepo deployment
+# Railway configuration for the backend service.
+#
+# This file configures one Railway service. The frontend has its own config at
+# /frontend/railway.toml. In Railway, keep the backend service root directory
+# at / so the Docker build context includes backend/.
 
 [build]
-builder = "NIXPACKS"
-
-# Backend Service
-[[services]]
-name = "backend"
-source = "backend"
-
-[services.build]
 builder = "DOCKERFILE"
 dockerfilePath = "backend/Dockerfile"
 
-[services.deploy]
-startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+[deploy]
+startCommand = "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
 healthcheckTimeout = 100
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
-
-# Frontend Service
-[[services]]
-name = "frontend"
-source = "frontend"
-
-[services.build]
-builder = "NIXPACKS"
-
-[services.deploy]
-startCommand = "npm run preview -- --host 0.0.0.0 --port $PORT"
