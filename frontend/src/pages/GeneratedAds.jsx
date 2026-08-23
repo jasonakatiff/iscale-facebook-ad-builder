@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Download, Trash2, Search, Filter, CheckSquare, Square, FileDown, ExternalLink, FileText, Image, LayoutGrid, List, Film } from 'lucide-react';
 import { useBrands } from '../context/BrandContext';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -45,7 +46,12 @@ export default function GeneratedAds() {
             const response = await authFetch(`${API_URL}/generated-ads?${params}`);
             if (response.ok) {
                 const data = await response.json();
-                setAds(Array.isArray(data) ? data : []);
+                setAds((Array.isArray(data) ? data : []).map(ad => ({
+                    ...ad,
+                    image_url: resolveMediaUrl(ad.image_url),
+                    video_url: resolveMediaUrl(ad.video_url),
+                    thumbnail_url: resolveMediaUrl(ad.thumbnail_url)
+                })));
             } else {
                 setAds([]);
             }

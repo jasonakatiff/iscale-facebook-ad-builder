@@ -8,6 +8,7 @@ import BrandSelectionStep from '../components/steps/BrandSelectionStep';
 import ProductSelectionStep from '../components/steps/ProductSelectionStep';
 import ProfileSelectionStep from '../components/steps/ProfileSelectionStep';
 import StyleSelector from '../components/StyleSelector';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -191,6 +192,7 @@ export default function ImageAds() {
             // Add bundle ID to images
             const imagesWithBundle = (data.images || []).map(img => ({
                 ...img,
+                url: resolveMediaUrl(img.url),
                 adBundleId: bundleId
             }));
 
@@ -202,7 +204,12 @@ export default function ImageAds() {
                     id: `ga_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                     brandId: wizardData.brand?.id,
                     productId: wizardData.product?.id,
-                    templateId: wizardData.template?.id,
+                    // Built-in styles are frontend-only and do not have a
+                    // corresponding winning_ads row. Only persist a real
+                    // database template ID.
+                    templateId: wizardData.template?.type === 'template'
+                        ? wizardData.template?.id
+                        : undefined,
                     imageUrl: img.url,
                     headline: copy.headline,
                     body: copy.body,

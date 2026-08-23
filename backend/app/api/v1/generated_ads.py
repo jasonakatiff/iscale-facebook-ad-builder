@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database import get_db
-from app.models import GeneratedAd, User
+from app.models import GeneratedAd, User, WinningAd
 from app.core.deps import get_current_active_user, require_permission
 from fastapi.responses import StreamingResponse
 import io
@@ -378,11 +378,20 @@ def batch_save_ads(
         if existing:
             continue
             
+        # The image-ad wizard also supports built-in style archetypes. Their
+        # IDs are frontend-only and are not rows in winning_ads, so do not
+        # place them in the template foreign key column.
+        template_id = ad_data.templateId
+        if template_id:
+            template_exists = db.query(WinningAd.id).filter(WinningAd.id == template_id).first()
+            if not template_exists:
+                template_id = None
+
         new_ad = GeneratedAd(
             id=ad_data.id,
             brand_id=ad_data.brandId,
             product_id=ad_data.productId,
-            template_id=ad_data.templateId,
+            template_id=template_id,
             image_url=ad_data.imageUrl,
             headline=ad_data.headline,
             body=ad_data.body,
