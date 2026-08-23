@@ -28,7 +28,10 @@ Railway will host:
 1. In your Railway project dashboard, click **"+ New"**
 2. Select **"Database"** → **"Add PostgreSQL"**
 3. Railway will automatically create a PostgreSQL database
-4. The `DATABASE_URL` environment variable will be automatically set for all services
+4. Note the exact name of the PostgreSQL service (usually `Postgres`)
+
+> [!IMPORTANT]
+> Railway creates `DATABASE_URL` on the PostgreSQL service. The backend still needs a reference variable pointing to it; it is not automatically injected into every application service.
 
 ## Step 3: Configure Backend Service
 
@@ -45,34 +48,31 @@ Keeping the backend root at `/` is required because the Dockerfile copies files 
 
 1. Click on the **backend** service
 2. Go to the **"Variables"** tab
-3. Add the following environment variables:
+3. Add the following variables. In the first line, replace `Postgres` with the exact name of your PostgreSQL service if it is different:
 
 ```
 DATABASE_URL=${{Postgres.DATABASE_URL}}
+SECRET_KEY=generate_a_secure_random_value
 GEMINI_API_KEY=your_gemini_api_key_here
-VITE_FACEBOOK_ACCESS_TOKEN=your_facebook_token_here
-VITE_FACEBOOK_AD_ACCOUNT_ID=your_facebook_ad_account_id_here
+FAL_AI_API_KEY=your_fal_ai_api_key_here
+KIE_AI_API_KEY=your_kie_ai_api_key_here
+FACEBOOK_ACCESS_TOKEN=your_facebook_token_here
+FACEBOOK_AD_ACCOUNT_ID=your_facebook_ad_account_id_here
+ALLOWED_ORIGINS=https://your-frontend-domain
 ```
 
 > [!IMPORTANT]
-> The `DATABASE_URL` variable uses Railway's reference syntax to automatically link to your PostgreSQL database.
+> Create `DATABASE_URL` on the **backend service**, not only on the PostgreSQL service. The value must use Railway's reference syntax, such as `${{Postgres.DATABASE_URL}}`. Also keep `SECRET_KEY` set; the backend intentionally refuses to start without both variables.
+
+> [!WARNING]
+> `VITE_*` variables are frontend build variables. They do not replace the backend variables above. Do not commit real tokens or secret values to this repository.
 
 ### Initialize Database Schema
 
-After the first deployment:
-
-1. Click on the **backend** service
-2. Go to the **"Deployments"** tab
-3. Click on the latest deployment
-4. Click **"View Logs"**
-5. Once the service is running, go to the **"Settings"** tab
-6. Under **"Deploy"**, find the **"Custom Start Command"** section
-7. Temporarily change the start command to: `python init_db.py && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-8. Trigger a new deployment
-9. After the database is initialized, change the start command back to: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+The backend's `/railway.toml` start command runs `alembic upgrade head` before starting FastAPI, so no manual schema initialization command is required. Once `DATABASE_URL` and `SECRET_KEY` are present, the first backend deployment will apply the migrations automatically.
 
 > [!TIP]
-> Alternatively, you can run `python init_db.py` using Railway's CLI or by connecting to the service shell.
+> If a migration needs to be run manually, use Railway's CLI or the service shell after confirming that the backend has access to `DATABASE_URL`.
 
 ## Step 4: Configure Frontend Service
 
@@ -90,7 +90,7 @@ The frontend config uses Railpack to run `npm ci && npm run build`, then serves 
 3. Add the following environment variables:
 
 ```
-VITE_API_URL=${{backend.RAILWAY_PUBLIC_DOMAIN}}
+VITE_API_URL=https://${{backend.RAILWAY_PUBLIC_DOMAIN}}/api/v1
 VITE_SUPABASE_URL=your_supabase_url_here
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 VITE_FACEBOOK_ACCESS_TOKEN=your_facebook_token_here
@@ -98,7 +98,7 @@ VITE_FACEBOOK_AD_ACCOUNT_ID=your_facebook_ad_account_id_here
 ```
 
 > [!IMPORTANT]
-> The `VITE_API_URL` uses Railway's reference syntax to automatically get your backend service URL. Make sure to include `https://` prefix: `https://${{backend.RAILWAY_PUBLIC_DOMAIN}}`
+> The `VITE_API_URL` uses Railway's reference syntax to automatically get your backend service URL. Include both the `https://` prefix and the `/api/v1` path: `https://${{backend.RAILWAY_PUBLIC_DOMAIN}}/api/v1`.
 
 ### Enable Public Networking
 
@@ -146,9 +146,11 @@ If you need to manually trigger a deployment:
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@host:5432/db` |
+| `SECRET_KEY` | JWT signing key (required) | `random-secure-value` |
 | `GEMINI_API_KEY` | Google Gemini API key | `AIza...` |
-| `VITE_FACEBOOK_ACCESS_TOKEN` | Facebook Marketing API token | `EAAx...` |
-| `VITE_FACEBOOK_AD_ACCOUNT_ID` | Facebook Ad Account ID | `act_123456789` |
+| `FACEBOOK_ACCESS_TOKEN` | Facebook Marketing API token | `EAAx...` |
+| `FACEBOOK_AD_ACCOUNT_ID` | Facebook Ad Account ID | `act_123456789` |
+| `ALLOWED_ORIGINS` | Comma-separated frontend origins | `https://frontend.example.com` |
 
 ### Frontend Service
 
@@ -166,8 +168,14 @@ If you need to manually trigger a deployment:
 
 **Error: "DATABASE_URL environment variable is required"**
 - Ensure the PostgreSQL database is added to your project
-- Verify the `DATABASE_URL` variable is set correctly
-- Check that the reference syntax is correct: `${{Postgres.DATABASE_URL}}`
+- Open the **backend service** → **Variables** and confirm `DATABASE_URL` exists there
+- Check that the reference uses the exact PostgreSQL service name: `${{Postgres.DATABASE_URL}}`
+- Redeploy the backend after saving the variable
+
+**Error: "SECRET_KEY environment variable is required"**
+- Add `SECRET_KEY` to the **backend service** variables
+- Generate one locally with: `python -c "import secrets; print(secrets.token_urlsafe(32))"`
+- Redeploy the backend after saving the variable
 
 **Error: "Failed to connect to database"**
 - Check the PostgreSQL service is running
@@ -184,8 +192,8 @@ If you need to manually trigger a deployment:
 ### Database Schema Not Initialized
 
 **Error: "relation does not exist"**
-- You need to run `python init_db.py` to create the database tables
-- Follow the database initialization steps in Step 3
+- Confirm the backend is using the intended PostgreSQL service
+- Check the migration output from the `alembic upgrade head` startup command
 
 ### Build Failures
 
