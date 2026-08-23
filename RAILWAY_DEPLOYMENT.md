@@ -69,7 +69,9 @@ ALLOWED_ORIGINS=https://your-frontend-domain
 
 ### Initialize Database Schema
 
-The backend's `/railway.toml` start command runs `alembic upgrade head` before starting FastAPI, so no manual schema initialization command is required. Once `DATABASE_URL` and `SECRET_KEY` are present, the first backend deployment will apply the migrations automatically.
+The backend's `startup.py` script handles database initialization before starting FastAPI. On a brand-new PostgreSQL service, it creates the current schema, seeds roles and permissions, creates the admin account when `ADMIN_EMAIL` and `ADMIN_PASSWORD` are set, and records the schema as the current Alembic head. On an existing database, it runs the normal Alembic migrations.
+
+Once `DATABASE_URL` and `SECRET_KEY` are present, no manual schema initialization command is required.
 
 > [!TIP]
 > If a migration needs to be run manually, use Railway's CLI or the service shell after confirming that the backend has access to `DATABASE_URL`.
@@ -193,7 +195,7 @@ If you need to manually trigger a deployment:
 
 **Error: "relation does not exist"**
 - Confirm the backend is using the intended PostgreSQL service
-- Check the migration output from the `alembic upgrade head` startup command
+- Check the migration/bootstrap output from the `startup.py` command
 
 ### Build Failures
 
