@@ -18,7 +18,7 @@ def read_brands(
     brands = db.query(BrandModel).offset(skip).limit(limit).all()
     return brands
 
-@router.post("/", response_model=Brand)
+@router.post("", response_model=Brand)
 def create_brand(
     brand: BrandCreate,
     db: Session = Depends(get_db),
