@@ -5,7 +5,7 @@
 
 [build]
 builder = "RAILPACK"
-buildCommand = "npm ci && npm run build"
+buildCommand = "npm run build"
 
 [deploy]
 startCommand = "npm run preview -- --host 0.0.0.0 --port $PORT"
