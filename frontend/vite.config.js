@@ -6,6 +6,10 @@ import react from '@vitejs/plugin-react'
 // API calls should be made from a backend server, not the frontend
 export default defineConfig({
   plugins: [react()],
+  preview: {
+    // Railway's public domains use the up.railway.app subdomain.
+    allowedHosts: ['.up.railway.app'],
+  },
   server: {
     proxy: {
       '/api': {
