@@ -7,6 +7,9 @@ class Settings:
     PROJECT_NAME: str = "Facebook Ad Automation App"
     API_V1_STR: str = "/api/v1"
 
+    # White-label brand (per-client deployments; server-side references)
+    BRAND_NAME: str = os.getenv("BRAND_NAME", "Nalarin Ads Studio")
+
     # Where to send the browser after a successful OAuth connect flow
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
@@ -34,6 +37,13 @@ class Settings:
     FAL_AI_API_KEY: str = os.getenv("FAL_AI_API_KEY", "")
     KIE_AI_API_KEY: str = os.getenv("KIE_AI_API_KEY", "")
     FACEBOOK_ACCESS_TOKEN: str = os.getenv("FACEBOOK_ACCESS_TOKEN", "")
+    FACEBOOK_APP_ID: str = os.getenv("FACEBOOK_APP_ID", "")
+    FACEBOOK_APP_SECRET: str = os.getenv("FACEBOOK_APP_SECRET", "")
+    FACEBOOK_OAUTH_REDIRECT_URI: str = os.getenv("FACEBOOK_OAUTH_REDIRECT_URI", "")
+
+    @property
+    def facebook_ads_enabled(self) -> bool:
+        return bool(self.FACEBOOK_APP_ID and self.FACEBOOK_APP_SECRET and self.FACEBOOK_OAUTH_REDIRECT_URI)
 
     # Google Ads OAuth (blank until connected — routes return a clear 500 with
     # a config-missing message rather than crashing app startup, since not

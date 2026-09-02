@@ -37,6 +37,7 @@ import UserManagement from './pages/UserManagement';
 import GoogleAdsCampaigns from './pages/GoogleAdsCampaigns';
 import Overview from './pages/Overview';
 import TikTokAdsCampaigns from './pages/TikTokAdsCampaigns';
+import PublicInfoPage from './pages/PublicInfoPage';
 
 function App() {
   return (
@@ -48,6 +49,9 @@ function App() {
               <Routes>
                 {/* Public routes */}
                 <Route path="/login" element={<Login />} />
+                <Route path="/about" element={<PublicInfoPage page="about" />} />
+                <Route path="/privacy" element={<PublicInfoPage page="privacy" />} />
+                <Route path="/terms" element={<PublicInfoPage page="terms" />} />
 
                 {/* Protected routes */}
                 <Route

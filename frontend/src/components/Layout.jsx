@@ -3,6 +3,7 @@ import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, BarChart3, Package, Users, Video, Wand2, Settings, LogOut, Image, ShoppingBag, Target, ChevronLeft, ChevronRight, FileImage, Search, ChevronDown, UserCog, TrendingUp, Music2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { APP_NAME, APP_LOGO, APP_TAGLINE } from '../lib/branding';
 
 export default function Layout() {
     const location = useLocation();
@@ -70,12 +71,12 @@ export default function Layout() {
                 <div className={`p-6 border-b border-amber-100 ${isCollapsed ? 'px-4' : ''}`}>
                     <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
                         <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center overflow-hidden border border-amber-200 flex-shrink-0">
-                            <img src="/breadwinner_logo.png" alt="BreadWinner Logo" className="w-full h-full object-cover" />
+                            <img src={APP_LOGO} alt={APP_NAME} className="w-full h-full object-cover" />
                         </div>
                         {!isCollapsed && (
                             <div className="overflow-hidden whitespace-nowrap">
-                                <h1 className="text-xl font-bold text-amber-900">BreadWinner</h1>
-                                <p className="text-xs text-amber-600">Fresh campaigns daily</p>
+                                <h1 className="text-xl font-bold text-amber-900">{APP_NAME}</h1>
+                                <p className="text-xs text-amber-600">{APP_TAGLINE}</p>
                             </div>
                         )}
                     </div>
