@@ -1,0 +1,64 @@
+{\rtf1\ansi\deff0
+{\fonttbl{\f0 Calibri;}{\f1 Consolas;}}
+\fs28\b Nalarin Ads Studio - Google Ads API Tool Design Documentation\b0\fs22\par
+\par
+\b Applicant organization\b0\par
+Banyumedia\par
+Company website: https://banyumedia.co.id\par
+Google Ads manager account: 313-110-6925\par
+Google Cloud project number: 126222253433\par
+Tool URL: https://ads.nalar.army\par
+\par
+\b 1. Business model and intended audience\b0\par
+Banyumedia is an Indonesian digital marketing agency that manages online advertising for business clients. Nalarin Ads Studio is a private, authenticated web application used by authorized Banyumedia operators to connect Google Ads accounts, review campaign performance, prepare campaign changes, and manage Search campaigns for accounts that have explicitly granted access. The tool is not an anonymous public API, does not sell Google Ads data, and does not scrape Google interfaces.\par
+\par
+\b 2. Google Ads API use cases\b0\par
+The tool uses the official Google Ads API for the following capabilities:\par
+- Reporting: read campaign and ad performance metrics such as impressions, clicks, cost, conversions, conversion value, status, and channel type using GAQL.\par
+- Campaign creation: create Search campaigns, campaign budgets, ad groups, and optional broad-match keywords. Every newly created campaign and ad group is created PAUSED.\par
+- Campaign management: pause or enable a selected campaign and add campaign-level negative keywords.\par
+- Account selection: list Google Ads customer IDs available to an authorized Google login and require the operator to explicitly select the account before data is loaded.\par
+The current implementation does not create Google Ads accounts, does not use App Conversion Tracking or Remarketing APIs, and does not perform automatic bidding or unattended budget changes.\par
+\par
+\b 3. Authentication and authorization flow\b0\par
+1. An authorized operator signs in to Nalarin Ads Studio.\par
+2. The operator starts Google OAuth from the Google Ads page.\par
+3. The application requests the standard Google Ads scope through Google's consent screen.\par
+4. The OAuth callback validates a signed, expiring state value bound to the Google Ads provider and operator identity.\par
+5. Access and refresh tokens are encrypted at rest. Tokens are never returned to the frontend after the OAuth exchange and are never logged.\par
+6. The application lists accessible Google Ads customer IDs. If more than one account is available, no account is selected automatically. The operator must choose one.\par
+7. All API queries are scoped to the authenticated operator's selected connection.\par
+\par
+\b 4. Safety controls for write operations\b0\par
+- Every write endpoint requires an authenticated active user.\par
+- Every campaign mutation requires an explicit confirm=true request after the UI displays a human-readable preview.\par
+- Campaign creation always creates the campaign PAUSED, so creation cannot start spending.\par
+- Enabling a campaign is a separate explicit action with a warning that spending will begin.\par
+- Pausing and enabling are never performed by background jobs.\par
+- The dedicated reporting bot has a separate hashed API key with ads:read scope only. It has no route that can create, pause, enable, publish, or spend.\par
+\par
+\b 5. Data handling and security\b0\par
+- OAuth refresh and access tokens are encrypted at rest using authenticated encryption.\par
+- Application passwords are hashed; machine API keys are hashed at rest.\par
+- OAuth state is signed, expiring, and provider-bound to protect the callback flow.\par
+- Production traffic uses HTTPS. The database and backend are not exposed directly to the public network.\par
+- API responses do not expose OAuth credentials, developer tokens, or application secrets.\par
+- Provider errors are sanitized before being shown to operators.\par
+- Account candidate and selection endpoints enforce user ownership. One and only one Google Ads connection can be active for a user at a time.\par
+\par
+\b 6. Operator workflow\b0\par
+The Google Ads page first shows connection status. After OAuth, it presents all accessible customer IDs and requires a selection. Once selected, the operator can choose a date range and review performance. Any create, pause, enable, or negative-keyword action is reviewed in a confirmation dialog before the API request is sent. Reports distinguish provider errors from actual campaign data and do not fabricate missing values.\par
+\par
+\b 7. Technical architecture\b0\par
+- Backend: Python 3.11, FastAPI, SQLAlchemy, PostgreSQL, official Google Ads API client library.\par
+- Frontend: React and Vite, served through nginx.\par
+- Deployment: isolated Docker Compose production stack behind Caddy and HTTPS at ads.nalar.army.\par
+- OAuth callback: https://ads.nalar.army/api/v1/google-ads/oauth/callback\par
+- Google Cloud project: nalarin-500102 (project number 126222253433).\par
+\par
+\b 8. Testing and operational controls\b0\par
+The Google Ads route test suite covers authentication gates, OAuth callback state validation, account ownership, single-active-account selection, and explicit confirmation requirements for write actions. Production health checks gate frontend startup on backend readiness. The account selection and reporting flows are also verified against the production API without exposing credentials.\par
+\par
+\b 9. Current limitations\b0\par
+The current release supports Google Search campaign creation and reporting. It does not claim support for Shopping, Performance Max, Display, Video, App campaigns, conversion uploads, remarketing lists, or automated optimization. New capabilities will be added only after appropriate design, testing, and policy review.\par
+}
