@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Check, Target, Users, Image as ImageIcon, Zap, CheckCircle, CreditCard, Megaphone, CheckCircle2, ArrowRight } from 'lucide-react';
 import { CampaignProvider } from '../context/CampaignContext';
 import AdAccountStep from '../components/AdAccountStep';
@@ -6,9 +6,22 @@ import CampaignStep from '../components/CampaignStep';
 import AdSetStep from '../components/AdSetStep';
 import AdCreativeStep from '../components/AdCreativeStep';
 import BulkAdCreation from '../components/BulkAdCreation';
+import ConnectAccountCard from '../components/ConnectAccountCard';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 const FacebookCampaignWizard = () => {
+    const { authFetch } = useAuth();
+    const { showError, showSuccess } = useToast();
     const [currentStep, setCurrentStep] = useState(1);
+    const [connection, setConnection] = useState(null);
+    const [connections, setConnections] = useState([]);
+    const [connectionLoading, setConnectionLoading] = useState(true);
+    const [selectingAccount, setSelectingAccount] = useState(false);
+    const [selectingAccountId, setSelectingAccountId] = useState(null);
+    const [disconnecting, setDisconnecting] = useState(false);
     const [formData, setFormData] = useState({
         adAccountId: null,
         campaignId: null,
@@ -24,6 +37,101 @@ const FacebookCampaignWizard = () => {
         { id: 5, label: 'Bulk Ads', icon: Megaphone },
         { id: 6, label: 'Review & Launch', icon: CheckCircle2 },
     ];
+
+    const loadConnection = useCallback(async () => {
+        setConnectionLoading(true);
+        try {
+            const response = await authFetch(`${API_URL}/facebook/connection`);
+            if (response.ok) setConnection(await response.json());
+        } catch (error) {
+            showError(error.message || 'Failed to load Meta Ads connection');
+        } finally {
+            setConnectionLoading(false);
+        }
+    }, [authFetch, showError]);
+
+    const loadConnections = useCallback(async () => {
+        try {
+            const response = await authFetch(`${API_URL}/facebook/connections`);
+            if (response.ok) {
+                const data = await response.json();
+                const candidates = data.connections || [];
+                setConnections(candidates);
+                if (candidates.length > 0 && !candidates.some((candidate) => candidate.selected)) {
+                    setSelectingAccount(true);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load Meta Ads account choices', error);
+        }
+    }, [authFetch]);
+
+    useEffect(() => {
+        loadConnection();
+        loadConnections();
+        const query = new URLSearchParams(window.location.search);
+        if (query.get('connected') === '1') {
+            showSuccess('Meta Ads account connected');
+            window.history.replaceState({}, '', window.location.pathname);
+        } else if (query.get('select') === '1') {
+            setSelectingAccount(true);
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+    }, [loadConnection, loadConnections, showSuccess]);
+
+    const connectMeta = async () => {
+        try {
+            const response = await authFetch(`${API_URL}/facebook/oauth/start`);
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.detail || 'Failed to start Meta connection');
+            }
+            window.location.href = (await response.json()).oauth_url;
+        } catch (error) {
+            showError(error.message || 'Failed to start Meta connection');
+        }
+    };
+
+    const disconnectMeta = async () => {
+        setDisconnecting(true);
+        try {
+            const response = await authFetch(`${API_URL}/facebook/connection`, { method: 'DELETE' });
+            if (!response.ok) throw new Error('Failed to disconnect Meta Ads');
+            setConnection({ connected: false });
+            setConnections((current) => current.map((candidate) => ({ ...candidate, selected: false })));
+            showSuccess('Meta Ads disconnected');
+        } catch (error) {
+            showError(error.message || 'Failed to disconnect Meta Ads');
+        } finally {
+            setDisconnecting(false);
+        }
+    };
+
+    const selectMetaAccount = async (adAccountId) => {
+        setSelectingAccountId(adAccountId);
+        try {
+            const response = await authFetch(`${API_URL}/facebook/connection/select`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ad_account_id: adAccountId }),
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.detail || 'Failed to select Meta ad account');
+            }
+            setConnection(await response.json());
+            setConnections((current) => current.map((candidate) => ({
+                ...candidate,
+                selected: candidate.ad_account_id === adAccountId,
+            })));
+            setSelectingAccount(false);
+            showSuccess('Meta ad account selected');
+        } catch (error) {
+            showError(error.message || 'Failed to select Meta ad account');
+        } finally {
+            setSelectingAccountId(null);
+        }
+    };
 
     const handleNext = () => {
         if (currentStep < steps.length) {
@@ -60,8 +168,50 @@ const FacebookCampaignWizard = () => {
                     <p className="text-gray-600">Create and manage your Facebook ad campaigns</p>
                 </div>
 
+                {!connectionLoading && (
+                    <div className="space-y-3">
+                        <ConnectAccountCard
+                            platformName="Meta Ads"
+                            icon={Megaphone}
+                            connected={!!connection?.connected}
+                            accountLabel={connection?.account_name || connection?.ad_account_id}
+                            connectedAt={connection?.connected_at}
+                            onConnect={connectMeta}
+                            onDisconnect={disconnectMeta}
+                            disconnecting={disconnecting}
+                        />
+                        {connection?.connected && connections.length > 1 && !selectingAccount && (
+                            <button type="button" onClick={() => setSelectingAccount(true)} className="text-sm font-medium text-amber-700 hover:text-amber-900">
+                                Change Meta ad account
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {selectingAccount && connections.length > 0 && (
+                    <section aria-labelledby="meta-account-heading" className="border-y border-gray-200 py-5">
+                        <h2 id="meta-account-heading" className="text-lg font-bold text-gray-900 mb-3">Choose a Meta ad account</h2>
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                            {connections.map((candidate) => (
+                                <button
+                                    key={candidate.ad_account_id}
+                                    type="button"
+                                    onClick={() => selectMetaAccount(candidate.ad_account_id)}
+                                    disabled={selectingAccountId !== null}
+                                    aria-pressed={candidate.selected}
+                                    className={`min-h-16 border px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 disabled:opacity-60 ${candidate.selected ? 'border-amber-600 bg-amber-50' : 'border-gray-300 bg-white hover:border-amber-500'}`}
+                                >
+                                    <span className="block font-semibold text-gray-900">{candidate.account_name || 'Meta ad account'}</span>
+                                    <span className="block text-sm text-gray-500">{candidate.ad_account_id}</span>
+                                    {selectingAccountId === candidate.ad_account_id && <span className="block text-xs text-amber-700 mt-1">Selecting…</span>}
+                                </button>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
                 {/* Wizard Steps */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                {connection?.connected && <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                     <div className="flex justify-between items-center mb-8 relative">
                         {/* Progress Bar Background */}
                         <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-100 -z-10 rounded-full" />
@@ -156,7 +306,7 @@ const FacebookCampaignWizard = () => {
                     </div>
 
 
-                </div>
+                </div>}
             </div>
         </CampaignProvider>
     );

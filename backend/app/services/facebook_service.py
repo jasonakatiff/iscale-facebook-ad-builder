@@ -17,12 +17,12 @@ env_path = Path(__file__).resolve().parent.parent.parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
 class FacebookService:
-    def __init__(self):
+    def __init__(self, access_token=None, ad_account_id=None, app_id=None, app_secret=None):
         # Try standard names first, then VITE_ prefixed names (common in this project)
-        self.access_token = os.getenv("FACEBOOK_ACCESS_TOKEN") or os.getenv("VITE_FACEBOOK_ACCESS_TOKEN")
-        self.ad_account_id = os.getenv("FACEBOOK_AD_ACCOUNT_ID") or os.getenv("VITE_FACEBOOK_AD_ACCOUNT_ID")
-        self.app_id = os.getenv("FACEBOOK_APP_ID") or os.getenv("VITE_FACEBOOK_APP_ID")
-        self.app_secret = os.getenv("FACEBOOK_APP_SECRET") or os.getenv("VITE_FACEBOOK_APP_SECRET")
+        self.access_token = access_token or os.getenv("FACEBOOK_ACCESS_TOKEN") or os.getenv("VITE_FACEBOOK_ACCESS_TOKEN")
+        self.ad_account_id = ad_account_id or os.getenv("FACEBOOK_AD_ACCOUNT_ID") or os.getenv("VITE_FACEBOOK_AD_ACCOUNT_ID")
+        self.app_id = app_id or os.getenv("FACEBOOK_APP_ID") or os.getenv("VITE_FACEBOOK_APP_ID")
+        self.app_secret = app_secret or os.getenv("FACEBOOK_APP_SECRET") or os.getenv("VITE_FACEBOOK_APP_SECRET")
         self.api = None
         self.account = None
         
@@ -64,8 +64,12 @@ class FacebookService:
         try:
             me = User(fbid='me', api=self.api)
             my_accounts = me.get_ad_accounts(fields=['id', 'name', 'account_id', 'account_status', 'currency', 'balance', 'amount_spent'])
-            print(f"Found {len(my_accounts)} accounts.")
-            return [dict(acc) for acc in my_accounts]
+            accounts = [dict(account) for account in my_accounts]
+            if self.ad_account_id:
+                selected_id = self.ad_account_id if self.ad_account_id.startswith('act_') else f'act_{self.ad_account_id}'
+                accounts = [account for account in accounts if account.get('id') == selected_id]
+            print(f"Found {len(accounts)} accounts.")
+            return accounts
         except Exception as e:
             print(f"Error fetching ad accounts: {e}")
             raise e
@@ -160,7 +164,6 @@ class FacebookService:
         fields = [
             Page.Field.id,
             Page.Field.name,
-            Page.Field.access_token,
             Page.Field.category,
         ]
         

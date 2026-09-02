@@ -1,21 +1,200 @@
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import datetime, timedelta, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
 from typing import Dict, Any, Optional
 from app.services.facebook_service import FacebookService
-from app.models import FacebookAd, FacebookAdSet, FacebookCampaign, User
+from app.models import FacebookAd, FacebookAdSet, FacebookCampaign, MetaAdsConnection, User
 from app.database import get_db
 from app.core.deps import get_current_active_user, require_permission
+from app.core.config import settings
+from app.core.oauth_state import create_oauth_state, verify_oauth_state, set_oauth_state_cookie, clear_oauth_state_cookie, get_oauth_state_cookie_name
+from app.core.token_encryption import encrypt_token, decrypt_token
+from app.services.meta_ads_oauth import build_oauth_url, exchange_code, list_ad_accounts, MetaOAuthError
 from sqlalchemy.orm import Session
 
 router = APIRouter()
+PROVIDER = "meta-ads"
 
-def get_facebook_service():
-    service = FacebookService()
+
+class SelectMetaAccountRequest(BaseModel):
+    ad_account_id: str
+
+
+def _require_meta_configured():
+    if not settings.facebook_ads_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Meta Ads OAuth is not configured on this server.",
+        )
+
+
+def get_facebook_service(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    connection = db.query(MetaAdsConnection).filter(
+        MetaAdsConnection.user_id == current_user.id,
+        MetaAdsConnection.is_active.is_(True),
+    ).first()
+    if not connection:
+        raise HTTPException(status_code=404, detail="No connected Meta Ads account. Connect and select one first.")
+    service = FacebookService(
+        access_token=decrypt_token(connection.encrypted_access_token),
+        ad_account_id=connection.ad_account_id,
+        app_id=settings.FACEBOOK_APP_ID,
+        app_secret=settings.FACEBOOK_APP_SECRET,
+    )
     try:
         if not service.api:
             service.initialize()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return service
+
+
+@router.get("/oauth/start")
+async def start_meta_oauth(
+    request: Request,
+    response: Response,
+    current_user: User = Depends(get_current_active_user),
+):
+    _require_meta_configured()
+    state_token = create_oauth_state(current_user.id, PROVIDER)
+    set_oauth_state_cookie(response, state_token, secure=request.url.scheme == "https")
+    return {"oauth_url": build_oauth_url(settings.FACEBOOK_APP_ID, settings.FACEBOOK_OAUTH_REDIRECT_URI, state_token)}
+
+
+@router.get("/oauth/callback")
+async def meta_oauth_callback(
+    request: Request,
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+    error_description: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    if error:
+        raise HTTPException(status_code=400, detail=error_description or f"Meta OAuth error: {error}")
+    if not code or not state:
+        raise HTTPException(status_code=400, detail="Missing Meta OAuth authorization code or state")
+    state_cookie = request.cookies.get(get_oauth_state_cookie_name())
+    if state_cookie and state_cookie != state:
+        raise HTTPException(status_code=400, detail="OAuth state mismatch between cookie and callback parameter")
+    try:
+        user_id = verify_oauth_state(state, PROVIDER)
+        token_data = await exchange_code(
+            code,
+            settings.FACEBOOK_APP_ID,
+            settings.FACEBOOK_APP_SECRET,
+            settings.FACEBOOK_OAUTH_REDIRECT_URI,
+        )
+        accounts = await list_ad_accounts(token_data["access_token"])
+    except (ValueError, MetaOAuthError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not accounts:
+        raise HTTPException(status_code=400, detail="No Meta ad accounts are available for this login.")
+
+    encrypted_token = encrypt_token(token_data["access_token"])
+    expires_in = token_data.get("expires_in")
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in) if isinstance(expires_in, (int, float)) else None
+    select_required = len(accounts) > 1
+    db.query(MetaAdsConnection).filter(MetaAdsConnection.user_id == user_id).update(
+        {MetaAdsConnection.is_active: False}, synchronize_session=False
+    )
+    for account in accounts:
+        account_id = str(account.get("id") or "")
+        if not account_id:
+            continue
+        connection = db.query(MetaAdsConnection).filter(
+            MetaAdsConnection.user_id == user_id,
+            MetaAdsConnection.ad_account_id == account_id,
+        ).first()
+        if not connection:
+            connection = MetaAdsConnection(user_id=user_id, ad_account_id=account_id, encrypted_access_token=encrypted_token)
+            db.add(connection)
+        connection.account_name = account.get("name")
+        connection.encrypted_access_token = encrypted_token
+        connection.access_token_expires_at = expires_at
+        connection.is_active = not select_required
+    db.commit()
+
+    redirect = RedirectResponse(
+        url=f"{settings.FRONTEND_URL.rstrip('/')}/facebook-campaigns?{'select=1' if select_required else 'connected=1'}"
+    )
+    clear_oauth_state_cookie(redirect)
+    return redirect
+
+
+@router.get("/connection")
+def meta_connection_status(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    connection = db.query(MetaAdsConnection).filter(
+        MetaAdsConnection.user_id == current_user.id,
+        MetaAdsConnection.is_active.is_(True),
+    ).first()
+    if not connection:
+        return {"connected": False}
+    return {
+        "connected": True,
+        "ad_account_id": connection.ad_account_id,
+        "account_name": connection.account_name,
+        "connected_at": connection.created_at.isoformat() if connection.created_at else None,
+    }
+
+
+@router.get("/connections")
+def meta_connections(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    connections = db.query(MetaAdsConnection).filter(
+        MetaAdsConnection.user_id == current_user.id,
+    ).order_by(MetaAdsConnection.ad_account_id).all()
+    return {"connections": [
+        {
+            "ad_account_id": connection.ad_account_id,
+            "account_name": connection.account_name,
+            "selected": connection.is_active,
+        }
+        for connection in connections
+    ]}
+
+
+@router.post("/connection/select")
+def select_meta_connection(
+    body: SelectMetaAccountRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    account_id = body.ad_account_id if body.ad_account_id.startswith("act_") else f"act_{body.ad_account_id}"
+    connection = db.query(MetaAdsConnection).filter(
+        MetaAdsConnection.user_id == current_user.id,
+        MetaAdsConnection.ad_account_id == account_id,
+    ).first()
+    if not connection:
+        raise HTTPException(status_code=404, detail="Meta ad account is not available for this user.")
+    db.query(MetaAdsConnection).filter(MetaAdsConnection.user_id == current_user.id).update(
+        {MetaAdsConnection.is_active: False}, synchronize_session=False
+    )
+    connection.is_active = True
+    db.commit()
+    return {"connected": True, "ad_account_id": connection.ad_account_id, "account_name": connection.account_name}
+
+
+@router.delete("/connection")
+def disconnect_meta_connection(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    db.query(MetaAdsConnection).filter(MetaAdsConnection.user_id == current_user.id).update(
+        {MetaAdsConnection.is_active: False}, synchronize_session=False
+    )
+    db.commit()
+    return {"message": "Disconnected"}
 
 @router.get("/accounts")
 def get_ad_accounts(

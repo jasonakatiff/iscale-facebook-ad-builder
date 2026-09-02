@@ -13,11 +13,13 @@ class TestFacebookCampaigns:
             "/api/v1/facebook/campaigns",
             headers=auth_headers
         )
-        # Without valid FB token, will return 500 (service error) or 200 with empty
+        # Without a connected Meta Ads account the dependency gate returns 404;
+        # with a connection but invalid token it is 500/200.
         assert response.status_code in [
             status.HTTP_200_OK,
             status.HTTP_400_BAD_REQUEST,
             status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_404_NOT_FOUND,  # No connected Meta Ads account
             status.HTTP_500_INTERNAL_SERVER_ERROR  # Facebook service error
         ]
 
@@ -29,8 +31,9 @@ class TestFacebookCampaigns:
             json={},
             headers=auth_headers
         )
-        # Without valid FB token, returns 500 from service
+        # 404 when no Meta Ads connection exists; otherwise service-level errors
         assert response.status_code in [
+            status.HTTP_404_NOT_FOUND,  # No connected Meta Ads account
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             status.HTTP_400_BAD_REQUEST,
             status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -129,8 +132,9 @@ class TestFacebookMediaUpload:
             json={},  # Missing image_url
             headers=auth_headers
         )
-        # Either 400 (missing image_url) or 500 (FB service error)
+        # 404 when no Meta Ads connection exists; otherwise service-level errors
         assert response.status_code in [
+            status.HTTP_404_NOT_FOUND,  # No connected Meta Ads account
             status.HTTP_400_BAD_REQUEST,
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             status.HTTP_500_INTERNAL_SERVER_ERROR

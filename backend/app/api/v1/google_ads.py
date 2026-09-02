@@ -59,6 +59,10 @@ class ConfirmOnlyRequest(BaseModel):
     confirm: bool = False
 
 
+class SelectAccountRequest(BaseModel):
+    customer_id: str
+
+
 def _require_confirmed(confirm: bool) -> None:
     if not confirm:
         raise HTTPException(
@@ -165,29 +169,38 @@ async def oauth_callback(
     if not customer_ids:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No accessible Google Ads accounts found for this login.")
 
-    customer_id = normalize_customer_id(customer_ids[0])
+    normalized_customer_ids = list(dict.fromkeys(normalize_customer_id(value) for value in customer_ids))
+    encrypted_refresh_token = encrypt_token(refresh_token)
+    encrypted_access_token = encrypt_token(tokens["access_token"])
+    select_required = len(normalized_customer_ids) > 1
 
-    existing = (
-        db.query(GoogleAdsConnection)
-        .filter(GoogleAdsConnection.user_id == user_id, GoogleAdsConnection.customer_id == customer_id)
-        .first()
+    db.query(GoogleAdsConnection).filter(GoogleAdsConnection.user_id == user_id).update(
+        {GoogleAdsConnection.is_active: False}, synchronize_session=False
     )
-    if existing:
-        existing.encrypted_refresh_token = encrypt_token(refresh_token)
-        existing.encrypted_access_token = encrypt_token(tokens["access_token"])
-        existing.is_active = True
-    else:
-        existing = GoogleAdsConnection(
-            user_id=user_id,
-            customer_id=customer_id,
-            encrypted_refresh_token=encrypt_token(refresh_token),
-            encrypted_access_token=encrypt_token(tokens["access_token"]),
+    for customer_id in normalized_customer_ids:
+        connection = (
+            db.query(GoogleAdsConnection)
+            .filter(GoogleAdsConnection.user_id == user_id, GoogleAdsConnection.customer_id == customer_id)
+            .first()
         )
-        db.add(existing)
+        if connection:
+            connection.encrypted_refresh_token = encrypted_refresh_token
+            connection.encrypted_access_token = encrypted_access_token
+            connection.is_active = not select_required
+        else:
+            db.add(GoogleAdsConnection(
+                user_id=user_id,
+                customer_id=customer_id,
+                encrypted_refresh_token=encrypted_refresh_token,
+                encrypted_access_token=encrypted_access_token,
+                is_active=not select_required,
+            ))
     db.commit()
 
     frontend_url = settings.FRONTEND_URL.rstrip("/")
-    redirect = RedirectResponse(url=f"{frontend_url}/google-ads?connected=1")
+    redirect = RedirectResponse(
+        url=f"{frontend_url}/google-ads?{'select=1' if select_required else 'connected=1'}"
+    )
     clear_oauth_state_cookie(redirect)
     return redirect
 
@@ -205,6 +218,60 @@ def get_connection(
     )
     if not connection:
         return {"connected": False}
+    return {
+        "connected": True,
+        "customer_id": connection.customer_id,
+        "account_name": connection.account_name,
+        "connected_at": connection.created_at.isoformat() if connection.created_at else None,
+    }
+
+
+@router.get("/connections")
+def list_connections(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    connections = (
+        db.query(GoogleAdsConnection)
+        .filter(GoogleAdsConnection.user_id == current_user.id)
+        .order_by(GoogleAdsConnection.customer_id)
+        .all()
+    )
+    return {
+        "connections": [
+            {
+                "customer_id": connection.customer_id,
+                "account_name": connection.account_name,
+                "selected": connection.is_active,
+            }
+            for connection in connections
+        ]
+    }
+
+
+@router.post("/connection/select")
+def select_connection(
+    body: SelectAccountRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    customer_id = normalize_customer_id(body.customer_id)
+    connection = (
+        db.query(GoogleAdsConnection)
+        .filter(
+            GoogleAdsConnection.user_id == current_user.id,
+            GoogleAdsConnection.customer_id == customer_id,
+        )
+        .first()
+    )
+    if not connection:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Google Ads account is not available for this user.")
+
+    db.query(GoogleAdsConnection).filter(GoogleAdsConnection.user_id == current_user.id).update(
+        {GoogleAdsConnection.is_active: False}, synchronize_session=False
+    )
+    connection.is_active = True
+    db.commit()
     return {
         "connected": True,
         "customer_id": connection.customer_id,
@@ -254,6 +321,18 @@ def _clean_google_ads_error(exc: Exception) -> str:
     return "Google Ads API request failed."
 
 
+def _google_ads_error_status(exc: Exception) -> int:
+    message = _clean_google_ads_error(exc).lower()
+    access_errors = (
+        "developer token is only approved for use with test accounts",
+        "customer account can't be accessed",
+        "caller does not have permission",
+    )
+    if any(fragment in message for fragment in access_errors):
+        return status.HTTP_403_FORBIDDEN
+    return status.HTTP_502_BAD_GATEWAY
+
+
 @router.get("/campaigns")
 async def get_campaigns(
     date_preset: str = "last_30d",
@@ -272,7 +351,7 @@ async def get_campaigns(
     except GoogleAdsNotConfigured as exc:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
     except GoogleAdsException as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=_clean_google_ads_error(exc))
+        raise HTTPException(status_code=_google_ads_error_status(exc), detail=_clean_google_ads_error(exc))
     return {"customer_id": connection.customer_id, "campaigns": campaigns}
 
 
@@ -294,7 +373,7 @@ async def get_campaign_ads(
     except GoogleAdsNotConfigured as exc:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
     except GoogleAdsException as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=_clean_google_ads_error(exc))
+        raise HTTPException(status_code=_google_ads_error_status(exc), detail=_clean_google_ads_error(exc))
     return {"campaign_id": campaign_id, "ads": ads}
 
 

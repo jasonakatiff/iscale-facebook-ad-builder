@@ -518,6 +518,23 @@ class GoogleAdsConnection(Base):
     user = relationship("User")
 
 
+class MetaAdsConnection(Base):
+    """One Meta Ads account authorized by a user OAuth grant."""
+    __tablename__ = "meta_ads_connections"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    ad_account_id = Column(String, nullable=False)
+    account_name = Column(String, nullable=True)
+    encrypted_access_token = Column(Text, nullable=False)
+    access_token_expires_at = Column(DateTime(timezone=True), nullable=True)
+    is_active = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User")
+
+
 class TikTokAdsConnection(Base):
     """One TikTok Marketing API advertiser connection, with OAuth tokens
     encrypted at rest through app.core.token_encryption."""

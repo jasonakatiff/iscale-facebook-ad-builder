@@ -22,10 +22,14 @@ export default function GoogleAdsCampaigns() {
     const { showError, showSuccess } = useToast();
 
     const [connection, setConnection] = useState(null);
+    const [connections, setConnections] = useState([]);
     const [connectionLoading, setConnectionLoading] = useState(true);
     const [disconnecting, setDisconnecting] = useState(false);
+    const [selectingAccount, setSelectingAccount] = useState(false);
+    const [selectingCustomerId, setSelectingCustomerId] = useState(null);
     const [campaigns, setCampaigns] = useState([]);
     const [campaignsLoading, setCampaignsLoading] = useState(false);
+    const [campaignError, setCampaignError] = useState(null);
     const [datePreset, setDatePreset] = useState('last_30d');
 
     // Create-campaign form
@@ -54,8 +58,25 @@ export default function GoogleAdsCampaigns() {
         }
     }, [authFetch]);
 
+    const loadConnections = useCallback(async () => {
+        try {
+            const response = await authFetch(`${API_URL}/google-ads/connections`);
+            if (response.ok) {
+                const data = await response.json();
+                const candidates = data.connections || [];
+                setConnections(candidates);
+                if (candidates.length > 0 && !candidates.some((candidate) => candidate.selected)) {
+                    setSelectingAccount(true);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load Google Ads account choices', error);
+        }
+    }, [authFetch]);
+
     const loadCampaigns = useCallback(async () => {
         setCampaignsLoading(true);
+        setCampaignError(null);
         try {
             const response = await authFetch(`${API_URL}/google-ads/campaigns?date_preset=${datePreset}`);
             if (response.ok) {
@@ -63,10 +84,12 @@ export default function GoogleAdsCampaigns() {
                 setCampaigns(data.campaigns || []);
             } else if (response.status !== 404) {
                 const error = await response.json().catch(() => ({}));
-                showError(error.detail || 'Failed to load Google Ads campaigns');
+                throw new Error(error.detail || 'Failed to load Google Ads campaigns');
             }
         } catch (error) {
-            showError('Failed to load Google Ads campaigns');
+            const message = error.message || 'Failed to load Google Ads campaigns';
+            setCampaignError(message);
+            showError(message);
         } finally {
             setCampaignsLoading(false);
         }
@@ -74,12 +97,17 @@ export default function GoogleAdsCampaigns() {
 
     useEffect(() => {
         loadConnection();
+        loadConnections();
         // Query param set by the OAuth callback redirect
-        if (new URLSearchParams(window.location.search).get('connected') === '1') {
+        const query = new URLSearchParams(window.location.search);
+        if (query.get('connected') === '1') {
             showSuccess('Google Ads account connected');
             window.history.replaceState({}, '', window.location.pathname);
+        } else if (query.get('select') === '1') {
+            setSelectingAccount(true);
+            window.history.replaceState({}, '', window.location.pathname);
         }
-    }, [loadConnection, showSuccess]);
+    }, [loadConnection, loadConnections, showSuccess]);
 
     useEffect(() => {
         if (connection?.connected) {
@@ -112,6 +140,36 @@ export default function GoogleAdsCampaigns() {
             showError('Failed to disconnect');
         } finally {
             setDisconnecting(false);
+        }
+    };
+
+    const formatCustomerId = (customerId) => customerId.replace(/^(\d{3})(\d{3})(\d{4})$/, '$1-$2-$3');
+
+    const handleSelectAccount = async (customerId) => {
+        setSelectingCustomerId(customerId);
+        try {
+            const response = await authFetch(`${API_URL}/google-ads/connection/select`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ customer_id: customerId }),
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.detail || 'Failed to select Google Ads account');
+            }
+            setConnection(await response.json());
+            setCampaigns([]);
+            setCampaignError(null);
+            setConnections((current) => current.map((candidate) => ({
+                ...candidate,
+                selected: candidate.customer_id === customerId,
+            })));
+            setSelectingAccount(false);
+            showSuccess(`Google Ads account ${formatCustomerId(customerId)} selected`);
+        } catch (error) {
+            showError(error.message || 'Failed to select Google Ads account');
+        } finally {
+            setSelectingCustomerId(null);
         }
     };
 
@@ -224,16 +282,70 @@ export default function GoogleAdsCampaigns() {
             </div>
 
             {!connectionLoading && (
-                <ConnectAccountCard
-                    platformName="Google Ads"
-                    icon={TrendingUp}
-                    connected={!!connection?.connected}
-                    accountLabel={connection?.account_name || connection?.customer_id}
-                    connectedAt={connection?.connected_at}
-                    onConnect={handleConnect}
-                    onDisconnect={handleDisconnect}
-                    disconnecting={disconnecting}
-                />
+                <div className="space-y-3">
+                    <ConnectAccountCard
+                        platformName="Google Ads"
+                        icon={TrendingUp}
+                        connected={!!connection?.connected}
+                        accountLabel={connection?.account_name || (connection?.customer_id && formatCustomerId(connection.customer_id))}
+                        connectedAt={connection?.connected_at}
+                        onConnect={handleConnect}
+                        onDisconnect={handleDisconnect}
+                        disconnecting={disconnecting}
+                    />
+                    {connection?.connected && connections.length > 1 && !selectingAccount && (
+                        <button
+                            type="button"
+                            onClick={() => setSelectingAccount(true)}
+                            className="text-sm font-medium text-amber-700 hover:text-amber-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600"
+                        >
+                            Change Google Ads account
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {selectingAccount && connections.length > 0 && (
+                <section aria-labelledby="google-account-heading" className="border-y border-gray-200 py-5">
+                    <div className="flex items-center justify-between gap-4 mb-3">
+                        <h2 id="google-account-heading" className="text-lg font-bold text-gray-900">Choose a Google Ads account</h2>
+                        {connection?.connected && (
+                            <button type="button" onClick={() => setSelectingAccount(false)} className="text-sm text-gray-600 hover:text-gray-900">
+                                Cancel
+                            </button>
+                        )}
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {connections.map((candidate) => (
+                            <button
+                                key={candidate.customer_id}
+                                type="button"
+                                onClick={() => handleSelectAccount(candidate.customer_id)}
+                                disabled={selectingCustomerId !== null}
+                                aria-pressed={candidate.selected}
+                                className={`min-h-16 border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 disabled:opacity-60 ${candidate.selected ? 'border-amber-600 bg-amber-50' : 'border-gray-300 bg-white hover:border-amber-500'}`}
+                            >
+                                <span className="block font-semibold text-gray-900">
+                                    {candidate.account_name || `Account ${formatCustomerId(candidate.customer_id)}`}
+                                </span>
+                                {candidate.account_name && <span className="block text-sm text-gray-500">{formatCustomerId(candidate.customer_id)}</span>}
+                                {selectingCustomerId === candidate.customer_id && <span className="block text-xs text-amber-700 mt-1">Selecting…</span>}
+                            </button>
+                        ))}
+                    </div>
+                </section>
+            )}
+
+            {campaignError && connection?.connected && (
+                <section role="alert" className="border border-amber-300 bg-amber-50 px-4 py-4 text-amber-950">
+                    <h2 className="font-bold">Google Ads data is not available yet</h2>
+                    <p className="mt-1 text-sm leading-6">{campaignError}</p>
+                    {campaignError.includes('developer token is only approved') && (
+                        <p className="mt-2 text-sm leading-6">
+                            The account is connected correctly. Google must approve Basic or Standard API access before production campaigns can be read.
+                        </p>
+                    )}
+                </section>
             )}
 
             {showCreateForm && connection?.connected && (
@@ -292,7 +404,7 @@ export default function GoogleAdsCampaigns() {
                 </form>
             )}
 
-            {connection?.connected && (
+            {connection?.connected && !campaignError && (
                 <PerformanceTable
                     rows={campaigns}
                     columns={CAMPAIGN_COLUMNS}
