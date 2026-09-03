@@ -1,5 +1,24 @@
 # Changelog
 
+## [2026-09-03] Fork contributions: SmittyCode subset
+
+### Added
+- `backend/startup.py`: database bootstrap. Empty database gets the schema from the models and is stamped at Alembic head; existing databases run `alembic upgrade head`; a database with tables but no `alembic_version` is refused. Fixes fresh Railway deploys, which failed because the first Alembic revision assumes existing tables. (SmittyCode `aac7b16`)
+- `frontend/src/utils/mediaUrl.js`: resolves backend-relative `/uploads/...` media paths against the API origin so legacy generated ads render on split frontend/backend services. (SmittyCode `20ca2bf`)
+- `frontend/railway.toml` for the frontend service; root `railway.toml` now configures only the backend with the Dockerfile builder. Closes the cause of issue #1 (Nixpacks at repo root). (SmittyCode `a5e5342`, `94047a6`)
+
+### Fixed
+- Batch-saving generated ads no longer fails when the image wizard used a built-in style: style IDs are not `winning_ads` rows, so `template_id` is nulled instead of violating the foreign key. (SmittyCode `20ca2bf`)
+- `POST /api/v1/brands` and `POST /api/v1/profiles` no longer 307-redirect to the trailing-slash form. (SmittyCode `2efd969`, `230540c`)
+- Vite preview accepts `.up.railway.app` hosts plus any listed in `PREVIEW_ALLOWED_HOSTS`. (SmittyCode `d999fef`, adapted)
+
+### Not taken from this fork
+- Removing the brand-to-profile filter in the ad wizards (product decision, not a bug).
+- The alternate R2 upload rewrite; main already carries an equivalent fix.
+- The contributor's `AGENTS.md`.
+
+Plan: none (external contribution review). Tests: backend pytest 99 passing, 1 xfailed; `startup.py` exercised against empty, migrated, and unversioned local databases; frontend `vite build` OK.
+
 ## [2026-09-03]
 
 ### Changed

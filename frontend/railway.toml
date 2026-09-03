@@ -4,7 +4,7 @@
 # /frontend/railway.toml in Railway service settings.
 
 [build]
-builder = "RAILPACK"
+builder = "NIXPACKS"
 buildCommand = "npm run build"
 
 [deploy]

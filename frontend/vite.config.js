@@ -7,8 +7,12 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   preview: {
-    // Railway's public domains use the up.railway.app subdomain.
-    allowedHosts: ['.up.railway.app'],
+    // Railway's generated domains plus any custom domains listed in
+    // PREVIEW_ALLOWED_HOSTS (comma-separated, e.g. ".example.com,app.example.com").
+    allowedHosts: [
+      '.up.railway.app',
+      ...(process.env.PREVIEW_ALLOWED_HOSTS || '').split(',').map(h => h.trim()).filter(Boolean),
+    ],
   },
   server: {
     proxy: {
