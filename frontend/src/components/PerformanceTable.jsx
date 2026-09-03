@@ -63,11 +63,11 @@ export default function PerformanceTable({
     return (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             {onDatePresetChange && (
-                <div className="flex justify-end p-4 border-b border-gray-100">
+                <div className="flex justify-end p-3 sm:p-4 border-b border-gray-100">
                     <select
                         value={datePreset}
                         onChange={(e) => onDatePresetChange(e.target.value)}
-                        className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                        className="border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm bg-white focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     >
                         {DATE_PRESETS.map((preset) => (
                             <option key={preset.value} value={preset.value}>
@@ -78,7 +78,10 @@ export default function PerformanceTable({
                 </div>
             )}
 
-            <table className="w-full text-sm">
+            {/* Horizontal scroll keeps wide metric tables usable on phones
+                without squeezing columns into unreadability. */}
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[560px]">
                 <thead className="bg-gray-50 text-gray-600">
                     <tr>
                         {columns.map((col) => (
@@ -130,6 +133,7 @@ export default function PerformanceTable({
                         ))}
                 </tbody>
             </table>
+            </div>
         </div>
     );
 }

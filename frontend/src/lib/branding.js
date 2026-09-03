@@ -5,3 +5,4 @@ export const APP_LOGO = import.meta.env.VITE_APP_LOGO || '/nalarin_ads_studio_lo
 export const APP_TAGLINE = import.meta.env.VITE_APP_TAGLINE || 'Paid media operations';
 export const APP_OPERATOR = import.meta.env.VITE_APP_OPERATOR || 'Banyumedia';
 export const APP_OPERATOR_URL = import.meta.env.VITE_APP_OPERATOR_URL || 'https://banyumedia.co.id';
+export const APP_ACCENT = import.meta.env.VITE_APP_ACCENT || '#B45309';

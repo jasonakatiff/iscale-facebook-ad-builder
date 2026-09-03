@@ -82,13 +82,14 @@ export default function Overview() {
     const errorEntries = Object.entries(errors).filter(([, message]) => !!message);
 
     return (
-        <div className="max-w-6xl mx-auto space-y-6">
+        <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
             <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-                    <LayoutDashboard size={32} className="text-amber-600" />
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2 flex items-center gap-3">
+                    <LayoutDashboard size={28} className="text-amber-600 sm:hidden" />
+                    <LayoutDashboard size={32} className="text-amber-600 hidden sm:block" />
                     Overview
                 </h1>
-                <p className="text-gray-600">Meta and Google Ads campaign performance, side by side</p>
+                <p className="text-sm sm:text-base text-gray-600">Meta and Google Ads campaign performance, side by side</p>
             </div>
 
             {errorEntries.length > 0 && (
