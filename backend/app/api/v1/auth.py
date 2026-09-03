@@ -10,6 +10,7 @@ from app.core.security import (
     get_password_hash,
     create_access_token,
     create_refresh_token,
+    hash_refresh_token,
 )
 from app.core.deps import get_current_active_user
 from app.schemas.auth import (
@@ -95,10 +96,10 @@ async def login(
     access_token = create_access_token(data={"sub": user.id})
     refresh_token_str, expires_at = create_refresh_token()
 
-    # Store refresh token in database
+    # Store refresh token hash in database (never the raw token)
     refresh_token_obj = RefreshToken(
         user_id=user.id,
-        token=refresh_token_str,
+        token_hash=hash_refresh_token(refresh_token_str),
         expires_at=expires_at
     )
     db.add(refresh_token_obj)
@@ -133,10 +134,10 @@ async def login_json(request: Request, user_data: UserLogin, db: Session = Depen
     access_token = create_access_token(data={"sub": user.id})
     refresh_token_str, expires_at = create_refresh_token()
 
-    # Store refresh token in database
+    # Store refresh token hash in database (never the raw token)
     refresh_token_obj = RefreshToken(
         user_id=user.id,
-        token=refresh_token_str,
+        token_hash=hash_refresh_token(refresh_token_str),
         expires_at=expires_at
     )
     db.add(refresh_token_obj)
@@ -152,9 +153,9 @@ async def login_json(request: Request, user_data: UserLogin, db: Session = Depen
 @limiter.limit("10/minute")
 async def refresh_token(request: Request, token_data: TokenRefresh, db: Session = Depends(get_db)):
     """Get new access and refresh tokens using a refresh token (rolling refresh)"""
-    # Find the refresh token
+    # Find the refresh token by its hash
     refresh_token_obj = db.query(RefreshToken).filter(
-        RefreshToken.token == token_data.refresh_token
+        RefreshToken.token_hash == hash_refresh_token(token_data.refresh_token)
     ).first()
 
     if not refresh_token_obj:
@@ -188,10 +189,10 @@ async def refresh_token(request: Request, token_data: TokenRefresh, db: Session 
     access_token = create_access_token(data={"sub": user.id})
     new_refresh_token_str, expires_at = create_refresh_token()
 
-    # Store new refresh token
+    # Store new refresh token hash
     new_refresh_token_obj = RefreshToken(
         user_id=user.id,
-        token=new_refresh_token_str,
+        token_hash=hash_refresh_token(new_refresh_token_str),
         expires_at=expires_at
     )
     db.add(new_refresh_token_obj)
@@ -210,9 +211,9 @@ async def logout(
     db: Session = Depends(get_db)
 ):
     """Logout by invalidating the refresh token"""
-    # Find and delete the refresh token
+    # Find and delete the refresh token by its hash
     refresh_token_obj = db.query(RefreshToken).filter(
-        RefreshToken.token == token_data.refresh_token,
+        RefreshToken.token_hash == hash_refresh_token(token_data.refresh_token),
         RefreshToken.user_id == current_user.id
     ).first()
 

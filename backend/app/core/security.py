@@ -1,3 +1,4 @@
+import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import jwt, JWTError
@@ -16,6 +17,15 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def get_password_hash(password: str) -> str:
     """Hash a password using bcrypt"""
     return pwd_context.hash(password)
+
+
+def hash_refresh_token(raw_token: str) -> str:
+    """SHA-256 one-way hash for refresh tokens stored at rest.
+
+    The raw token is only ever shown to the client that created it; the
+    database stores the hash so a DB read (backup leak, SQL injection, etc.)
+    cannot mint a valid session. Same pattern as ApiKey.key_hash."""
+    return hashlib.sha256(raw_token.encode()).hexdigest()
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

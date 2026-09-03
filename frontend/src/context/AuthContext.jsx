@@ -172,45 +172,65 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('refreshToken');
     }, [accessToken, refreshToken]);
 
+    // Shared in-flight refresh promise: when several concurrent requests hit
+    // 401 at once (e.g. Overview firing Meta+Google+TikTok in parallel), every
+    // caller must await the SAME refresh — otherwise the second refresh uses
+    // the already-rotated (deleted) token, fails, and logs the user out for
+    // no reason. The promise is cleared on settle so a later expiry can
+    // refresh again.
+    const refreshPromiseRef = React.useRef(null);
+
     const refreshAccessToken = async () => {
+        if (refreshPromiseRef.current) {
+            return refreshPromiseRef.current;
+        }
         if (!refreshToken) {
             throw new Error('No refresh token');
         }
 
-        let response;
+        const promise = (async () => {
+            let response;
+            try {
+                response = await fetch(`${API_URL}/auth/refresh`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ refresh_token: localStorage.getItem('refreshToken') }),
+                });
+            } catch (err) {
+                // Network error - rethrow but don't attach status so we don't logout
+                throw err;
+            }
+
+            if (!response.ok) {
+                const error = new Error('Failed to refresh token');
+                error.status = response.status;
+                throw error;
+            }
+
+            const data = await response.json();
+            setAccessToken(data.access_token);
+            localStorage.setItem('accessToken', data.access_token);
+
+            // Update refresh token if new one provided (rolling refresh)
+            if (data.refresh_token) {
+                setRefreshToken(data.refresh_token);
+                localStorage.setItem('refreshToken', data.refresh_token);
+            }
+
+            // Re-fetch user data with new token
+            await fetchUser();
+
+            return data.access_token;
+        })();
+
+        refreshPromiseRef.current = promise;
         try {
-            response = await fetch(`${API_URL}/auth/refresh`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ refresh_token: refreshToken }),
-            });
-        } catch (err) {
-            // Network error - rethrow but don't attach status so we don't logout
-            throw err;
+            return await promise;
+        } finally {
+            refreshPromiseRef.current = null;
         }
-
-        if (!response.ok) {
-            const error = new Error('Failed to refresh token');
-            error.status = response.status;
-            throw error;
-        }
-
-        const data = await response.json();
-        setAccessToken(data.access_token);
-        localStorage.setItem('accessToken', data.access_token);
-
-        // Update refresh token if new one provided (rolling refresh)
-        if (data.refresh_token) {
-            setRefreshToken(data.refresh_token);
-            localStorage.setItem('refreshToken', data.refresh_token);
-        }
-
-        // Re-fetch user data with new token
-        await fetchUser();
-
-        return data.access_token;
     };
 
     // Helper to make authenticated API calls
