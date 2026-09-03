@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_current_active_user
 from app.core.token_encryption import decrypt_token
 from app.database import get_db
-from app.models import GoogleAdsConnection, TikTokAdsConnection, User
+from app.models import GoogleAdsConnection, MetaAdsConnection, TikTokAdsConnection, User
 from app.services.facebook_service import FacebookService
 from app.services.google_ads_service import (
     get_campaign_performance,
@@ -46,11 +46,28 @@ def _normalize(platform: str, campaign_name: str, spend: float, impressions: int
     }
 
 
-def _fetch_meta_rows(ad_account_id: Optional[str], date_preset: str) -> List[Dict[str, Any]]:
-    service = FacebookService()
+def _fetch_meta_rows(db: Session, user_id: str, ad_account_id: Optional[str], date_preset: str) -> List[Dict[str, Any]]:
+    # Per-user Meta OAuth connection (Sprint 6): when the user has an active
+    # MetaAdsConnection, its decrypted token and selected ad account drive the
+    # fetch. The legacy env-token path only remains as a fallback for
+    # deployments that never adopted per-user OAuth.
+    connection = (
+        db.query(MetaAdsConnection)
+        .filter(MetaAdsConnection.user_id == user_id, MetaAdsConnection.is_active.is_(True))
+        .first()
+    )
+    if connection is not None:
+        service = FacebookService(
+            access_token=decrypt_token(connection.encrypted_access_token),
+            ad_account_id=connection.ad_account_id,
+        )
+    else:
+        service = FacebookService()
     if not service.api:
         service.initialize()
-    campaigns = service.get_campaigns(ad_account_id)
+    if service.ad_account_id is None and ad_account_id:
+        service.ad_account_id = ad_account_id
+    campaigns = service.get_campaigns(service.ad_account_id)
     rows = []
     for campaign in campaigns:
         insights = service.get_campaign_insights(campaign["id"], date_preset=date_preset)
@@ -138,9 +155,15 @@ async def build_overview(
     errors: Dict[str, str] = {}
 
     try:
-        rows.extend(_fetch_meta_rows(ad_account_id, date_preset))
+        rows.extend(_fetch_meta_rows(db, user_id, ad_account_id, date_preset))
     except Exception as exc:  # Meta config/API errors shouldn't block Google's rows
-        errors["meta"] = str(exc)
+        # A bare "NoneType ... encode" means no token at all (env fallback empty
+        # and no per-user connection) — translate to a user-actionable message
+        # instead of surfacing the raw SDK/NoneType traceback text.
+        message = str(exc)
+        if "NoneType" in message or ("encode" in message and "None" in message):
+            message = "No connected Meta Ads account. Connect Meta Ads in Facebook Campaigns first."
+        errors["meta"] = message
 
     try:
         rows.extend(await _fetch_google_rows(db, user_id, date_preset))
