@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-09-03] Fork contributions: masgant99 auth pass
+
+### Security
+- 44 API routes had no authentication at all: the whole Research module (saved searches, verticals, blacklists, brand scrapes, run-scheduled-searches), Ad Remix, ad styles, prompts, dashboard stats, copy generation, and file uploads. Verified with the test client returning 200 without a token. Every one now requires a logged-in user; only login and refresh remain public. (masgant99 PR #3, commit `98d033c`, router files only)
+- Settings page now sends the bearer token when loading prompts and ad styles. (masgant99 `98d033c`)
+- Research API client (`frontend/src/api/research.js`) now attaches the bearer token and refreshes once on 401, matching `authFetch`. Without this the Research pages would have broken once their routes were protected.
+
+Plan: none (external contribution review). Tests: backend pytest 99 passing; unauthenticated probe of 8 previously-open routes now returns 401; frontend `vite build` OK.
+
 ## [2026-09-03] Fork contributions: ryuiciwazaka subset
 
 ### Added

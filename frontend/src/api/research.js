@@ -3,9 +3,67 @@ import axios from 'axios';
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const API_URL = `${API_BASE}/research`;
 
+// Research endpoints require a logged-in user. This client mirrors
+// AuthContext.authFetch: attach the bearer token, and on a 401 refresh once
+// (single-flight) and retry. Refresh failure clears the session.
+const http = axios.create();
+
+http.interceptors.request.use((config) => {
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+        config.headers = { ...config.headers, Authorization: `Bearer ${token}` };
+    }
+    return config;
+});
+
+let refreshPromise = null;
+async function refreshAccessToken() {
+    if (refreshPromise) return refreshPromise;
+    refreshPromise = (async () => {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) throw new Error('No refresh token');
+        const res = await fetch(`${API_BASE}/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        if (!res.ok) throw new Error(`Refresh failed (${res.status})`);
+        const data = await res.json();
+        localStorage.setItem('accessToken', data.access_token);
+        if (data.refresh_token) localStorage.setItem('refreshToken', data.refresh_token);
+        return data.access_token;
+    })();
+    try {
+        return await refreshPromise;
+    } finally {
+        refreshPromise = null;
+    }
+}
+
+http.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const original = error.config;
+        if (error.response?.status === 401 && original && !original._retried) {
+            original._retried = true;
+            try {
+                const token = await refreshAccessToken();
+                original.headers = { ...original.headers, Authorization: `Bearer ${token}` };
+                return http(original);
+            } catch (refreshError) {
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('refreshToken');
+                window.location.href = '/login';
+                return Promise.reject(refreshError);
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+
 export const searchAndSave = async (request) => {
     try {
-        const response = await axios.post(`${API_URL}/search-and-save`, request);
+        const response = await http.post(`${API_URL}/search-and-save`, request);
         return response.data;
     } catch (error) {
         console.error('Error searching and saving:', error);
@@ -15,7 +73,7 @@ export const searchAndSave = async (request) => {
 
 export const getSavedSearches = async () => {
     try {
-        const response = await axios.get(`${API_URL}/saved-searches`);
+        const response = await http.get(`${API_URL}/saved-searches`);
         return response.data;
     } catch (error) {
         console.error('Error fetching saved searches:', error);
@@ -25,7 +83,7 @@ export const getSavedSearches = async () => {
 
 export const getSavedSearch = async (searchId) => {
     try {
-        const response = await axios.get(`${API_URL}/saved-searches/${searchId}`);
+        const response = await http.get(`${API_URL}/saved-searches/${searchId}`);
         return response.data;
     } catch (error) {
         console.error('Error fetching saved search:', error);
@@ -35,7 +93,7 @@ export const getSavedSearch = async (searchId) => {
 
 export const deleteSavedSearch = async (searchId) => {
     try {
-        const response = await axios.delete(`${API_URL}/saved-searches/${searchId}`);
+        const response = await http.delete(`${API_URL}/saved-searches/${searchId}`);
         return response.data;
     } catch (error) {
         console.error('Error deleting saved search:', error);
@@ -45,7 +103,7 @@ export const deleteSavedSearch = async (searchId) => {
 
 export const getApiUsage = async () => {
     try {
-        const response = await axios.get(`${API_URL}/api-usage`);
+        const response = await http.get(`${API_URL}/api-usage`);
         return response.data;
     } catch (error) {
         console.error('Error fetching API usage:', error);
@@ -55,7 +113,7 @@ export const getApiUsage = async () => {
 
 export const getBlacklist = async () => {
     try {
-        const response = await axios.get(`${API_URL}/blacklist`);
+        const response = await http.get(`${API_URL}/blacklist`);
         return response.data;
     } catch (error) {
         console.error('Error fetching blacklist:', error);
@@ -65,7 +123,7 @@ export const getBlacklist = async () => {
 
 export const addToBlacklist = async (pageName, reason = null) => {
     try {
-        const response = await axios.post(`${API_URL}/blacklist`, null, {
+        const response = await http.post(`${API_URL}/blacklist`, null, {
             params: { page_name: pageName, reason }
         });
         return response.data;
@@ -77,7 +135,7 @@ export const addToBlacklist = async (pageName, reason = null) => {
 
 export const removeFromBlacklist = async (blacklistId) => {
     try {
-        const response = await axios.delete(`${API_URL}/blacklist/${blacklistId}`);
+        const response = await http.delete(`${API_URL}/blacklist/${blacklistId}`);
         return response.data;
     } catch (error) {
         console.error('Error removing from blacklist:', error);
@@ -87,7 +145,7 @@ export const removeFromBlacklist = async (blacklistId) => {
 
 export const getKeywordBlacklist = async () => {
     try {
-        const response = await axios.get(`${API_URL}/keyword-blacklist`);
+        const response = await http.get(`${API_URL}/keyword-blacklist`);
         return response.data;
     } catch (error) {
         console.error('Error fetching keyword blacklist:', error);
@@ -97,7 +155,7 @@ export const getKeywordBlacklist = async () => {
 
 export const addToKeywordBlacklist = async (keyword, reason = null) => {
     try {
-        const response = await axios.post(`${API_URL}/keyword-blacklist`, null, {
+        const response = await http.post(`${API_URL}/keyword-blacklist`, null, {
             params: { keyword, reason }
         });
         return response.data;
@@ -109,7 +167,7 @@ export const addToKeywordBlacklist = async (keyword, reason = null) => {
 
 export const removeFromKeywordBlacklist = async (blacklistId) => {
     try {
-        const response = await axios.delete(`${API_URL}/keyword-blacklist/${blacklistId}`);
+        const response = await http.delete(`${API_URL}/keyword-blacklist/${blacklistId}`);
         return response.data;
     } catch (error) {
         console.error('Error removing from keyword blacklist:', error);
@@ -119,7 +177,7 @@ export const removeFromKeywordBlacklist = async (blacklistId) => {
 
 export const getRateLimit = async () => {
     try {
-        const response = await axios.get(`${API_URL}/rate-limit`);
+        const response = await http.get(`${API_URL}/rate-limit`);
         return response.data;
     } catch (error) {
         console.error('Error fetching rate limit:', error);
@@ -129,7 +187,7 @@ export const getRateLimit = async () => {
 
 export const getFacebookPages = async (limit = 50, offset = 0, sortBy = 'total_ads') => {
     try {
-        const response = await axios.get(`${API_URL}/facebook-pages`, {
+        const response = await http.get(`${API_URL}/facebook-pages`, {
             params: { limit, offset, sort_by: sortBy }
         });
         return response.data;
@@ -141,7 +199,7 @@ export const getFacebookPages = async (limit = 50, offset = 0, sortBy = 'total_a
 
 export const getVerticals = async () => {
     try {
-        const response = await axios.get(`${API_URL}/verticals`);
+        const response = await http.get(`${API_URL}/verticals`);
         return response.data;
     } catch (error) {
         console.error('Error fetching verticals:', error);
@@ -151,7 +209,7 @@ export const getVerticals = async () => {
 
 export const createVertical = async (name, description = null) => {
     try {
-        const response = await axios.post(`${API_URL}/verticals`, null, {
+        const response = await http.post(`${API_URL}/verticals`, null, {
             params: { name, description }
         });
         return response.data;
@@ -163,7 +221,7 @@ export const createVertical = async (name, description = null) => {
 
 export const getVerticalAggregatedAds = async (verticalId) => {
     try {
-        const response = await axios.get(`${API_URL}/verticals/${verticalId}/aggregated-ads`);
+        const response = await http.get(`${API_URL}/verticals/${verticalId}/aggregated-ads`);
         return response.data;
     } catch (error) {
         console.error('Error fetching vertical aggregated ads:', error);
@@ -173,7 +231,7 @@ export const getVerticalAggregatedAds = async (verticalId) => {
 
 export const getVerticalPageAds = async (verticalId, pageId) => {
     try {
-        const response = await axios.get(`${API_URL}/verticals/${verticalId}/pages/${pageId}/ads`);
+        const response = await http.get(`${API_URL}/verticals/${verticalId}/pages/${pageId}/ads`);
         return response.data;
     } catch (error) {
         console.error('Error fetching vertical page ads:', error);
@@ -184,7 +242,7 @@ export const getVerticalPageAds = async (verticalId, pageId) => {
 // Brand Scrapes API
 export const createBrandScrape = async (brandName, pageUrl) => {
     try {
-        const response = await axios.post(`${API_URL}/brand-scrapes`, {
+        const response = await http.post(`${API_URL}/brand-scrapes`, {
             brand_name: brandName,
             page_url: pageUrl
         });
@@ -197,7 +255,7 @@ export const createBrandScrape = async (brandName, pageUrl) => {
 
 export const getBrandScrapes = async () => {
     try {
-        const response = await axios.get(`${API_URL}/brand-scrapes`);
+        const response = await http.get(`${API_URL}/brand-scrapes`);
         return response.data;
     } catch (error) {
         console.error('Error fetching brand scrapes:', error);
@@ -207,7 +265,7 @@ export const getBrandScrapes = async () => {
 
 export const getBrandScrape = async (scrapeId) => {
     try {
-        const response = await axios.get(`${API_URL}/brand-scrapes/${scrapeId}`);
+        const response = await http.get(`${API_URL}/brand-scrapes/${scrapeId}`);
         return response.data;
     } catch (error) {
         console.error('Error fetching brand scrape:', error);
@@ -217,7 +275,7 @@ export const getBrandScrape = async (scrapeId) => {
 
 export const deleteBrandScrape = async (scrapeId) => {
     try {
-        const response = await axios.delete(`${API_URL}/brand-scrapes/${scrapeId}`);
+        const response = await http.delete(`${API_URL}/brand-scrapes/${scrapeId}`);
         return response.data;
     } catch (error) {
         console.error('Error deleting brand scrape:', error);

@@ -1,12 +1,16 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Brand, Product, GeneratedAd, WinningAd, FacebookCampaign
+from app.models import Brand, Product, GeneratedAd, WinningAd, FacebookCampaign, User
+from app.core.deps import get_current_active_user
 
 router = APIRouter()
 
 @router.get("/stats")
-def get_dashboard_stats(db: Session = Depends(get_db)):
+def get_dashboard_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """
     Get aggregated statistics for the dashboard.
     """
@@ -23,3 +27,4 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         "templates_count": templates_count,
         "campaigns_count": campaigns_count
     }
+
