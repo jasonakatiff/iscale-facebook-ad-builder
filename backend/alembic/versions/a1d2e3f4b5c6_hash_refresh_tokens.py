@@ -21,6 +21,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # Invalidate outstanding sessions first: their stored values are
+    # plaintext tokens we cannot hash without the raw client-side values,
+    # and leaving them as ''-defaulted rows would violate the new unique
+    # index. Users simply log in again.
+    op.execute("DELETE FROM refresh_tokens")
     op.drop_index("ix_refresh_tokens_token", table_name="refresh_tokens")
     op.drop_column("refresh_tokens", "token")
     op.add_column("refresh_tokens", sa.Column("token_hash", sa.String(), nullable=False, server_default=""))
