@@ -35,7 +35,6 @@ class TestOverviewAggregation:
         fallback. Before the fix this died with a raw
         "Facebook API Init Error: 'NoneType' object has no attribute 'encode'"
         even for connected users."""
-        from unittest.mock import MagicMock
         from app.models import MetaAdsConnection
         from app.api.v1 import overview as overview_module
 

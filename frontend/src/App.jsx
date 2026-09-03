@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { BrandProvider } from './context/BrandContext';
 import { CampaignProvider } from './context/CampaignContext';
@@ -54,6 +54,10 @@ function App() {
                 <Route path="/about" element={<PublicInfoPage page="about" />} />
                 <Route path="/privacy" element={<PublicInfoPage page="privacy" />} />
                 <Route path="/terms" element={<PublicInfoPage page="terms" />} />
+                {/* Stale deep-link guard: /overview was never a route (nav
+                    targets the index); redirect instead of rendering a blank
+                    SPA fallback. */}
+                <Route path="/overview" element={<Navigate to="/" replace />} />
 
                 {/* Protected routes */}
                 <Route
