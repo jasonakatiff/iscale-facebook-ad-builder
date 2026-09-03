@@ -38,6 +38,19 @@ const FacebookCampaignWizard = () => {
         { id: 6, label: 'Review & Launch', icon: CheckCircle2 },
     ];
 
+    // Sprint 8: surface lapsed/expiring Meta user tokens so the operator
+    // reconnects before campaigns start failing with raw Meta 401s. Lapsed
+    // tokens can't be refreshed server-side without a fresh user grant.
+    const metaTokenWarning = (() => {
+        if (!connection?.connected || !connection?.token_expires_at) return null;
+        const expiry = new Date(connection.token_expires_at).getTime();
+        if (!Number.isFinite(expiry)) return null;
+        const daysLeft = (expiry - Date.now()) / 86400000;
+        if (daysLeft <= 0) return 'Access token has expired. Reconnect Meta Ads to keep reporting and campaign actions working.';
+        if (daysLeft <= 7) return `Access token expires in ${Math.ceil(daysLeft)} day${daysLeft > 1 ? 's' : ''}. Reconnect soon to avoid interruption.`;
+        return null;
+    })();
+
     const loadConnection = useCallback(async () => {
         setConnectionLoading(true);
         try {
@@ -179,6 +192,7 @@ const FacebookCampaignWizard = () => {
                             onConnect={connectMeta}
                             onDisconnect={disconnectMeta}
                             disconnecting={disconnecting}
+                            warning={metaTokenWarning}
                         />
                         {connection?.connected && connections.length > 1 && !selectingAccount && (
                             <button type="button" onClick={() => setSelectingAccount(true)} className="text-sm font-medium text-amber-700 hover:text-amber-900">

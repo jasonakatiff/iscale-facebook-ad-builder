@@ -138,11 +138,18 @@ def meta_connection_status(
     ).first()
     if not connection:
         return {"connected": False}
+    expires_at = connection.access_token_expires_at
+    if expires_at is not None and expires_at.tzinfo is None:
+        from datetime import timezone as _tz
+        expires_at = expires_at.replace(tzinfo=_tz.utc)
     return {
         "connected": True,
         "ad_account_id": connection.ad_account_id,
         "account_name": connection.account_name,
         "connected_at": connection.created_at.isoformat() if connection.created_at else None,
+        # Sprint 8: lets the UI flag a soon/lapsed user token so the operator
+        # reconnects BEFORE campaigns start failing with raw Meta 401s.
+        "token_expires_at": expires_at.isoformat() if expires_at else None,
     }
 
 

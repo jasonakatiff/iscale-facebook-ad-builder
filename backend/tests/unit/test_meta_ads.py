@@ -59,6 +59,30 @@ class TestMetaConnectionStatus:
         assert response.status_code == status.HTTP_200_OK
         assert response.json() == {"connected": False}
 
+    def test_connection_reports_token_expiry(self, client, auth_headers, db_session, test_user):
+        """Sprint 8: /facebook/connection must expose token_expires_at (naive
+        datetimes normalized to UTC) so the UI can flag a lapsed token."""
+        from datetime import datetime
+        from app.models import MetaAdsConnection
+
+        naive = datetime(2026, 8, 22, 6, 53, 57)  # naive on purpose — Postgres may return naive
+        db_session.add(MetaAdsConnection(
+            user_id=test_user.id,
+            ad_account_id="act_1350206440591360",
+            account_name="Nalarin Ads",
+            encrypted_access_token="token",
+            is_active=True,
+            access_token_expires_at=naive,
+        ))
+        db_session.commit()
+
+        response = client.get("/api/v1/facebook/connection", headers=auth_headers)
+
+        assert response.status_code == status.HTTP_200_OK
+        body = response.json()
+        assert body["connected"] is True
+        assert body["token_expires_at"].startswith("2026-08-22T06:53:57")
+
     def test_select_activates_only_owned_candidate(self, client, auth_headers, db_session, test_user):
         first = MetaAdsConnection(
             user_id=test_user.id,

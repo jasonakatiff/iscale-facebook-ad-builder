@@ -38,9 +38,11 @@ import GoogleAdsCampaigns from './pages/GoogleAdsCampaigns';
 import Overview from './pages/Overview';
 import TikTokAdsCampaigns from './pages/TikTokAdsCampaigns';
 import PublicInfoPage from './pages/PublicInfoPage';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
   return (
+    <ErrorBoundary>
     <ToastProvider>
       <AuthProvider>
         <BrandProvider>
@@ -96,6 +98,7 @@ function App() {
         </BrandProvider>
       </AuthProvider>
     </ToastProvider>
+    </ErrorBoundary>
   );
 }
 
