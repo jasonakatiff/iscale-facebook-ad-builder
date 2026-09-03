@@ -1,7 +1,6 @@
 """TikTok Marketing API OAuth, reporting, and guarded campaign creation."""
 from datetime import date, timedelta
 from typing import Optional
-
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
@@ -97,26 +96,35 @@ async def oauth_callback(request: Request, auth_code: Optional[str] = None, code
     advertiser_ids = tokens.get("advertiser_ids") or tokens.get("advertiser_id") or []
     if isinstance(advertiser_ids, str):
         advertiser_ids = [advertiser_ids]
+    advertiser_ids = [str(a) for a in advertiser_ids if str(a)]
     if not advertiser_ids or not tokens.get("refresh_token") or not tokens.get("access_token"):
         raise HTTPException(status_code=400, detail="TikTok OAuth did not return an advertiser and renewable tokens.")
-    advertiser_id = str(advertiser_ids[0])
-    connection = db.query(TikTokAdsConnection).filter(
-        TikTokAdsConnection.user_id == user_id,
-        TikTokAdsConnection.advertiser_id == advertiser_id,
-    ).first()
+    # Multi-advertiser parity (Sprint 7): store every advertiser in the grant,
+    # the same shape Meta/Google Ads use. The connection auto-activates only
+    # when the grant covers a single advertiser; otherwise the user picks one
+    # via /connection/select right after the redirect.
+    select_required = len(advertiser_ids) > 1
     values = {
         "encrypted_refresh_token": encrypt_token(tokens["refresh_token"]),
         "encrypted_access_token": encrypt_token(tokens["access_token"]),
-        "is_active": True,
     }
-    if connection:
-        for key, value in values.items():
-            setattr(connection, key, value)
-    else:
-        connection = TikTokAdsConnection(user_id=user_id, advertiser_id=advertiser_id, **values)
-        db.add(connection)
+    db.query(TikTokAdsConnection).filter(
+        TikTokAdsConnection.user_id == user_id
+    ).update({"is_active": False}, synchronize_session=False)
+    for advertiser_id in advertiser_ids:
+        connection = db.query(TikTokAdsConnection).filter(
+            TikTokAdsConnection.user_id == user_id,
+            TikTokAdsConnection.advertiser_id == advertiser_id,
+        ).first()
+        if connection:
+            for key, value in values.items():
+                setattr(connection, key, value)
+            connection.is_active = not select_required
+        else:
+            db.add(TikTokAdsConnection(user_id=user_id, advertiser_id=advertiser_id, is_active=not select_required, **values))
     db.commit()
-    return RedirectResponse(url=f"{settings.FRONTEND_URL.rstrip('/')}/tiktok-ads?connected=1")
+    query = "select=1" if select_required else "connected=1"
+    return RedirectResponse(url=f"{settings.FRONTEND_URL.rstrip('/')}/tiktok-ads?{query}")
 
 
 @router.get("/connection")
@@ -131,15 +139,62 @@ def connection_status(db: Session = Depends(get_db), current_user: User = Depend
             "connected_at": connection.created_at.isoformat() if connection.created_at else None}
 
 
-@router.delete("/connection")
-def disconnect_connection(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+@router.get("/connections")
+def list_connections(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)) -> dict:
+    """All TikTok advertisers authorized by this user (Sprint 7 multi-account parity)."""
+    connections = (
+        db.query(TikTokAdsConnection)
+        .filter(TikTokAdsConnection.user_id == current_user.id)
+        .order_by(TikTokAdsConnection.advertiser_id)
+        .all()
+    )
+    return {
+        "connections": [
+            {
+                "advertiser_id": connection.advertiser_id,
+                "account_name": connection.account_name,
+                "selected": connection.is_active,
+            }
+            for connection in connections
+        ]
+    }
+
+
+class SelectAdvertiserRequest(BaseModel):
+    advertiser_id: str
+
+
+@router.post("/connection/select")
+def select_connection(
+    body: SelectAdvertiserRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> dict:
     connection = db.query(TikTokAdsConnection).filter(
         TikTokAdsConnection.user_id == current_user.id,
-        TikTokAdsConnection.is_active.is_(True),
+        TikTokAdsConnection.advertiser_id == body.advertiser_id,
     ).first()
-    if connection:
-        connection.is_active = False
-        db.commit()
+    if not connection:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="TikTok advertiser is not available for this user.")
+    db.query(TikTokAdsConnection).filter(
+        TikTokAdsConnection.user_id == current_user.id
+    ).update({"is_active": False}, synchronize_session=False)
+    connection.is_active = True
+    db.commit()
+    return {
+        "connected": True,
+        "advertiser_id": connection.advertiser_id,
+        "account_name": connection.account_name,
+        "connected_at": connection.created_at.isoformat() if connection.created_at else None,
+    }
+
+
+@router.delete("/connection")
+def disconnect_connection(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    db.query(TikTokAdsConnection).filter(
+        TikTokAdsConnection.user_id == current_user.id
+    ).update({"is_active": False}, synchronize_session=False)
+    db.commit()
     return {"message": "Disconnected"}
 
 

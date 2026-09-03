@@ -20,7 +20,10 @@ export default function TikTokAdsCampaigns() {
     const { authFetch } = useAuth();
     const { showError, showSuccess } = useToast();
     const [connection, setConnection] = useState(null);
+    const [connections, setConnections] = useState([]);
     const [loadingConnection, setLoadingConnection] = useState(true);
+    const [selectingAccount, setSelectingAccount] = useState(false);
+    const [selectingId, setSelectingId] = useState(null);
     const [campaigns, setCampaigns] = useState([]);
     const [loadingCampaigns, setLoadingCampaigns] = useState(false);
     const [datePreset, setDatePreset] = useState('last_30d');
@@ -41,6 +44,35 @@ export default function TikTokAdsCampaigns() {
         }
     }, [authFetch, showError]);
 
+    const loadConnections = useCallback(async () => {
+        try {
+            const response = await authFetch(`${API_URL}/tiktok-ads/connections`);
+            if (response.ok) {
+                const data = await response.json();
+                const candidates = data.connections || [];
+                setConnections(candidates);
+                if (candidates.length > 0 && !candidates.some((candidate) => candidate.selected)) {
+                    setSelectingAccount(true);
+                }
+            }
+        } catch {
+            // account-choices panel is additive; silent on failure
+        }
+    }, [authFetch]);
+
+    useEffect(() => {
+        loadConnection();
+        loadConnections();
+        const query = new URLSearchParams(window.location.search);
+        if (query.get('connected') === '1') {
+            showSuccess('TikTok Ads connected');
+            window.history.replaceState({}, '', window.location.pathname);
+        } else if (query.get('select') === '1') {
+            setSelectingAccount(true);
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+    }, [loadConnection, loadConnections, showSuccess]);
+
     const loadCampaigns = useCallback(async () => {
         if (!connection?.connected) return;
         setLoadingCampaigns(true);
@@ -57,9 +89,6 @@ export default function TikTokAdsCampaigns() {
             setLoadingCampaigns(false);
         }
     }, [authFetch, connection?.connected, datePreset, showError]);
-
-    useEffect(() => { loadConnection(); }, [loadConnection]);
-    useEffect(() => { loadCampaigns(); }, [loadCampaigns]);
 
     const connect = async () => {
         try {
@@ -79,10 +108,38 @@ export default function TikTokAdsCampaigns() {
             const response = await authFetch(`${API_URL}/tiktok-ads/connection`, { method: 'DELETE' });
             if (!response.ok) throw new Error('Failed to disconnect TikTok Ads');
             setConnection({ connected: false });
+            setConnections((current) => current.map((candidate) => ({ ...candidate, selected: false })));
             setCampaigns([]);
             showSuccess('TikTok Ads disconnected');
         } catch (error) {
             showError(error.message || 'Failed to disconnect TikTok Ads');
+        }
+    };
+
+    const selectAdvertiser = async (advertiserId) => {
+        setSelectingId(advertiserId);
+        try {
+            const response = await authFetch(`${API_URL}/tiktok-ads/connection/select`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ advertiser_id: advertiserId }),
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.detail || 'Failed to select TikTok advertiser');
+            }
+            setConnection(await response.json());
+            setCampaigns([]);
+            setConnections((current) => current.map((candidate) => ({
+                ...candidate,
+                selected: candidate.advertiser_id === advertiserId,
+            })));
+            setSelectingAccount(false);
+            showSuccess('TikTok advertiser selected');
+        } catch (error) {
+            showError(error.message || 'Failed to select TikTok advertiser');
+        } finally {
+            setSelectingId(null);
         }
     };
 
@@ -119,18 +176,58 @@ export default function TikTokAdsCampaigns() {
     };
 
     return (
-        <div className="max-w-6xl mx-auto space-y-6">
-            <div className="flex items-start justify-between gap-4">
+        <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3"><Music2 size={32} className="text-amber-600" />TikTok Ads</h1>
-                    <p className="text-gray-600">Connect a TikTok advertiser to manage and measure campaigns</p>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2 flex items-center gap-3">
+                        <Music2 size={28} className="text-amber-600 sm:hidden" />
+                        <Music2 size={32} className="text-amber-600 hidden sm:block" />
+                        TikTok Ads
+                    </h1>
+                    <p className="text-sm sm:text-base text-gray-600">Connect a TikTok advertiser to manage and measure campaigns</p>
                 </div>
                 {connection?.connected && <button onClick={() => setShowCreateForm((visible) => !visible)} className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700"><Plus size={18} />Create campaign</button>}
             </div>
 
-            {!loadingConnection && <ConnectAccountCard platformName="TikTok Ads" icon={Music2} connected={!!connection?.connected} accountLabel={connection?.account_name || connection?.advertiser_id} connectedAt={connection?.connected_at} onConnect={connect} onDisconnect={disconnect} />}
+            {!loadingConnection && (
+                <div className="space-y-3">
+                    <ConnectAccountCard platformName="TikTok Ads" icon={Music2} connected={!!connection?.connected} accountLabel={connection?.account_name || connection?.advertiser_id} connectedAt={connection?.connected_at} onConnect={connect} onDisconnect={disconnect} />
+                    {connection?.connected && connections.length > 1 && !selectingAccount && (
+                        <button type="button" onClick={() => setSelectingAccount(true)} className="text-sm font-medium text-amber-700 hover:text-amber-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600">
+                            Change TikTok advertiser
+                        </button>
+                    )}
+                </div>
+            )}
 
-            {showCreateForm && <form onSubmit={reviewCreate} className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+            {selectingAccount && connections.length > 0 && (
+                <section aria-labelledby="tiktok-account-heading" className="border-y border-gray-200 py-5">
+                    <div className="flex items-center justify-between gap-4 mb-3">
+                        <h2 id="tiktok-account-heading" className="text-lg font-bold text-gray-900">Choose a TikTok advertiser</h2>
+                        {connection?.connected && (
+                            <button type="button" onClick={() => setSelectingAccount(false)} className="text-sm text-gray-600 hover:text-gray-900">Cancel</button>
+                        )}
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {connections.map((candidate) => (
+                            <button
+                                key={candidate.advertiser_id}
+                                type="button"
+                                onClick={() => selectAdvertiser(candidate.advertiser_id)}
+                                disabled={selectingId !== null}
+                                aria-pressed={candidate.selected}
+                                className={`min-h-16 border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 disabled:opacity-60 ${candidate.selected ? 'border-amber-600 bg-amber-50' : 'border-gray-300 bg-white hover:border-amber-500'}`}
+                            >
+                                <span className="block font-semibold text-gray-900">{candidate.account_name || 'TikTok advertiser'}</span>
+                                <span className="block text-sm text-gray-500">{candidate.advertiser_id}</span>
+                                {selectingId === candidate.advertiser_id && <span className="block text-xs text-amber-700 mt-1">Selecting…</span>}
+                            </button>
+                        ))}
+                    </div>
+                </section>
+            )}
+
+            {showCreateForm && <form onSubmit={reviewCreate} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6 space-y-4">
                 <h2 className="text-lg font-bold text-gray-900">New TikTok campaign</h2>
                 <div className="grid sm:grid-cols-2 gap-4">
                     <label className="text-sm font-medium text-gray-700">Campaign name<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2" /></label>
