@@ -10,6 +10,10 @@ from unittest.mock import MagicMock, patch
 # Set TEST_DATABASE_URL env var or fallback to dev database
 
 from app.main import app
+from app.core.rate_limit import limiter
+
+# Fixtures log in once per test, which trips the 5/min login limit. Disable for tests.
+limiter.enabled = False
 from app.database import Base, get_db
 from app.models import User, Role
 from app.core.security import get_password_hash
