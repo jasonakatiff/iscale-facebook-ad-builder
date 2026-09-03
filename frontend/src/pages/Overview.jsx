@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { LayoutDashboard } from 'lucide-react';
+import { LayoutDashboard, Target, TrendingUp, Music2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -122,13 +123,36 @@ export default function Overview() {
                 </div>
             )}
 
+            {/* Empty state CTA: a fresh account lands here with zero
+                connections — give the operator a direct action instead of a
+                bare "no campaigns" table. */}
+            {!loading && campaigns.length === 0 && (
+                <div className="bg-white rounded-xl border border-amber-200 shadow-sm p-6 sm:p-8 text-center">
+                    <h2 className="text-lg font-bold text-gray-900">Connect your first ad account</h2>
+                    <p className="text-sm text-gray-600 mt-2 max-w-md mx-auto">
+                        Link Meta Ads, Google Ads, or TikTok Ads to see cross-platform performance here.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center mt-5">
+                        <Link to="/facebook-campaigns" className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 transition-colors">
+                            <Target size={18} /> Connect Meta Ads
+                        </Link>
+                        <Link to="/google-ads" className="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-amber-300 text-amber-800 rounded-lg font-medium hover:bg-amber-50 transition-colors">
+                            <TrendingUp size={18} /> Connect Google Ads
+                        </Link>
+                        <Link to="/tiktok-ads" className="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-amber-300 text-amber-800 rounded-lg font-medium hover:bg-amber-50 transition-colors">
+                            <Music2 size={18} /> Connect TikTok Ads
+                        </Link>
+                    </div>
+                </div>
+            )}
+
             <PerformanceTable
                 rows={campaigns.map((row, index) => ({ ...row, id: `${row.platform}-${index}` }))}
                 columns={OVERVIEW_COLUMNS}
                 loading={loading}
                 datePreset={datePreset}
                 onDatePresetChange={setDatePreset}
-                emptyMessage="No campaigns yet. Connect Meta and/or Google Ads to see performance here."
+                emptyMessage={campaigns.length === 0 ? '' : 'No campaigns in this date range.'}
             />
         </div>
     );

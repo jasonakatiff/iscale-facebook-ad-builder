@@ -23,6 +23,10 @@ vi.mock('../components/PerformanceTable', () => ({
     ),
 }));
 
+vi.mock('react-router-dom', () => ({
+    Link: ({ to, children }) => <a href={to}>{children}</a>,
+}));
+
 vi.mock('recharts', () => ({
     BarChart: ({ children }) => <div>{children}</div>,
     Bar: ({ children }) => <div>{children}</div>,

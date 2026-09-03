@@ -147,6 +147,12 @@ const FacebookCampaignWizard = () => {
     };
 
     const handleNext = () => {
+        // Guard: don't advance past a step whose required choice is missing —
+        // the user would land on the next step with no data to act on.
+        if (!isStepValid()) {
+            showError('Complete this step before continuing (pick the required selection first).');
+            return;
+        }
         if (currentStep < steps.length) {
             setCurrentStep(currentStep + 1);
         }
@@ -158,7 +164,6 @@ const FacebookCampaignWizard = () => {
         }
     };
 
-    // Placeholder for validation logic
     const isStepValid = () => {
         switch (currentStep) {
             case 1: return !!formData.adAccountId;
