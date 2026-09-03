@@ -82,6 +82,61 @@ class FacebookService:
             
         raise Exception("No Ad Account ID provided and no default account set.")
 
+    def get_insights(self, ad_account_id=None, level='campaign', date_preset='last_30d',
+                     time_range=None, breakdown=None):
+        """Fetch performance insights for an ad account.
+
+        Args:
+            ad_account_id: act_xxx account id (optional; defaults to env)
+            level: 'account' | 'campaign' | 'adset' | 'ad'
+            date_preset: today, yesterday, last_7d, last_14d, last_30d, last_90d, maximum
+            time_range: {'since':'YYYY-MM-DD','until':'YYYY-MM-DD'} — overrides date_preset
+            breakdown: optional FB breakdown (e.g. 'age', 'gender', 'country')
+        """
+        account = self._get_account(ad_account_id)
+
+        fields = [
+            'account_id', 'account_name',
+            'campaign_id', 'campaign_name',
+            'adset_id', 'adset_name',
+            'ad_id', 'ad_name',
+            'spend', 'impressions', 'reach', 'frequency',
+            'clicks', 'unique_clicks', 'ctr', 'unique_ctr',
+            'cpc', 'cpm', 'cpp',
+            'actions', 'action_values',
+            'purchase_roas', 'website_purchase_roas',
+            'cost_per_action_type', 'cost_per_unique_click',
+            'video_p25_watched_actions', 'video_p50_watched_actions',
+            'video_p75_watched_actions', 'video_p100_watched_actions',
+            'date_start', 'date_stop',
+        ]
+
+        params = {'level': level}
+        if time_range:
+            params['time_range'] = time_range
+        else:
+            params['date_preset'] = date_preset
+        if breakdown:
+            params['breakdowns'] = breakdown
+
+        try:
+            insights = account.get_insights(fields=fields, params=params)
+            results = []
+            for row in insights:
+                d = dict(row)
+                # Convert nested list-of-dict Facebook structures to plain JSON-safe
+                for key in ('actions', 'action_values', 'cost_per_action_type',
+                            'purchase_roas', 'website_purchase_roas',
+                            'video_p25_watched_actions', 'video_p50_watched_actions',
+                            'video_p75_watched_actions', 'video_p100_watched_actions'):
+                    if key in d and d[key] is not None:
+                        d[key] = [dict(x) for x in d[key]]
+                results.append(d)
+            return results
+        except Exception as e:
+            print(f"Error fetching insights: {e}")
+            raise
+
     def get_campaigns(self, ad_account_id=None):
         """Fetch all campaigns from the ad account."""
         account = self._get_account(ad_account_id)

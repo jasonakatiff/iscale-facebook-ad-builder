@@ -144,6 +144,38 @@ def read_ads(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.get("/insights")
+def read_insights(
+    ad_account_id: Optional[str] = None,
+    level: str = "campaign",
+    date_preset: str = "last_30d",
+    since: Optional[str] = None,
+    until: Optional[str] = None,
+    breakdown: Optional[str] = None,
+    service: FacebookService = Depends(get_facebook_service),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Return Facebook Marketing API insights (spend, impressions, CTR, ROAS, etc.).
+
+    Pass either date_preset (today/yesterday/last_7d/last_30d/last_90d/maximum)
+    or since+until (YYYY-MM-DD) for a custom range. Level is account/campaign/adset/ad.
+    """
+    try:
+        time_range = None
+        if since and until:
+            time_range = {"since": since, "until": until}
+        rows = service.get_insights(
+            ad_account_id=ad_account_id,
+            level=level,
+            date_preset=date_preset,
+            time_range=time_range,
+            breakdown=breakdown,
+        )
+        return rows
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/campaigns/save")
 def save_campaign_locally(
     campaign_data: Dict[str, Any],
