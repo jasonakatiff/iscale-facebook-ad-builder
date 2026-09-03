@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-09-03] Fork contributions: ryuiciwazaka subset
+
+### Added
+- `GET /api/v1/facebook/insights`: Marketing API insights (spend, impressions, CTR, ROAS, actions) at account, campaign, ad set, or ad level, by date preset or custom range, optional breakdown. Backend only; groundwork for Reporting and the planned Facebook data cache. (ryuiciwazaka `7caaf39`, backend files)
+
+### Fixed
+- Ad Library scraper honors `country` and `active_status` from the saved page URL instead of hardcoding US/active, forces an en-US locale so DOM selectors match in other countries, and waits on `domcontentloaded` with a longer timeout. (ryuiciwazaka `94a3dae`, `6ca1e62`)
+
+### Not taken from this fork
+- Turkish-language Reporting page, ad edit/pause/budget drawer, A/B duplicate, creative analytics, and VLM strategy recommender. All are tailored to one Turkish boutique (prompts, currency, power words), the duplicate flow falls back to the contributor's store URL, and the write endpoints use the login check instead of `campaigns:write`. Kept as reference for the reporting work.
+
+Plan: none (external contribution review). Tests: backend pytest 99 passing, 1 xfailed.
+
 ## [2026-09-03] Fork contributions: SmittyCode subset
 
 ### Added
