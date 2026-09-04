@@ -49,11 +49,13 @@ def parse_url_filters(url: Optional[str]) -> Tuple[str, str]:
         return country, active_status
     try:
         params = parse_qs(urlparse(url).query)
+        # Both values are interpolated into the Ads Library URL, so only accept
+        # the exact shapes Facebook uses; anything else keeps the default.
         c = (params.get("country") or [None])[0]
-        if c:
+        if c and re.fullmatch(r"[A-Za-z]{2}", c):
             country = c.upper()
         s = (params.get("active_status") or [None])[0]
-        if s:
+        if s and s.lower() in ("active", "inactive", "all"):
             active_status = s.lower()
     except Exception:
         pass
