@@ -85,10 +85,16 @@ export default function TikTokAdsCampaigns() {
                 const error = await response.json().catch(() => ({}));
                 showError(error.detail || 'Failed to load TikTok campaigns');
             }
+        } catch {
+            showError('Failed to load TikTok campaigns');
         } finally {
             setLoadingCampaigns(false);
         }
-    }, [authFetch, connection?.connected, datePreset, showError]);
+    }, [authFetch, connection, datePreset, showError]);
+
+    useEffect(() => {
+        loadCampaigns();
+    }, [loadCampaigns]);
 
     const connect = async () => {
         try {

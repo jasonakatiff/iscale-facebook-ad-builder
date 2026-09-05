@@ -1,13 +1,35 @@
 # Changelog
 
-## [2026-09-04] PR3 backend Railway compatibility and security
+## [2026-09-05] Ads Studio integration (PR #3 by masgant99, reworked)
 
-- Restored the original migration chain and added missing bot/Google tables. Refresh-token rollout retains plaintext rows and adds nullable hashes; deferred column removal stays outside the migration chain.
-- Required browser-bound OAuth state and campaign write permissions; scoped bot connections to their owner; fixed active-account reselection.
-- Restored shared Meta env-token fallback, exchanged long-lived Meta tokens, and isolated every Facebook SDK object to its service API instance.
-- Restored Railway proxy and BreadWinner defaults, exempted API docs from backend CSP, corrected TikTok date presets, and configured CI/test token encryption.
+Merged masgant99's PR #3 with their authorship preserved, then fixed every finding from the six-model security review before landing it.
 
-Plan: [.claude/plans/pr3-backend.md](.claude/plans/pr3-backend.md). Tests: **214 passed, 1 existing XPASS**; all three real PostgreSQL migration acceptance checks passed. [Verification and commit references](backend/PR3_VERIFICATION.md).
+### Added
+- Google Ads: OAuth connect, multi-account select, campaign and ad performance, and guarded write actions (create paused, pause, enable, negative keywords) behind `confirm=true` and `campaigns:write`.
+- TikTok Ads: OAuth connect, multi-advertiser select, campaign performance, guarded campaign creation.
+- Meta: per-user OAuth with multi-account select, long-lived token exchange, and the existing env system token as fallback when a user has no connection.
+- Cross-platform Overview page at `/overview` (Dashboard stays the home page).
+- Read-only bot API (`/api/v1/bot/*`) with SHA-256 hashed, scope-limited API keys bound to their owner; `backend/scripts/create_api_key.py` mints them.
+- OAuth tokens encrypted at rest with a dedicated `OAUTH_TOKEN_ENCRYPTION_KEY` (required; app refuses to boot without it).
+- Refresh tokens stored as SHA-256 hashes. Expand step only: `token_hash` added, `token` kept nullable so an in-flight old container keeps working; `backend/alembic/pending/z9_drop_refresh_token_plaintext.py` drops it next release. All existing sessions must log in again.
+- White-label branding via `VITE_APP_*` env, defaulting to BreadWinner. Mobile layout pass, ErrorBoundary, token-expiry warning.
+- Optional self-host path: `docker-compose.yml`, `frontend/Dockerfile`, `frontend/nginx.conf`.
+
+### Fixed (review findings, all on top of the PR)
+- Migration chain: original 16 revisions restored; new tables chained additively onto `add_page_fields_001`; verified on an empty DB, a prod-like stamped DB, and old plaintext refresh rows.
+- OAuth callbacks require the browser-bound state cookie (login-CSRF fix); TikTok now clears it.
+- Google/TikTok write routes require `campaigns:write`; bot `/connections` scoped to the key owner.
+- Facebook SDK objects always built with an explicit `api=` (per-user tokens no longer race on the SDK global).
+- Reselecting the already-active ad account no longer deactivates it.
+- `TRUSTED_PROXIES` default back to `*` for Railway; backend CSP no longer sent on `/api/v1/docs`.
+- TikTok campaigns page loads on mount and on date change; overview handles all eight date presets.
+- New ads default to PAUSED (matches media-team feedback #13).
+
+### Removed
+- Contributor branding, public legal pages, sprint docs, project brief, and production compose file.
+
+Plan: [.claude/plans/pr3-backend.md](.claude/plans/pr3-backend.md), [.claude/plans/breadwinner-tiktok.md](.claude/plans/breadwinner-tiktok.md); verification evidence in [.claude/plans/pr3-backend-verification.md](.claude/plans/pr3-backend-verification.md). Tests: backend pytest 214 passing, 1 xpassed; frontend vitest 5 passing; Vite build OK.
+
 
 ## [2026-09-03] Fork contributions: masgant99 auth pass
 

@@ -42,7 +42,7 @@ class TestOverviewAggregation:
         db_session.add(MetaAdsConnection(
             user_id=test_user.id,
             ad_account_id="act_1350206440591360",
-            account_name="Nalarin Ads",
+            account_name="Test Ads",
             encrypted_access_token=encrypt_token("plaintext-token"),
             is_active=True,
         ))

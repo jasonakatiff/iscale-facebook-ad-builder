@@ -2,16 +2,15 @@ import React from 'react';
 import { CheckCircle2, Unplug, ExternalLink, AlertTriangle } from 'lucide-react';
 
 /**
- * Reusable "Connect Account" card for any ad platform OAuth flow (Google Ads
- * first, TikTok Ads in Sprint 3, Meta if it's ever retrofitted onto OAuth).
+ * Reusable "Connect Account" card for Google Ads, TikTok Ads, and Meta OAuth.
  * Composes into GoogleAdsCampaigns.jsx / TikTokAdsCampaigns.jsx / the
  * cross-platform Overview page — don't reimplement per-platform markup.
- * `warning` (optional, Sprint 8): action-needed line shown under the status —
+ * `warning` (optional): action-needed line shown under the status —
  * e.g. a lapsed/expiring OAuth token that the operator should reconnect.
  */
 export default function ConnectAccountCard({
     platformName,
-    icon: Icon,
+    icon,
     connected,
     accountLabel,
     connectedAt,
@@ -20,6 +19,7 @@ export default function ConnectAccountCard({
     disconnecting = false,
     warning,
 }) {
+    const Icon = icon;
     return (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

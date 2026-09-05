@@ -21,7 +21,7 @@ class TestMetaOAuthHelpers:
     def test_ad_accounts_are_limited_to_selected_connection(self, monkeypatch):
         accounts = [
             {"id": "act_111", "name": "Personal"},
-            {"id": "act_222", "name": "Nalarin Ads"},
+            {"id": "act_222", "name": "Test Ads"},
         ]
 
         class FakeUser:
@@ -35,7 +35,7 @@ class TestMetaOAuthHelpers:
         service = FacebookService(access_token="token", ad_account_id="act_222")
         service.api = object()
 
-        assert service.get_ad_accounts() == [{"id": "act_222", "name": "Nalarin Ads"}]
+        assert service.get_ad_accounts() == [{"id": "act_222", "name": "Test Ads"}]
 
 
 class TestMetaAuthGate:
@@ -69,7 +69,7 @@ class TestMetaConnectionStatus:
         db_session.add(MetaAdsConnection(
             user_id=test_user.id,
             ad_account_id="act_1350206440591360",
-            account_name="Nalarin Ads",
+            account_name="Test Ads",
             encrypted_access_token="token",
             is_active=True,
             access_token_expires_at=naive,

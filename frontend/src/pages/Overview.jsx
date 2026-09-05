@@ -56,7 +56,7 @@ export default function Overview() {
                 const error = await response.json().catch(() => ({}));
                 showError(error.detail || 'Failed to load overview');
             }
-        } catch (error) {
+        } catch {
             showError('Failed to load overview');
         } finally {
             setLoading(false);
