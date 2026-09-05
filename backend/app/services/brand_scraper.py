@@ -166,7 +166,7 @@ class BrandScraperService:
             while len(ads) < limit:
                 params = {
                     "access_token": self.access_token,
-                    "ad_active_status": "ALL",
+                    "ad_active_status": active_status.upper(),  # ACTIVE | INACTIVE | ALL
                     "ad_reached_countries": country,
                     "limit": min(300, limit - len(ads)),
                     "fields": "id,ad_creative_bodies,ad_creative_link_titles,ad_creative_link_captions,ad_snapshot_url,page_id,page_name,publisher_platforms,ad_delivery_start_time",
@@ -195,7 +195,9 @@ class BrandScraperService:
 
                 except Exception as e:
                     print(f"API error: {e}, falling back to Playwright")
-                    return await self._playwright_scrape_ads(page_id, limit, is_search=False)
+                    return await self._playwright_scrape_ads(
+                        page_id, limit, is_search=False, country=country, active_status=active_status,
+                    )
 
         return ads
 
