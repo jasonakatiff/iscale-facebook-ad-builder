@@ -48,13 +48,14 @@ def bootstrap_database() -> None:
     if not application_tables:
         print("Empty database detected; creating the current application schema")
         init_db()
+        # Stamp immediately after the tables exist, before any seeding. If a
+        # seed step fails after this point the database is still a valid
+        # stamped schema and the next boot takes the normal upgrade path
+        # instead of the "tables but no alembic_version" refusal below.
+        command.stamp(_alembic_config(), "head")
+        print("Fresh database schema created and stamped at Alembic head")
         seed_roles_and_permissions()
         _create_configured_admin()
-
-        # The schema was created from the current models, so mark all existing
-        # migrations as applied. Future deployments can use normal upgrades.
-        command.stamp(_alembic_config(), "head")
-        print("Fresh database initialized and stamped at Alembic head")
         return
 
     if ALEMBIC_VERSION_TABLE not in tables:
