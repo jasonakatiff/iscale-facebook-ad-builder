@@ -93,7 +93,7 @@ class RefreshToken(Base):
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     # SHA-256 hash of the raw token — the raw value only ever lives in the
     # client's storage, so a database read cannot mint a valid session.
-    token_hash = Column(String, unique=True, nullable=False, index=True)
+    token_hash = Column(String, unique=True, nullable=True, index=True)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

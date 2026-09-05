@@ -83,7 +83,7 @@ for model in (ApiKey, GoogleAdsConnection):
     assert set(actual) == set(table.columns.keys())
     for col in table.columns:
         assert actual[col.name]["nullable"] == col.nullable, col.name
-        assert str(actual[col.name]["type"]) == str(col.type.compile(engine.dialect)), col.name
+        assert str(actual[col.name]["type"].compile(engine.dialect)) == str(col.type.compile(engine.dialect)), (col.name, actual[col.name]["type"], col.type)
         expected_default = str(col.server_default.arg) if col.server_default is not None else None
         assert actual[col.name]["default"] == expected_default, col.name
     assert inspector.get_pk_constraint(table.name)["constrained_columns"] == ["id"]

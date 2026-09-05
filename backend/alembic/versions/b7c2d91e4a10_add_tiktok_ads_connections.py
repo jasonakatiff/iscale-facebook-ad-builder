@@ -1,7 +1,7 @@
 """add TikTok Ads connections
 
 Revision ID: b7c2d91e4a10
-Revises: fba8f217905e
+Revises: add_page_fields_001
 Create Date: 2026-07-21
 """
 from typing import Sequence, Union
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 
 revision: str = "b7c2d91e4a10"
-down_revision: Union[str, Sequence[str], None] = "fba8f217905e"
+down_revision: Union[str, Sequence[str], None] = "add_page_fields_001"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
