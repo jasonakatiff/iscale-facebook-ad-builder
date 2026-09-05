@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-09-04] PR3 backend Railway compatibility and security
+
+- Restored the original migration chain and added missing bot/Google tables. Refresh-token rollout retains plaintext rows and adds nullable hashes; deferred column removal stays outside the migration chain.
+- Required browser-bound OAuth state and campaign write permissions; scoped bot connections to their owner; fixed active-account reselection.
+- Restored shared Meta env-token fallback, exchanged long-lived Meta tokens, and isolated every Facebook SDK object to its service API instance.
+- Restored Railway proxy and BreadWinner defaults, exempted API docs from backend CSP, corrected TikTok date presets, and configured CI/test token encryption.
+
+Plan: [.claude/plans/pr3-backend.md](.claude/plans/pr3-backend.md). Tests: **214 passed, 1 existing XPASS**; all three real PostgreSQL migration acceptance checks passed. [Verification and commit references](backend/PR3_VERIFICATION.md).
+
 ## [2026-09-03] Fork contributions: masgant99 auth pass
 
 ### Security
