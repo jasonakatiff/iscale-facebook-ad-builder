@@ -1,0 +1,69 @@
+# Standalone production stack for ads.nalar.army (Sprint 4 wires this into
+# Caddy + cloudflared, port 3024 per PROJECT_BRIEF).
+#
+# Deliberately NOT an overlay on docker-compose.yml (the dev file) — Docker
+# Compose merges list-type keys like `ports` by concatenation, not
+# replacement, which silently leaked the dev port mapping (and once, the dev
+# command) into an earlier overlay-based version of this file. A standalone
+# file removes that entire class of bug at the cost of a little duplication.
+#
+# Run with an isolated compose project name so its network/volumes never
+# collide with nalarin-postgres or MedSos's Postgres:
+#
+#   docker compose -p ads-studio-prod -f docker-compose.prod.yml up -d
+#
+# Only the frontend's port is published to the host — Postgres and the
+# backend are reachable only from other containers on the compose network.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ads_studio
+      POSTGRES_USER: ads_studio
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+    volumes:
+      - ads_studio_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ads_studio -d ads_studio"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: ads-studio-backend
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://ads_studio:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}@postgres:5432/ads_studio
+      TRUSTED_PROXIES: 127.0.0.1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: ads-studio-frontend
+    ports:
+      - "127.0.0.1:3024:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  ads_studio_postgres_data:
+

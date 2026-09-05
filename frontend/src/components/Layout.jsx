@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, Users, Video, Wand2, Settings, LogOut, Image, ShoppingBag, Target, ChevronLeft, ChevronRight, FileImage, Search, ChevronDown, UserCog } from 'lucide-react';
+import { LayoutDashboard, BarChart3, Package, Users, Video, Wand2, Settings, LogOut, Image, ShoppingBag, Target, ChevronLeft, ChevronRight, FileImage, Search, ChevronDown, UserCog, TrendingUp, Music2, Menu, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { APP_NAME, APP_LOGO, APP_TAGLINE } from '../lib/branding';
 
 export default function Layout() {
     const location = useLocation();
@@ -12,6 +13,14 @@ export default function Layout() {
     const [expandedMenus, setExpandedMenus] = useState({ Brands: false, Research: false });
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [showUserMenu, setShowUserMenu] = useState(false);
+    // Mobile off-canvas nav. md+ always shows the desktop sidebar; the
+    // mobile drawer shares the exact same markup (className toggles only).
+    const [mobileOpen, setMobileOpen] = useState(false);
+
+    // Close the drawer whenever the route changes (tap-through navigation).
+    useEffect(() => {
+        setMobileOpen(false);
+    }, [location.pathname]);
 
     const handleLogout = async () => {
         await logout();
@@ -20,7 +29,8 @@ export default function Layout() {
     };
 
     const menuItems = [
-        { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
+        { icon: LayoutDashboard, label: 'Overview', path: '/' },
+        { icon: BarChart3, label: 'Dashboard', path: '/dashboard' },
         {
             icon: Search,
             label: 'Research',
@@ -43,6 +53,8 @@ export default function Layout() {
         { icon: Image, label: 'Winning Ads', path: '/winning-ads' },
         { icon: FileImage, label: 'Generated Ads', path: '/generated-ads' },
         { icon: Target, label: 'Facebook Campaigns', path: '/facebook-campaigns' },
+        { icon: TrendingUp, label: 'Google Ads', path: '/google-ads' },
+        { icon: Music2, label: 'TikTok Ads', path: '/tiktok-ads' },
     ];
 
     const toggleMenu = (label) => {
@@ -54,25 +66,60 @@ export default function Layout() {
 
     return (
         <div className="flex h-screen bg-[#FFFAF0]">
-            {/* Sidebar */}
-            <aside className={`${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-amber-200 flex flex-col shadow-sm transition-all duration-300 ease-in-out relative`}>
-                {/* Toggle Button */}
+            {/* Mobile top bar */}
+            <header className="md:hidden fixed top-0 inset-x-0 z-40 bg-white border-b border-amber-200 flex items-center justify-between px-4 h-14 shadow-sm">
                 <button
-                    onClick={() => setIsCollapsed(!isCollapsed)}
-                    className="absolute -right-3 top-9 bg-white border border-amber-200 rounded-full p-1 shadow-sm hover:bg-amber-50 text-amber-600 z-10"
+                    onClick={() => setMobileOpen(true)}
+                    aria-label="Open navigation menu"
+                    className="p-2 -ml-2 rounded-lg text-amber-800 hover:bg-amber-50"
+                >
+                    <Menu size={22} />
+                </button>
+                <div className="flex items-center gap-2 min-w-0">
+                    <img src={APP_LOGO} alt={APP_NAME} className="w-7 h-7 rounded-lg object-cover flex-shrink-0" />
+                    <span className="font-bold text-amber-900 truncate text-sm">{APP_NAME}</span>
+                </div>
+                <span className="w-8" aria-hidden="true" />
+            </header>
+
+            {/* Mobile drawer backdrop */}
+            {mobileOpen && (
+                <div
+                    className="md:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+                    onClick={() => setMobileOpen(false)}
+                    aria-hidden="true"
+                />
+            )}
+
+            {/* Sidebar — desktop: static; mobile: off-canvas drawer */}
+            <aside className={`${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-amber-200 flex-col shadow-sm transition-all duration-300 ease-in-out relative
+                fixed md:static inset-y-0 left-0 z-50 -translate-x-full md:translate-x-0
+                ${mobileOpen ? 'translate-x-0 flex' : 'md:flex'}`}>
+                {/* Toggle Button (desktop collapse / mobile close) */}
+                <button
+                    onClick={() => (window.matchMedia('(min-width: 768px)').matches ? setIsCollapsed(!isCollapsed) : setMobileOpen(false))}
+                    className={`absolute -right-3 top-9 bg-white border border-amber-200 rounded-full p-1 shadow-sm hover:bg-amber-50 text-amber-600 z-10 hidden md:block`}
+                    title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 >
                     {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                </button>
+                <button
+                    onClick={() => setMobileOpen(false)}
+                    className="absolute right-3 top-4 p-1 rounded-lg text-gray-400 hover:text-amber-700 hover:bg-amber-50 md:hidden"
+                    aria-label="Close navigation menu"
+                >
+                    <X size={20} />
                 </button>
 
                 <div className={`p-6 border-b border-amber-100 ${isCollapsed ? 'px-4' : ''}`}>
                     <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
                         <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center overflow-hidden border border-amber-200 flex-shrink-0">
-                            <img src="/breadwinner_logo.png" alt="BreadWinner Logo" className="w-full h-full object-cover" />
+                            <img src={APP_LOGO} alt={APP_NAME} className="w-full h-full object-cover" />
                         </div>
                         {!isCollapsed && (
                             <div className="overflow-hidden whitespace-nowrap">
-                                <h1 className="text-xl font-bold text-amber-900">BreadWinner</h1>
-                                <p className="text-xs text-amber-600">Fresh campaigns daily</p>
+                                <h1 className="text-xl font-bold text-amber-900">{APP_NAME}</h1>
+                                <p className="text-xs text-amber-600">{APP_TAGLINE}</p>
                             </div>
                         )}
                     </div>
@@ -214,8 +261,8 @@ export default function Layout() {
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 overflow-y-auto">
-                <div className="p-8 max-w-7xl mx-auto">
+            <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
+                <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
                     <Outlet />
                 </div>
             </main>

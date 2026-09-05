@@ -130,7 +130,6 @@ export async function getPages(adAccountId) {
         return pages.map(page => ({
             id: page.id,
             name: page.name,
-            accessToken: page.access_token,
             category: page.category
         }));
     } catch (error) {

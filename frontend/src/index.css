@@ -65,3 +65,19 @@
 .animate-slide-in {
   animation: slide-in 0.3s ease-out;
 }
+
+/* Mobile heading scale (Sprint 8): page h1s across legacy pages were built
+   desktop-first at text-3xl/2xl. One media rule shrinks every page's h1/h2
+   on phones without touching 24+ JSX files. Component-level sm: classes
+   (Overview, TikTok, PerformanceTable) already handle their own scale and
+   keep working — this only adds a smaller floor under 640px. */
+@media (max-width: 639px) {
+  main h1 {
+    font-size: 1.5rem;
+    line-height: 2rem;
+  }
+  main h2 {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+  }
+}

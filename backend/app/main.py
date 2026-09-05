@@ -18,6 +18,10 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.core.config import settings
 from app.core.rate_limit import limiter
+# Imported eagerly (not just where used) so a missing/malformed
+# OAUTH_TOKEN_ENCRYPTION_KEY fails app startup immediately, matching the
+# fail-fast pattern already used for SECRET_KEY in app.core.config.
+from app.core import token_encryption  # noqa: F401
 
 app = FastAPI(
     title="Facebook Ad Automation API",
@@ -38,18 +42,31 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'; "
+        "object-src 'none'; "
+        "base-uri 'self'"
+    )
     if request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
-# Trust proxy headers (Railway uses reverse proxy)
-# In production, consider restricting to specific CIDR ranges
-trusted_proxies = os.getenv("TRUSTED_PROXIES", "*")
+# Trust proxy headers. In production this must be the actual reverse-proxy hop
+# (Caddy on 127.0.0.1), never "*" — a wildcard lets any client spoof
+# X-Forwarded-For/X-Forwarded-Proto and defeat IP-based rate limiting or HTTPS
+# enforcement further up the stack.
+trusted_proxies = os.getenv("TRUSTED_PROXIES", "127.0.0.1")
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=[trusted_proxies] if trusted_proxies != "*" else ["*"])
 
 # CORS origins from env var or defaults
 default_origins = [
     "http://localhost:5173",
+    "http://127.0.0.1:5173",
     "http://localhost:3000",
 ]
 extra_origins = os.getenv("ALLOWED_ORIGINS", "").split(",")
@@ -96,7 +113,7 @@ async def startup_event():
 
 
 # Include Routers
-from app.api.v1 import brands, products, research, generated_ads, templates, facebook, uploads, dashboard, copy_generation, profiles, ad_remix, prompts, ad_styles, auth, users
+from app.api.v1 import brands, products, research, generated_ads, templates, facebook, uploads, dashboard, copy_generation, profiles, ad_remix, prompts, ad_styles, auth, users, google_ads, overview, tiktok_ads, bot
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
@@ -113,6 +130,10 @@ app.include_router(profiles.router, prefix="/api/v1/profiles", tags=["profiles"]
 app.include_router(ad_remix.router, prefix="/api/v1/ad-remix", tags=["ad-remix"])
 app.include_router(prompts.router, prefix="/api/v1/prompts", tags=["prompts"])
 app.include_router(ad_styles.router, prefix="/api/v1/ad-styles", tags=["ad-styles"])
+app.include_router(google_ads.router, prefix="/api/v1/google-ads", tags=["google-ads"])
+app.include_router(overview.router, prefix="/api/v1/overview", tags=["overview"])
+app.include_router(tiktok_ads.router, prefix="/api/v1/tiktok-ads", tags=["tiktok-ads"])
+app.include_router(bot.router, prefix="/api/v1/bot", tags=["bot"])
 
 # Mount static files for uploads
 import os

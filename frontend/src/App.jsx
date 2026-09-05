@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { BrandProvider } from './context/BrandContext';
 import { CampaignProvider } from './context/CampaignContext';
@@ -34,9 +34,15 @@ import AdRemix from './pages/AdRemix';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import UserManagement from './pages/UserManagement';
+import GoogleAdsCampaigns from './pages/GoogleAdsCampaigns';
+import Overview from './pages/Overview';
+import TikTokAdsCampaigns from './pages/TikTokAdsCampaigns';
+import PublicInfoPage from './pages/PublicInfoPage';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
   return (
+    <ErrorBoundary>
     <ToastProvider>
       <AuthProvider>
         <BrandProvider>
@@ -45,6 +51,13 @@ function App() {
               <Routes>
                 {/* Public routes */}
                 <Route path="/login" element={<Login />} />
+                <Route path="/about" element={<PublicInfoPage page="about" />} />
+                <Route path="/privacy" element={<PublicInfoPage page="privacy" />} />
+                <Route path="/terms" element={<PublicInfoPage page="terms" />} />
+                {/* Stale deep-link guard: /overview was never a route (nav
+                    targets the index); redirect instead of rendering a blank
+                    SPA fallback. */}
+                <Route path="/overview" element={<Navigate to="/" replace />} />
 
                 {/* Protected routes */}
                 <Route
@@ -55,7 +68,8 @@ function App() {
                     </PrivateRoute>
                   }
                 >
-                  <Route index element={<Dashboard />} />
+                  <Route index element={<Overview />} />
+                  <Route path="dashboard" element={<Dashboard />} />
                   <Route path="research" element={<Research />} />
                   <Route path="research/brand-scrapes" element={<BrandScrapes />} />
                   <Route path="research/settings" element={<ResearchSettings />} />
@@ -63,6 +77,8 @@ function App() {
                   <Route path="image-ads" element={<ImageAds />} />
                   <Route path="video-ads" element={<VideoAds />} />
                   <Route path="facebook-campaigns" element={<FacebookCampaigns />} />
+                  <Route path="google-ads" element={<GoogleAdsCampaigns />} />
+                  <Route path="tiktok-ads" element={<TikTokAdsCampaigns />} />
                   <Route path="winning-ads" element={<WinningAds />} />
                   <Route path="generated-ads" element={<GeneratedAds />} />
                   <Route path="brands" element={<Brands />} />
@@ -86,6 +102,7 @@ function App() {
         </BrandProvider>
       </AuthProvider>
     </ToastProvider>
+    </ErrorBoundary>
   );
 }
 

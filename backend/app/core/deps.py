@@ -1,9 +1,11 @@
 from typing import Callable, List, Optional
-from fastapi import Depends, HTTPException, status
+import hashlib
+from datetime import datetime, timezone
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import User
+from app.models import User, ApiKey
 from app.core.security import decode_access_token
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -120,3 +122,42 @@ async def get_optional_user(
 
     user = db.query(User).filter(User.id == user_id).first()
     return user
+
+
+def _hash_api_key(raw_key: str) -> str:
+    return hashlib.sha256(raw_key.encode()).hexdigest()
+
+
+def require_api_key_scope(required_scope: str) -> Callable:
+    """Dependency for machine-to-machine callers (e.g. the Hermes Telegram bot).
+    Validates `Authorization: Bearer <key>` against the stored hash, rejects
+    revoked keys, and enforces the route's required scope.
+
+    Only "ads:read" and "ads:draft" are ever valid scopes for bot-issued keys.
+    "ads:publish" / "ads:spend" do not exist as grantable scopes — this is
+    enforced here in code, not left to the bot's persona/prompt text alone.
+    """
+    async def checker(
+        authorization: Optional[str] = Header(None),
+        db: Session = Depends(get_db),
+    ) -> ApiKey:
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Missing bearer API key",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        raw_key = authorization[len("Bearer "):].strip()
+        key_hash = _hash_api_key(raw_key)
+        api_key = db.query(ApiKey).filter(ApiKey.key_hash == key_hash).first()
+        if api_key is None or api_key.revoked_at is not None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or revoked API key")
+        if required_scope not in (api_key.scopes or []):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"API key is missing the required scope: {required_scope}",
+            )
+        api_key.last_used_at = datetime.now(timezone.utc)
+        db.commit()
+        return api_key
+    return checker

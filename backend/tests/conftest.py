@@ -18,6 +18,7 @@ from app.database import Base, get_db
 from app.models import User, Role
 from app.core.security import get_password_hash
 from app.core.config import settings
+from app.core.rate_limit import limiter
 
 # Use DATABASE_URL from env (CI sets this to localhost postgres)
 # No fallback - DATABASE_URL must be set
@@ -26,6 +27,20 @@ if not TEST_DATABASE_URL:
     raise ValueError("DATABASE_URL or TEST_DATABASE_URL environment variable required for tests")
 engine = create_engine(TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """Reset slowapi's limiter before every test.
+
+    All TestClient requests share one fake client IP, so rate-limited routes
+    (e.g. 5/minute on login) get exhausted after only a handful of tests in
+    the same session — regardless of whether they call login directly or via
+    the `auth_headers` fixture. This only resets the test process's in-memory
+    limiter state; it has no effect on production.
+    """
+    limiter.reset()
+    yield
 
 
 @pytest.fixture(scope="function")
