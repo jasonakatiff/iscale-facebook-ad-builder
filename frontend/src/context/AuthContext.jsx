@@ -63,15 +63,20 @@ export const AuthProvider = ({ children }) => {
         return () => clearInterval(refreshInterval);
     }, [refreshToken]);
 
-    const fetchUser = async () => {
+    // `token` must be passed explicitly right after a refresh: the `accessToken`
+    // state captured by this closure is still the old value until the next
+    // render, so re-fetching with it fails against a just-expired token.
+    const fetchUser = async (token = accessToken) => {
         const response = await fetch(`${API_URL}/auth/me`, {
             headers: {
-                'Authorization': `Bearer ${accessToken}`,
+                'Authorization': `Bearer ${token}`,
             },
         });
 
         if (!response.ok) {
-            throw new Error('Failed to fetch user');
+            const error = new Error('Failed to fetch user');
+            error.status = response.status;
+            throw error;
         }
 
         const userData = await response.json();
@@ -207,8 +212,8 @@ export const AuthProvider = ({ children }) => {
             localStorage.setItem('refreshToken', data.refresh_token);
         }
 
-        // Re-fetch user data with new token
-        await fetchUser();
+        // Re-fetch user data with the NEW token (state has not re-rendered yet)
+        await fetchUser(data.access_token);
 
         return data.access_token;
     };
