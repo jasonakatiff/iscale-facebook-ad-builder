@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, BarChart3, Package, Users, Video, Wand2, Settings, LogOut, Image, ShoppingBag, Target, ChevronLeft, ChevronRight, FileImage, Search, ChevronDown, UserCog, TrendingUp, Music2, Menu, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -12,15 +12,15 @@ export default function Layout() {
     const { showSuccess } = useToast();
     const [expandedMenus, setExpandedMenus] = useState({ Brands: false, Research: false });
     const [isCollapsed, setIsCollapsed] = useState(false);
-    const [showUserMenu, setShowUserMenu] = useState(false);
     // Mobile off-canvas nav. md+ always shows the desktop sidebar; the
     // mobile drawer shares the exact same markup (className toggles only).
     const [mobileOpen, setMobileOpen] = useState(false);
 
-    // Close the drawer whenever the route changes (tap-through navigation).
-    useEffect(() => {
+    const [previousPath, setPreviousPath] = useState(location.pathname);
+    if (previousPath !== location.pathname) {
+        setPreviousPath(location.pathname);
         setMobileOpen(false);
-    }, [location.pathname]);
+    }
 
     const handleLogout = async () => {
         await logout();
@@ -29,8 +29,8 @@ export default function Layout() {
     };
 
     const menuItems = [
-        { icon: LayoutDashboard, label: 'Overview', path: '/' },
-        { icon: BarChart3, label: 'Dashboard', path: '/dashboard' },
+        { icon: LayoutDashboard, label: 'Overview', path: '/overview' },
+        { icon: BarChart3, label: 'Dashboard', path: '/' },
         {
             icon: Search,
             label: 'Research',

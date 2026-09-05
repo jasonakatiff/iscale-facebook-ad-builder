@@ -20,9 +20,7 @@ const DEFAULT_COLUMNS = [
  * Reusable campaign/ad performance table shared across Google Ads, TikTok
  * Ads, and the cross-platform Overview page. Callers own data-fetching (pass
  * rows + loading state) — this component only handles sorting, the
- * date-range filter dropdown, and empty/loading states. Never hardcode mock
- * rows here — see docs/sprint-0/done.md's note on Reporting.jsx's mock-data
- * anti-pattern.
+ * date-range filter dropdown, and empty/loading states.
  */
 export default function PerformanceTable({
     rows = [],

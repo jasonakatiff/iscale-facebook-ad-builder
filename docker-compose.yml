@@ -1,5 +1,5 @@
 # Local development stack: hot-reloading backend + frontend against a
-# disposable Postgres. Not used in production — see docker-compose.prod.yml.
+# disposable Postgres for optional self-hosted development.
 #
 # Usage: docker compose up
 #   backend:  http://localhost:8000  (uvicorn --reload)
@@ -31,12 +31,12 @@ services:
       DATABASE_URL: postgresql://ads_studio:ads_studio_dev_password@postgres:5432/ads_studio_dev
       ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
       FRONTEND_URL: http://localhost:5173
-      GOOGLE_ADS_OAUTH_REDIRECT_URI: http://localhost:8010/api/v1/google-ads/oauth/callback
-      TIKTOK_ADS_OAUTH_REDIRECT_URI: http://localhost:8010/api/v1/tiktok-ads/oauth/callback
+      GOOGLE_ADS_OAUTH_REDIRECT_URI: http://localhost:8000/api/v1/google-ads/oauth/callback
+      TIKTOK_ADS_OAUTH_REDIRECT_URI: http://localhost:8000/api/v1/tiktok-ads/oauth/callback
     volumes:
       - ./backend:/app
     ports:
-      - "127.0.0.1:8010:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,11 +48,8 @@ services:
     environment:
       # Used by vite dev's own proxy for relative-path requests (container-to-container)
       VITE_BACKEND_PROXY_TARGET: http://backend:8000
-      # Used by pages that build an absolute API_URL (most of them) — this
-      # runs in the user's BROWSER on the host, not inside Docker, so it must
-      # be the HOST-published backend port (8010, not 8000 — 8000 is taken by
-      # an unrelated container on this machine, see docs/sprint-0/done.md)
-      VITE_API_URL: http://localhost:8010/api/v1
+      # Browser requests use the backend port published on the host.
+      VITE_API_URL: http://localhost:8000/api/v1
     volumes:
       - ./frontend:/app
     ports:

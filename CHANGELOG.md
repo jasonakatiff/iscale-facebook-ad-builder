@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-09-04] BreadWinner frontend restoration
+
+- Restore BreadWinner branding, upstream logo/HTML/production env template, Dashboard at `/`, and Overview at `/overview`.
+- Remove contributor public pages, process documents, and production compose file; restore upstream README with integration configuration and generic env examples.
+- Keep optional Docker/nginx hosting with backend port 8000 and a same-origin Docker build API URL; preserve Railway preview hosts and proxy overrides.
+- Load TikTok campaigns on connection discovery, date changes, and advertiser changes; report network failures.
+
+Plan: [BreadWinner frontend restoration](./frontend/.claude/plans/breadwinner-tiktok.md). Tests: 6 passing; Vite build passes; 14 added/edited frontend files lint clean (81 pre-existing errors and 25 warnings elsewhere). HTTP homepage/logo checks pass. Browser smoke blocked by Chrome launch failure. Remaining backend branding matches belong to the separate backend task.
+
 ## [2026-09-03] Fork contributions: masgant99 auth pass
 
 ### Security

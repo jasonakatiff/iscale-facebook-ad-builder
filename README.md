@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="frontend/public/breadwinner_logo.png" alt="NALARIN Ads Studio" width="120" />
+  <img src="frontend/public/breadwinner_logo.png" alt="Facebook Ad Builder" width="120" />
 </p>
 
-<h1 align="center">NALARIN Ads Studio</h1>
+<h1 align="center">Facebook Ad Builder</h1>
 
 <p align="center">
-  <strong>Secure multi-platform paid ads operations workspace</strong><br>
-  From competitor research to creative generation, campaign review, and cross-platform reporting
+  <strong>AI-powered Facebook ad automation platform</strong><br>
+  From competitor research to ad generation and campaign management
 </p>
 
 <p align="center">
@@ -34,7 +34,7 @@
 
 ## Overview
 
-NALARIN Ads Studio is a standalone, login-protected application for reviewing and managing paid advertising workflows across Meta, Google Ads, and TikTok Ads. Use AI to research competitors, generate creative concepts, review campaign changes before they can spend, and compare performance from one workspace.
+Facebook Ad Builder is a full-stack application that streamlines the entire Facebook advertising workflow. Use AI to research competitors, generate compelling ad copy and images, and manage campaigns—all from one platform.
 
 ### Key Capabilities
 
@@ -42,9 +42,7 @@ NALARIN Ads Studio is a standalone, login-protected application for reviewing an
 - **AI Content Generation** — Create ad copy and images using Google Gemini and Fal.ai
 - **Brand Management** — Maintain consistent brand voice, colors, and assets
 - **Template System** — Deconstruct winning ads into reusable blueprints
-- **Cross-Platform Overview** — Compare normalized Meta, Google Ads, and TikTok campaign performance
-- **Guarded Campaign Actions** — Google/TikTok campaign creation defaults to paused and requires an explicit confirmation
-- **Read-Only Hermes Surface** — A scoped bot API can report performance but cannot spend, publish, or change campaigns
+- **Campaign Management** — Create and manage Facebook campaigns via API
 
 ---
 
@@ -73,26 +71,11 @@ Build a library of proven ad structures:
 - Track performance by template type
 
 ### 📊 Campaign Management
-Manage paid-campaign workflows with explicit safety controls:
+Manage Facebook campaigns directly:
 - Create campaigns, ad sets, and ads
 - Upload creative assets
 - Monitor campaign status
 - Sync with Facebook Ads Manager
-- Connect Google Ads through OAuth for campaign reporting and guarded actions
-- Prepare TikTok Marketing API campaigns only after developer-app approval
-- Review cross-platform spend, clicks, conversions, and CPA from **Overview**
-
-> **Safety:** Platform writes are never silent. Google and TikTok campaign create
-> flows present a preview and require `confirm=true`; new campaigns are created
-> paused. The production bot API is read-only and has no spend or publish route.
-
-### Platform Integration Status
-
-| Platform | Status | Notes |
-|----------|--------|-------|
-| Meta | Available when a Marketing API token and ad account are configured | Inherited campaign/research workflow |
-| Google Ads | OAuth connection implemented | Connected account requires Google Ads API access; production reporting may be blocked until the developer token/account is enabled |
-| TikTok Ads | OAuth/API implementation ready | Requires TikTok for Business developer-app Marketing API approval and credentials |
 
 ---
 
@@ -518,3 +501,16 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 <p align="center">
   Built with ❤️ by <a href="https://iscale.com">iSCALE</a> using FastAPI, React, and AI
 </p>
+
+
+## Additional Ad Integrations
+
+Connect accounts from **Google Ads**, **TikTok Ads**, or **Facebook Campaigns**. The **Overview** page combines platform reporting. Configure the backend variables below; `.env.example` contains callback URL examples.
+
+- **Google Ads:** `GOOGLE_ADS_CLIENT_ID`, `GOOGLE_ADS_CLIENT_SECRET`, `GOOGLE_ADS_DEVELOPER_TOKEN`, and `GOOGLE_ADS_OAUTH_REDIRECT_URI`; set `GOOGLE_ADS_LOGIN_CUSTOMER_ID` when using a manager account.
+- **TikTok Ads:** `TIKTOK_ADS_APP_ID`, `TIKTOK_ADS_APP_SECRET`, and `TIKTOK_ADS_OAUTH_REDIRECT_URI`. `TIKTOK_ADS_API_BASE_URL` overrides the API endpoint.
+- **Meta OAuth:** `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`, and `FACEBOOK_OAUTH_REDIRECT_URI`. Existing `FACEBOOK_ACCESS_TOKEN` and `FACEBOOK_AD_ACCOUNT_ID` configuration remains available.
+- **OAuth storage:** Set `OAUTH_TOKEN_ENCRYPTION_KEY` to a Fernet key for encrypted provider credentials. Set `FRONTEND_URL` to the frontend origin and register each configured callback URL with its provider.
+- **Bot API keys:** From `backend/`, run `python scripts/create_api_key.py --name "campaign-bot" --scopes ads:read ads:draft --created-by-user-id USER_UUID`, replacing `USER_UUID` with the account owner's ID. Save the printed key securely; it is displayed once.
+
+For optional local self-hosting, `docker-compose.yml` runs PostgreSQL, the backend on port 8000, and Vite on port 5173. `frontend/Dockerfile` and `frontend/nginx.conf` provide a static frontend with a same-origin backend proxy; the Docker build defaults `VITE_API_URL` to `/api/v1`.
