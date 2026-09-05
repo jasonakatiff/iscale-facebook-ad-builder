@@ -8,12 +8,11 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.deps import get_current_active_user
+from app.core.deps import get_current_active_user, require_permission
 from app.core.oauth_state import (
     create_oauth_state,
     verify_oauth_state,
     set_oauth_state_cookie,
-    clear_oauth_state_cookie,
     get_oauth_state_cookie_name,
 )
 from app.core.token_encryption import encrypt_token, decrypt_token
@@ -113,16 +112,7 @@ async def oauth_callback(
     error: str = None,
     db: Session = Depends(get_db),
 ):
-    """Public callback — Google redirects the browser here directly, so there's
-    no Authorization header. Identity is recovered from the signed `state`
-    query parameter Google echoes back (app.core.oauth_state), which is
-    itself a JWT signed with our SECRET_KEY — self-verifying (signature +
-    expiry + provider binding), so it doesn't depend on the browser actually
-    round-tripping the oauth_state cookie set in /oauth/start. The cookie is
-    validated as a defense-in-depth match ONLY when present; some browser/dev
-    setups (e.g. cross-port localhost during local development) don't reliably
-    persist it, so its absence alone must never fail an otherwise-valid,
-    signed state."""
+    """Recover identity from signed state bound to the initiating browser cookie."""
     if error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Google OAuth error: {error}")
     if not code:
@@ -131,7 +121,9 @@ async def oauth_callback(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing OAuth state parameter")
 
     state_cookie = request.cookies.get(get_oauth_state_cookie_name())
-    if state_cookie and state_cookie != state:
+    if not state_cookie:
+        raise HTTPException(status_code=400, detail="Missing OAuth state cookie")
+    if state_cookie != state:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OAuth state mismatch between cookie and callback parameter")
 
     try:
@@ -175,7 +167,7 @@ async def oauth_callback(
     select_required = len(normalized_customer_ids) > 1
 
     db.query(GoogleAdsConnection).filter(GoogleAdsConnection.user_id == user_id).update(
-        {GoogleAdsConnection.is_active: False}, synchronize_session=False
+        {GoogleAdsConnection.is_active: False}, synchronize_session="fetch"
     )
     for customer_id in normalized_customer_ids:
         connection = (
@@ -201,7 +193,6 @@ async def oauth_callback(
     redirect = RedirectResponse(
         url=f"{frontend_url}/google-ads?{'select=1' if select_required else 'connected=1'}"
     )
-    clear_oauth_state_cookie(redirect)
     return redirect
 
 
@@ -268,7 +259,7 @@ def select_connection(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Google Ads account is not available for this user.")
 
     db.query(GoogleAdsConnection).filter(GoogleAdsConnection.user_id == current_user.id).update(
-        {GoogleAdsConnection.is_active: False}, synchronize_session=False
+        {GoogleAdsConnection.is_active: False}, synchronize_session="fetch"
     )
     connection.is_active = True
     db.commit()
@@ -388,13 +379,13 @@ async def get_campaign_ads(
 async def create_campaign(
     body: CreateCampaignRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission("campaigns:write")),
 ):
     """Create a new Search campaign. Always created PAUSED -- activating it
     is a separate, explicit action (see /campaigns/{id}/enable)."""
-    _require_configured()
     _require_confirmed(body.confirm)
     connection = _get_active_connection(db, current_user.id)
+    _require_configured()
     try:
         refresh_token = decrypt_token(connection.encrypted_refresh_token)
         await get_valid_access_token(db, connection)
@@ -419,11 +410,11 @@ async def pause_campaign(
     campaign_id: str,
     body: ConfirmOnlyRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission("campaigns:write")),
 ):
-    _require_configured()
     _require_confirmed(body.confirm)
     connection = _get_active_connection(db, current_user.id)
+    _require_configured()
     try:
         refresh_token = decrypt_token(connection.encrypted_refresh_token)
         await get_valid_access_token(db, connection)
@@ -442,13 +433,13 @@ async def enable_campaign(
     campaign_id: str,
     body: ConfirmOnlyRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission("campaigns:write")),
 ):
     """Activate a campaign -- the one write action that starts real spend.
     Requires confirm=true like every other write action here."""
-    _require_configured()
     _require_confirmed(body.confirm)
     connection = _get_active_connection(db, current_user.id)
+    _require_configured()
     try:
         refresh_token = decrypt_token(connection.encrypted_refresh_token)
         await get_valid_access_token(db, connection)
@@ -467,11 +458,11 @@ async def add_negative_keywords(
     campaign_id: str,
     body: NegativeKeywordsRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission("campaigns:write")),
 ):
-    _require_configured()
     _require_confirmed(body.confirm)
     connection = _get_active_connection(db, current_user.id)
+    _require_configured()
     try:
         refresh_token = decrypt_token(connection.encrypted_refresh_token)
         await get_valid_access_token(db, connection)

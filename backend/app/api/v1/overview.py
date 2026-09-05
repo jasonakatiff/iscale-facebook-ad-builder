@@ -12,10 +12,11 @@ from google.ads.googleads.errors import GoogleAdsException
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_active_user
+from app.api.v1.tiktok_ads import _date_range
 from app.core.token_encryption import decrypt_token
 from app.database import get_db
-from app.models import GoogleAdsConnection, MetaAdsConnection, TikTokAdsConnection, User
-from app.services.facebook_service import FacebookService
+from app.models import GoogleAdsConnection, TikTokAdsConnection, User
+from app.services.facebook_service import resolve_facebook_service
 from app.services.google_ads_service import (
     get_campaign_performance,
     get_valid_access_token,
@@ -47,24 +48,7 @@ def _normalize(platform: str, campaign_name: str, spend: float, impressions: int
 
 
 def _fetch_meta_rows(db: Session, user_id: str, ad_account_id: Optional[str], date_preset: str) -> List[Dict[str, Any]]:
-    # Per-user Meta OAuth connection (Sprint 6): when the user has an active
-    # MetaAdsConnection, its decrypted token and selected ad account drive the
-    # fetch. The legacy env-token path only remains as a fallback for
-    # deployments that never adopted per-user OAuth.
-    connection = (
-        db.query(MetaAdsConnection)
-        .filter(MetaAdsConnection.user_id == user_id, MetaAdsConnection.is_active.is_(True))
-        .first()
-    )
-    if connection is not None:
-        service = FacebookService(
-            access_token=decrypt_token(connection.encrypted_access_token),
-            ad_account_id=connection.ad_account_id,
-        )
-    else:
-        service = FacebookService()
-    if not service.api:
-        service.initialize()
+    service = resolve_facebook_service(db, user_id)
     if service.ad_account_id is None and ad_account_id:
         service.ad_account_id = ad_account_id
     campaigns = service.get_campaigns(service.ad_account_id)
@@ -118,14 +102,9 @@ async def _fetch_tiktok_rows(db: Session, user_id: str, date_preset: str) -> Lis
     if connection is None:
         raise TikTokAdsApiError("No connected TikTok Ads advertiser.")
 
-    # TikTok Reporting API requires literal YYYY-MM-DD dates rather than a
-    # Google-style preset constant; reuse the same 30-day default here until
-    # the UI passes an explicit TikTok-specific date range.
-    from datetime import date, timedelta
-    end = date.today()
-    start = end - timedelta(days=29 if date_preset == "last_30d" else 6)
+    start, end = _date_range(date_preset)
     token = await get_valid_tiktok_access_token(db, connection)
-    campaigns = await get_tiktok_campaign_performance(token, connection.advertiser_id, start.isoformat(), end.isoformat())
+    campaigns = await get_tiktok_campaign_performance(token, connection.advertiser_id, start, end)
     return [
         _normalize(
             "tiktok",

@@ -18,6 +18,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.core.config import settings
 from app.core.rate_limit import limiter
+from app.core.oauth_state import clear_oauth_state_cookie
 # Imported eagerly (not just where used) so a missing/malformed
 # OAUTH_TOKEN_ENCRYPTION_KEY fails app startup immediately, matching the
 # fail-fast pattern already used for SECRET_KEY in app.core.config.
@@ -28,6 +29,7 @@ app = FastAPI(
     version="1.0.0",
     openapi_url="/api/v1/openapi.json",
     docs_url="/api/v1/docs",
+    redoc_url="/api/v1/redoc",
 )
 
 # Register rate limiter
@@ -38,29 +40,33 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response: Response = await call_next(request)
+    if request.url.path in {
+        "/api/v1/google-ads/oauth/callback",
+        "/api/v1/facebook/oauth/callback",
+        "/api/v1/tiktok-ads/oauth/callback",
+    }:
+        clear_oauth_state_cookie(response)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; "
-        "script-src 'self'; "
-        "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data: https:; "
-        "connect-src 'self'; "
-        "frame-ancestors 'none'; "
-        "object-src 'none'; "
-        "base-uri 'self'"
-    )
+    if request.url.path not in {"/api/v1/docs", "/api/v1/redoc", "/api/v1/openapi.json"}:
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: https:; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none'; "
+            "object-src 'none'; "
+            "base-uri 'self'"
+        )
     if request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
-# Trust proxy headers. In production this must be the actual reverse-proxy hop
-# (Caddy on 127.0.0.1), never "*" — a wildcard lets any client spoof
-# X-Forwarded-For/X-Forwarded-Proto and defeat IP-based rate limiting or HTTPS
-# enforcement further up the stack.
-trusted_proxies = os.getenv("TRUSTED_PROXIES", "127.0.0.1")
+# Railway terminates HTTPS at its reverse proxy before forwarding to the app.
+trusted_proxies = os.getenv("TRUSTED_PROXIES", "*")
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=[trusted_proxies] if trusted_proxies != "*" else ["*"])
 
 # CORS origins from env var or defaults

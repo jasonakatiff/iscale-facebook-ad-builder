@@ -4,13 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
-from app.services.facebook_service import FacebookService
+from app.services.facebook_service import FacebookService, FacebookConnectionError, resolve_facebook_service
 from app.models import FacebookAd, FacebookAdSet, FacebookCampaign, MetaAdsConnection, User
 from app.database import get_db
 from app.core.deps import get_current_active_user, require_permission
 from app.core.config import settings
-from app.core.oauth_state import create_oauth_state, verify_oauth_state, set_oauth_state_cookie, clear_oauth_state_cookie, get_oauth_state_cookie_name
-from app.core.token_encryption import encrypt_token, decrypt_token
+from app.core.oauth_state import create_oauth_state, verify_oauth_state, set_oauth_state_cookie, get_oauth_state_cookie_name
+from app.core.token_encryption import encrypt_token
 from app.services.meta_ads_oauth import build_oauth_url, exchange_code, list_ad_accounts, MetaOAuthError
 from sqlalchemy.orm import Session
 
@@ -34,24 +34,12 @@ def get_facebook_service(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    connection = db.query(MetaAdsConnection).filter(
-        MetaAdsConnection.user_id == current_user.id,
-        MetaAdsConnection.is_active.is_(True),
-    ).first()
-    if not connection:
-        raise HTTPException(status_code=404, detail="No connected Meta Ads account. Connect and select one first.")
-    service = FacebookService(
-        access_token=decrypt_token(connection.encrypted_access_token),
-        ad_account_id=connection.ad_account_id,
-        app_id=settings.FACEBOOK_APP_ID,
-        app_secret=settings.FACEBOOK_APP_SECRET,
-    )
     try:
-        if not service.api:
-            service.initialize()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    return service
+        return resolve_facebook_service(db, current_user.id)
+    except FacebookConnectionError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/oauth/start")
@@ -80,7 +68,9 @@ async def meta_oauth_callback(
     if not code or not state:
         raise HTTPException(status_code=400, detail="Missing Meta OAuth authorization code or state")
     state_cookie = request.cookies.get(get_oauth_state_cookie_name())
-    if state_cookie and state_cookie != state:
+    if not state_cookie:
+        raise HTTPException(status_code=400, detail="Missing OAuth state cookie")
+    if state_cookie != state:
         raise HTTPException(status_code=400, detail="OAuth state mismatch between cookie and callback parameter")
     try:
         user_id = verify_oauth_state(state, PROVIDER)
@@ -101,7 +91,7 @@ async def meta_oauth_callback(
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in) if isinstance(expires_in, (int, float)) else None
     select_required = len(accounts) > 1
     db.query(MetaAdsConnection).filter(MetaAdsConnection.user_id == user_id).update(
-        {MetaAdsConnection.is_active: False}, synchronize_session=False
+        {MetaAdsConnection.is_active: False}, synchronize_session="fetch"
     )
     for account in accounts:
         account_id = str(account.get("id") or "")
@@ -123,7 +113,6 @@ async def meta_oauth_callback(
     redirect = RedirectResponse(
         url=f"{settings.FRONTEND_URL.rstrip('/')}/facebook-campaigns?{'select=1' if select_required else 'connected=1'}"
     )
-    clear_oauth_state_cookie(redirect)
     return redirect
 
 
@@ -185,7 +174,7 @@ def select_meta_connection(
     if not connection:
         raise HTTPException(status_code=404, detail="Meta ad account is not available for this user.")
     db.query(MetaAdsConnection).filter(MetaAdsConnection.user_id == current_user.id).update(
-        {MetaAdsConnection.is_active: False}, synchronize_session=False
+        {MetaAdsConnection.is_active: False}, synchronize_session="fetch"
     )
     connection.is_active = True
     db.commit()
@@ -198,7 +187,7 @@ def disconnect_meta_connection(
     current_user: User = Depends(get_current_active_user),
 ):
     db.query(MetaAdsConnection).filter(MetaAdsConnection.user_id == current_user.id).update(
-        {MetaAdsConnection.is_active: False}, synchronize_session=False
+        {MetaAdsConnection.is_active: False}, synchronize_session="fetch"
     )
     db.commit()
     return {"message": "Disconnected"}

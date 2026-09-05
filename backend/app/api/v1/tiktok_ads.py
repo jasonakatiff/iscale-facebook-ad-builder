@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.deps import get_current_active_user
+from app.core.deps import get_current_active_user, require_permission
 from app.core.oauth_state import create_oauth_state, verify_oauth_state, set_oauth_state_cookie, get_oauth_state_cookie_name
 from app.core.token_encryption import encrypt_token
 from app.database import get_db
@@ -54,7 +54,13 @@ def _active_connection(db: Session, user_id: str) -> TikTokAdsConnection:
 
 def _date_range(preset: str) -> tuple[str, str]:
     end = date.today()
-    if preset == "last_7d":
+    if preset == "today":
+        start = end
+    elif preset == "yesterday":
+        start = end = end - timedelta(days=1)
+    elif preset == "last_90d":
+        start = end - timedelta(days=89)
+    elif preset == "last_7d":
         start = end - timedelta(days=6)
     elif preset == "last_14d":
         start = end - timedelta(days=13)
@@ -85,7 +91,9 @@ async def oauth_callback(request: Request, auth_code: Optional[str] = None, code
     if not authorization_code or not state:
         raise HTTPException(status_code=400, detail="Missing TikTok OAuth authorization code or state")
     cookie = request.cookies.get(get_oauth_state_cookie_name())
-    if cookie and cookie != state:
+    if not cookie:
+        raise HTTPException(status_code=400, detail="Missing OAuth state cookie")
+    if cookie != state:
         raise HTTPException(status_code=400, detail="OAuth state mismatch between cookie and callback parameter")
     try:
         user_id = verify_oauth_state(state, PROVIDER)
@@ -110,7 +118,7 @@ async def oauth_callback(request: Request, auth_code: Optional[str] = None, code
     }
     db.query(TikTokAdsConnection).filter(
         TikTokAdsConnection.user_id == user_id
-    ).update({"is_active": False}, synchronize_session=False)
+    ).update({"is_active": False}, synchronize_session="fetch")
     for advertiser_id in advertiser_ids:
         connection = db.query(TikTokAdsConnection).filter(
             TikTokAdsConnection.user_id == user_id,
@@ -178,7 +186,7 @@ def select_connection(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="TikTok advertiser is not available for this user.")
     db.query(TikTokAdsConnection).filter(
         TikTokAdsConnection.user_id == current_user.id
-    ).update({"is_active": False}, synchronize_session=False)
+    ).update({"is_active": False}, synchronize_session="fetch")
     connection.is_active = True
     db.commit()
     return {
@@ -193,7 +201,7 @@ def select_connection(
 def disconnect_connection(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     db.query(TikTokAdsConnection).filter(
         TikTokAdsConnection.user_id == current_user.id
-    ).update({"is_active": False}, synchronize_session=False)
+    ).update({"is_active": False}, synchronize_session="fetch")
     db.commit()
     return {"message": "Disconnected"}
 
@@ -212,10 +220,10 @@ async def campaigns(date_preset: str = "last_30d", db: Session = Depends(get_db)
 
 
 @router.post("/campaigns", status_code=status.HTTP_201_CREATED)
-async def create_campaign(body: CreateCampaignRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    _require_configured()
+async def create_campaign(body: CreateCampaignRequest, db: Session = Depends(get_db), current_user: User = Depends(require_permission("campaigns:write"))):
     _require_confirmed(body.confirm)
     connection = _active_connection(db, current_user.id)
+    _require_configured()
     try:
         token = await get_valid_access_token(db, connection)
         return await create_tiktok_campaign(token, connection.advertiser_id, body.name, body.daily_budget)

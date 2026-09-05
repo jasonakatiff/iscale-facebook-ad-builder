@@ -121,3 +121,15 @@ def test_unbound_bot_cannot_list_connections(client, db_session):
     finally:
         db_session.delete(key)
         db_session.commit()
+
+
+@pytest.mark.parametrize("secure,samesite", [(True, "none"), (False, "lax")])
+def test_state_cookie_supports_split_frontend_origin(secure, samesite):
+    from fastapi import Response
+    from app.core.oauth_state import set_oauth_state_cookie
+    response = Response()
+    set_oauth_state_cookie(response, "test-state", secure=secure)
+    cookie = response.headers["set-cookie"]
+    assert f"SameSite={samesite}" in cookie
+    assert ("Secure" in cookie) is secure
+    assert "HttpOnly" in cookie

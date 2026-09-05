@@ -65,13 +65,14 @@ def set_oauth_state_cookie(response: Response, token: str, secure: bool = True) 
     refuse to store a cookie with the Secure attribute on a non-HTTPS origin,
     which otherwise makes the callback fail with "Missing OAuth state cookie"
     even though /oauth/start appeared to succeed."""
+    # HTTPS frontend/API deployments can live on separate sites.
     response.set_cookie(
         key=_COOKIE_NAME,
         value=token,
         max_age=_STATE_TTL_MINUTES * 60,
         httponly=True,
         secure=secure,
-        samesite="lax",
+        samesite="none" if secure else "lax",
         path="/",
     )
 

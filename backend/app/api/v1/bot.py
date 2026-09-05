@@ -17,12 +17,23 @@ router = APIRouter()
 
 @router.get("/connections")
 def list_connections(
-    _api_key: ApiKey = Depends(require_api_key_scope("ads:read")),
+    api_key: ApiKey = Depends(require_api_key_scope("ads:read")),
     db: Session = Depends(get_db),
 ):
     """Return connection metadata only. OAuth token material never leaves the backend."""
-    google = db.query(GoogleAdsConnection).filter(GoogleAdsConnection.is_active.is_(True)).all()
-    tiktok = db.query(TikTokAdsConnection).filter(TikTokAdsConnection.is_active.is_(True)).all()
+    if not api_key.created_by_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This API key is not bound to an owner and cannot read Ads Studio connections.",
+        )
+    google = db.query(GoogleAdsConnection).filter(
+        GoogleAdsConnection.user_id == api_key.created_by_user_id,
+        GoogleAdsConnection.is_active.is_(True),
+    ).all()
+    tiktok = db.query(TikTokAdsConnection).filter(
+        TikTokAdsConnection.user_id == api_key.created_by_user_id,
+        TikTokAdsConnection.is_active.is_(True),
+    ).all()
     return {
         "google_ads": [
             {"customer_id": connection.customer_id, "account_name": connection.account_name, "connected_at": connection.created_at}

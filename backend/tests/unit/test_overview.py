@@ -36,13 +36,14 @@ class TestOverviewAggregation:
         "Facebook API Init Error: 'NoneType' object has no attribute 'encode'"
         even for connected users."""
         from app.models import MetaAdsConnection
-        from app.api.v1 import overview as overview_module
+        from app.core.token_encryption import encrypt_token
+        from app.services import facebook_service as facebook_module
 
         db_session.add(MetaAdsConnection(
             user_id=test_user.id,
             ad_account_id="act_1350206440591360",
             account_name="Nalarin Ads",
-            encrypted_access_token="cipher-blob",
+            encrypted_access_token=encrypt_token("plaintext-token"),
             is_active=True,
         ))
         db_session.commit()
@@ -52,6 +53,7 @@ class TestOverviewAggregation:
         class FakeService:
             def __init__(self, **kwargs):
                 captured.update(kwargs)
+                self.access_token = kwargs.get("access_token")
                 self.api = None
                 self.ad_account_id = kwargs.get("ad_account_id")
 
@@ -64,8 +66,7 @@ class TestOverviewAggregation:
             def get_campaign_insights(self, campaign_id, date_preset="last_30d", **kw):
                 return {"spend": 10.0, "impressions": 100, "clicks": 5, "conversions": 1.0}
 
-        monkeypatch.setattr(overview_module, "FacebookService", FakeService)
-        monkeypatch.setattr(overview_module, "decrypt_token", lambda blob: "plaintext-token")
+        monkeypatch.setattr(facebook_module, "FacebookService", FakeService)
 
         response = client.get("/api/v1/overview", headers=auth_headers)
 
@@ -80,17 +81,18 @@ class TestOverviewAggregation:
     def test_overview_meta_missing_token_message_is_actionable(self, client, auth_headers, monkeypatch):
         """When no Meta connection exists and env token is empty, the meta error
         must be a user-actionable message, not raw NoneType SDK noise."""
-        from app.api.v1 import overview as overview_module
+        from app.services import facebook_service as facebook_module
 
         class BrokenService:
             def __init__(self, **kwargs):
+                self.access_token = kwargs.get("access_token")
                 self.api = None
                 self.ad_account_id = None
 
             def initialize(self):
                 raise RuntimeError("Facebook API Init Error: 'NoneType' object has no attribute 'encode'")
 
-        monkeypatch.setattr(overview_module, "FacebookService", BrokenService)
+        monkeypatch.setattr(facebook_module, "FacebookService", BrokenService)
 
         response = client.get("/api/v1/overview", headers=auth_headers)
 
