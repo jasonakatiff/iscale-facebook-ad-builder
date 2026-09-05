@@ -68,7 +68,7 @@ class TestMetaConnectionStatus:
         naive = datetime(2026, 8, 22, 6, 53, 57)  # naive on purpose — Postgres may return naive
         db_session.add(MetaAdsConnection(
             user_id=test_user.id,
-            ad_account_id="act_1350206440591360",
+            ad_account_id="act_1000000000000001",
             account_name="Test Ads",
             encrypted_access_token="token",
             is_active=True,

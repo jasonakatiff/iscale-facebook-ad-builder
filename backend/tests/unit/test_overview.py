@@ -41,7 +41,7 @@ class TestOverviewAggregation:
 
         db_session.add(MetaAdsConnection(
             user_id=test_user.id,
-            ad_account_id="act_1350206440591360",
+            ad_account_id="act_1000000000000001",
             account_name="Test Ads",
             encrypted_access_token=encrypt_token("plaintext-token"),
             is_active=True,
@@ -73,7 +73,7 @@ class TestOverviewAggregation:
         assert response.status_code == status.HTTP_200_OK
         body = response.json()
         assert captured.get("access_token") == "plaintext-token"
-        assert captured.get("ad_account_id") == "act_1350206440591360"
+        assert captured.get("ad_account_id") == "act_1000000000000001"
         meta_rows = [row for row in body["campaigns"] if row["platform"] == "meta"]
         assert meta_rows and meta_rows[0]["campaign_name"] == "Meta Campaign"
         assert "meta" not in body["errors"]
