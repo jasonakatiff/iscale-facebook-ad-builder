@@ -32,12 +32,11 @@ class FacebookService:
     def initialize(self):
         """Initialize the Facebook API connection."""
         try:
-            FacebookAdsApi.init(
+            self.api = FacebookAdsApi.init(
                 app_id=self.app_id,
                 app_secret=self.app_secret,
                 access_token=self.access_token
             )
-            self.api = FacebookAdsApi.get_default_api()
             
             # Only set up the AdAccount object if we have an ID
             if self.ad_account_id:
@@ -45,7 +44,7 @@ class FacebookService:
                 account_id = self.ad_account_id
                 if not account_id.startswith('act_'):
                     account_id = f'act_{account_id}'
-                self.account = AdAccount(account_id)
+                self.account = AdAccount(account_id, api=self.api)
             
             return True
         except Exception as e:
@@ -383,7 +382,7 @@ class FacebookService:
                 tmp.write(response.content)
                 local_path = tmp.name
 
-            image = AdImage(parent_id=account.get_id_assured())
+            image = AdImage(parent_id=account.get_id_assured(), api=self.api)
             image[AdImage.Field.filename] = local_path
             image.remote_create()
 
@@ -396,7 +395,7 @@ class FacebookService:
             return image[AdImage.Field.hash]
         else:
             # Local file path
-            image = AdImage(parent_id=account.get_id_assured())
+            image = AdImage(parent_id=account.get_id_assured(), api=self.api)
             image[AdImage.Field.filename] = image_path_or_url
             image.remote_create()
             return image[AdImage.Field.hash]
@@ -443,7 +442,7 @@ class FacebookService:
 
         try:
             # Create and upload video
-            video = AdVideo(parent_id=account.get_id_assured())
+            video = AdVideo(parent_id=account.get_id_assured(), api=self.api)
             video[AdVideo.Field.filepath] = local_path
             video.remote_create()
 
@@ -702,3 +701,35 @@ class FacebookService:
         
         return account.get_targeting_search(params=params)
 
+
+
+class FacebookConnectionError(Exception):
+    """No user OAuth connection or legacy system token is available."""
+
+
+def resolve_facebook_service(db, user_id: str) -> FacebookService:
+    """Use the user's active Meta account, falling back to the env system token."""
+    from app.core.config import settings
+    from app.core.token_encryption import decrypt_token
+    from app.models import MetaAdsConnection
+
+    connection = db.query(MetaAdsConnection).filter(
+        MetaAdsConnection.user_id == user_id,
+        MetaAdsConnection.is_active.is_(True),
+    ).first()
+    if connection:
+        service = FacebookService(
+            access_token=decrypt_token(connection.encrypted_access_token),
+            ad_account_id=connection.ad_account_id,
+            app_id=settings.FACEBOOK_APP_ID,
+            app_secret=settings.FACEBOOK_APP_SECRET,
+        )
+    else:
+        service = FacebookService()
+    if not service.access_token:
+        raise FacebookConnectionError(
+            "No connected Meta Ads account. Connect and select one or configure a Facebook system token."
+        )
+    if not service.api:
+        service.initialize()
+    return service

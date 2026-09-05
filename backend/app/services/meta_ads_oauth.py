@@ -40,6 +40,20 @@ async def exchange_code(code: str, client_id: str, client_secret: str, redirect_
     }
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.get(f"{META_GRAPH_URL}/oauth/access_token", params=params)
+        data = _token_response(response)
+        response = await client.get(
+            f"{META_GRAPH_URL}/oauth/access_token",
+            params={
+                "grant_type": "fb_exchange_token",
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "fb_exchange_token": data["access_token"],
+            },
+        )
+        return _token_response(response)
+
+
+def _token_response(response: httpx.Response) -> dict:
     data = response.json()
     if response.status_code != 200 or data.get("error") or not data.get("access_token"):
         error = data.get("error", {})
