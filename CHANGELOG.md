@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-09-05] Consolidate remaining local (breadWinner) assets
+
+### Added
+- Playwright end-to-end suite ported from the private repo: 10 spec files, 42 tests (auth, session refresh, brands CRUD, Facebook campaign wizard, generated-ads gallery, video upload, no-browser-dialogs policy, smoke). `npm run test:e2e`; needs `BASE_URL`, `TEST_EMAIL`, `TEST_PASSWORD`. Verified 42/42 against a local stack on this commit. agent-browser smoke scripts remain the default `npm test`.
+- Ops scripts under `backend/scripts/`: `copy_prod_to_dev.py` (brands/products/profiles between databases), `cleanup_searches_and_ads.py`, `check_all_ads_dates.py`.
+- `.gitignore`: `.env*.local`, `.vercel`.
+
+### Not ported
+- Client-specific research specs, the exploratory drag-drop and example specs, a one-off Facebook-pages data migration, and stale test-plan documents. Application code was already fully consolidated; the private repo has no code changes left to bring over.
+
+Plan: none (asset consolidation). Tests: Playwright 42 passing; backend suite unchanged.
+
 ## [2026-09-05] Ads Studio integration (PR #3 by masgant99, reworked)
 
 Merged masgant99's PR #3 with their authorship preserved, then fixed every finding from the six-model security review before landing it.

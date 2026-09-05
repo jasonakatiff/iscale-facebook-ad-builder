@@ -346,7 +346,8 @@ npm run test:unit
 ```
 
 **Test file locations:**
-- Frontend e2e: `frontend/tests/agent-browser/*.sh`
+- Frontend e2e (agent-browser smoke): `frontend/tests/agent-browser/*.sh`
+- Frontend e2e (Playwright, 42 tests: auth, brands, campaigns, gallery, video ads, UI policy): `frontend/tests/**/*.spec.js`; run with `BASE_URL=http://localhost:5173 TEST_EMAIL=... TEST_PASSWORD=... npm run test:e2e` against a running stack
 - Frontend unit: `frontend/src/**/*.test.js`
 - Backend unit: `backend/tests/test_*.py`
 
