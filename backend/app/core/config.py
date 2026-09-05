@@ -8,7 +8,7 @@ class Settings:
     API_V1_STR: str = "/api/v1"
 
     # White-label brand (per-client deployments; server-side references)
-    BRAND_NAME: str = os.getenv("BRAND_NAME", "Nalarin Ads Studio")
+    BRAND_NAME: str = os.getenv("BRAND_NAME", "BreadWinner")
 
     # Where to send the browser after a successful OAuth connect flow
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")

@@ -49,6 +49,7 @@ jobs:
           SECRET_KEY: test-secret-key-for-ci
           GEMINI_API_KEY: mock-key
           FAL_AI_API_KEY: mock-key
+          OAUTH_TOKEN_ENCRYPTION_KEY: YLYPoADkMGcJu-Eqq2n3Q-mql-fZ69SOiyrUm2tlJgs=
         run: |
           pytest tests/ -v --tb=short --cov=app --cov-report=xml
 

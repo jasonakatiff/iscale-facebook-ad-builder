@@ -9,6 +9,8 @@ from unittest.mock import MagicMock, patch
 # For tests, use a SEPARATE dev database to avoid polluting production
 # Set TEST_DATABASE_URL env var or fallback to dev database
 
+os.environ.setdefault("OAUTH_TOKEN_ENCRYPTION_KEY", "YLYPoADkMGcJu-Eqq2n3Q-mql-fZ69SOiyrUm2tlJgs=")
+
 from app.main import app
 from app.core.rate_limit import limiter
 
