@@ -4,6 +4,8 @@ import json
 import subprocess
 import sys
 import time
+import tomllib
+from pathlib import Path
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
@@ -31,10 +33,10 @@ def main():
     network = prefix + "-network"
     containers, volumes = [], []
 
-    def run(service, image, *args):
+    def run(service, image, *args, command=()):
         name = prefix + "-" + service
         containers.append(name)
-        docker("run", "--detach", "--name", name, "--network", network, *args, image)
+        docker("run", "--detach", "--name", name, "--network", network, *args, image, *command)
         return name
 
     def api(path, method="GET", data=None, token=None):
@@ -109,7 +111,15 @@ def main():
                "from app.services.provider_settings import require_provider_key; assert require_provider_key('gemini') == 'test-container-gemini-value'")
         with urlopen(api_url + "/uploads/test-persistence.txt", timeout=5) as response:
             assert response.read() == b"test-persistent-media"
-        frontend = run("frontend", f"breadwinner-frontend:{tag}", "--publish", "127.0.0.1::8080", "--env", "PORT=8080")
+        frontend_config = tomllib.loads(
+            (Path(__file__).resolve().parents[2] / "frontend/railway.toml").read_text()
+        )
+        frontend = run(
+            "frontend", f"breadwinner-frontend:{tag}",
+            "--publish", "127.0.0.1::8080", "--env", "PORT=8080",
+            "--entrypoint", "/bin/sh",
+            command=("-c", frontend_config["deploy"]["startCommand"]),
+        )
         frontend_url = "http://" + docker("port", frontend, "8080/tcp")
 
         def frontend_ready():

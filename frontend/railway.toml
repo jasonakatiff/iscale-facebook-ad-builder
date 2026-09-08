@@ -8,4 +8,4 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile.railway"
 
 [deploy]
-startCommand = 'nginx -g "daemon off;"'
+startCommand = '/docker-entrypoint.sh nginx -g "daemon off;"'

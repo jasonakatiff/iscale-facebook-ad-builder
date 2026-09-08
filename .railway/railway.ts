@@ -6,7 +6,7 @@ export default defineRailway((ctx) => {
     if (ctx.projectName !== 'test-breadwinner-installer') {
         throw new Error('This scaffold only targets the isolated test-breadwinner-installer project.');
     }
-    const source = github('jasonakatiff/iscale-facebook-ad-builder', { branch: 'main' });
+    const source = github('jasonakatiff/iscale-facebook-ad-builder', { branch: 'codex/railway-installer-public-20260908' });
     const databaseVolume = volume('Database data', { sizeMB: 1024, region: 'us-west2' });
     const mediaVolume = volume('Creative media', { sizeMB: 1024, region: 'us-west2' });
     const database = service('Postgres', {
@@ -36,7 +36,7 @@ export default defineRailway((ctx) => {
     const frontend = service('Frontend', {
         source, root: '/frontend', replicas: 1,
         build: { builder: 'DOCKERFILE', dockerfilePath: 'Dockerfile.railway' },
-        start: 'nginx -g "daemon off;"', healthcheck: '/', healthcheckTimeout: 60,
+        start: '/docker-entrypoint.sh nginx -g "daemon off;"', healthcheck: '/', healthcheckTimeout: 60,
         env: { PORT: '8080', VITE_API_URL: 'https://${{Backend.RAILWAY_PUBLIC_DOMAIN}}/api/v1' },
     });
     const worker = service('Worker', {
