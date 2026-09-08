@@ -1,12 +1,13 @@
 from app.telemetry.runtime import capture_exception
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Header, Query
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 from app.services.facebook_service import FacebookService, FacebookConnectionError, resolve_facebook_service
 from app.models import FacebookAd, FacebookAdSet, FacebookCampaign, MetaAdsConnection, User
+from app.delivery.schemas import AdRequest
 from app.database import get_db
 from app.core.deps import get_current_active_user, require_permission
 from app.core.config import settings
@@ -310,22 +311,23 @@ def create_creative(
         capture_exception(e, "facebook.create_creative")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/ads")
+@router.post("/ads", status_code=202)
 def create_ad(
-    ad: Dict[str, Any],
-    ad_account_id: Optional[str] = None,
-    service: FacebookService = Depends(get_facebook_service),
+    ad: "AdRequest",
+    ad_account_id: str = Query(..., pattern=r"^(act_)?[0-9]+$"),
+    idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=1, max_length=160),
+    db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("campaigns:write"))
 ):
+    from app.delivery.queue import enqueue
+    from app.delivery.api import job_json, problem
+    account_id = ad_account_id if ad_account_id.startswith('act_') else 'act_' + ad_account_id
     try:
-        result = service.create_ad(ad, ad_account_id)
-        return dict(result)
-    except ValueError as e:
-        capture_exception(e, "facebook.create_ad")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        capture_exception(e, "facebook.create_ad")
-        raise HTTPException(status_code=500, detail=str(e))
+        return job_json(enqueue(db, current_user.id, idempotency_key, account_id, 'ad', ad.model_dump()))
+    except ValueError as error:
+        db.rollback()
+        problem(409, 'SUBMISSION_CONFLICT', str(error))
+
 
 @router.get("/ads")
 def read_ads(
@@ -472,12 +474,20 @@ def save_ad_locally(
     current_user: User = Depends(require_permission("campaigns:write"))
 ):
     try:
-        # Check if adset exists locally, if not we might need to create it or handle error
-        # For now, assuming adset exists or we just save the ID
-
-        existing = db.query(FacebookAd).filter(FacebookAd.id == ad_data.get('id')).first()
+        from sqlalchemy import text
+        from app.delivery.models import ManagedAd
+        fb_ad_id = ad_data.get('fbAdId')
+        identity = fb_ad_id or ad_data.get('id')
+        if not identity:
+            raise HTTPException(status_code=422, detail="An ad identity is required")
+        db.execute(text('SELECT pg_advisory_xact_lock(hashtextextended(:identity, 195558004))'), {'identity': identity})
+        managed = db.query(ManagedAd).filter(ManagedAd.fb_ad_id == fb_ad_id).first() if fb_ad_id else None
+        if managed and managed.owner_id != current_user.id and not current_user.has_role('admin'):
+            raise HTTPException(status_code=403, detail="Ad belongs to another buyer")
+        existing = db.query(FacebookAd).filter(FacebookAd.fb_ad_id == fb_ad_id).first() if fb_ad_id else db.get(FacebookAd, ad_data.get('id'))
         if existing:
-            return {"message": "Ad already saved", "id": existing.id}
+            return {"message": "Ad already saved locally", "id": existing.id}
+
         new_ad = FacebookAd(
             id=ad_data.get('id'),
             adset_id=ad_data.get('adsetId'),
@@ -499,14 +509,21 @@ def save_ad_locally(
             fb_creative_id=ad_data.get('fbCreativeId')
         )
         db.add(new_ad)
+        db.flush()
+        if managed:
+            managed.local_ad_id = new_ad.id
         db.commit()
         db.refresh(new_ad)
         return {"message": "Ad saved locally", "id": new_ad.id}
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         capture_exception(e, "facebook.save_ad_locally")
         db.rollback()
         print(f"Error saving ad locally: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/upload-image")
 def upload_image(

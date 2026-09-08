@@ -1,3 +1,4 @@
+import { DeliveryReporting } from '../components/DeliveryReporting';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { SearchableSelect } from '../components/SearchableSelect';
@@ -28,13 +29,14 @@ export default function Reporting() {
                 <div>
                     <h1 className="studio-heading">Campaign Reporting</h1>
                     <p className="studio-description">
-                        LeadRouter campaign activity and your linked BreadWinner campaigns.
+                        Imported Meta ad performance and linked LeadRouter campaign activity.
                     </p>
                 </div>
                 <Link className="studio-button" to={LEADROUTER_SETTINGS_PATH}>
                     Configure LeadRouter
                 </Link>
             </header>
+            <DeliveryReporting />
             <section className="studio-panel p-5 space-y-4" aria-label="LeadRouter reporting">
                 <div className="flex flex-wrap justify-between gap-3">
                     <h2 className="font-semibold">LeadRouter campaigns</h2>

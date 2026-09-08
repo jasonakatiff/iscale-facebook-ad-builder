@@ -23,6 +23,7 @@ import CreateAds from './pages/CreateAds';
 import ImageAds from './pages/ImageAds';
 import VideoAds from './pages/VideoAds';
 import Reporting from './pages/Reporting';
+import { PostingQueue } from './pages/PostingQueue';
 import Brands from './pages/Brands';
 import Products from './pages/Products';
 import CustomerProfiles from './pages/CustomerProfiles';
@@ -87,6 +88,7 @@ function App() {
                   <Route path="products" element={<Products />} />
                   <Route path="profiles" element={<CustomerProfiles />} />
                   <Route path="ad-remix" element={<AdRemix />} />
+                  <Route path="posting-queue" element={<PostingQueue />} />
                   <Route path="reporting" element={<Reporting />} />
                   <Route path="settings" element={<Settings />} />
                   <Route path="connections" element={<Connections />} />

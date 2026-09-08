@@ -5,7 +5,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "bw_install_001"
-down_revision = "bw_plugins_001"
+down_revision = "delivery_20260908"
 branch_labels = None
 depends_on = None
 

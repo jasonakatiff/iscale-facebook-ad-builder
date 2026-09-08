@@ -1,6 +1,6 @@
 # Railway installer release procedure
 
-Current state: local implementation. No template created, no public-source publication, no production deployment, and no live AI call performed by this task.
+Current state: implementation verified in local tests and private branch CI. All three images build; disposable-container checks cover fresh startup, worker heartbeat, encrypted-key decryption and media persistence after restart. No template created, no public-source publication, no production deployment, and no live AI call performed by this task.
 
 The customer guide is [install-on-railway.md](install-on-railway.md). Resource settings live in [railway.ts](../../.railway/railway.ts); template fields and generated-variable expressions live in [template.json](../../.railway/template.json). These files form a reference-project scaffold and composition manifest. A manifest is not a published Railway template.
 

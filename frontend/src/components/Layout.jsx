@@ -68,6 +68,7 @@ const sections = [
                         label: 'Facebook Campaigns',
                         path: '/facebook-campaigns',
                     },
+                    { label: 'Posting queue', path: '/posting-queue' },
                     { label: 'Google Ads', path: '/google-ads' },
                     { label: 'TikTok Ads', path: '/tiktok-ads' },
                 ],

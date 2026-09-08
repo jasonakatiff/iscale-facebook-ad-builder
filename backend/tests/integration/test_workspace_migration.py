@@ -127,7 +127,7 @@ def test_alembic_upgrades_old_schema_and_repeating_head_is_safe():
             tables=[
                 table
                 for table in Base.metadata.sorted_tables
-                if table.name not in TABLES | {"installation_state", "provider_connections", "telemetry_events"}
+                if table.name not in TABLES | {"installation_state", "provider_connections", "telemetry_events", "plugin_installations", "plugin_runs", "delivery_settings", "delivery_jobs", "managed_ads", "delivery_syncs", "ad_insights"}
             ],
         )
         with scoped.begin() as db:

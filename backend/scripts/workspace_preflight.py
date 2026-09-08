@@ -15,6 +15,12 @@ REQUIRED_TABLES = frozenset(
         "users",
         "api_keys",
         "telemetry_events",
+        "delivery_settings",
+        "delivery_jobs",
+        "managed_ads",
+        "delivery_syncs",
+        "ad_insights",
+
         "plugin_installations",
         "plugin_runs",
         "user_themes",
@@ -32,6 +38,12 @@ REQUIRED_TABLES = frozenset(
     }
 )
 REQUIRED_API = {
+    "/api/v1/delivery/settings": {"get", "put"},
+    "/api/v1/delivery/jobs": {"get"},
+    "/api/v1/delivery/launches": {"post"},
+    "/api/v1/delivery/syncs": {"get"},
+    "/api/v1/delivery/report": {"get"},
+
     "/api/v1/plugins": {"get", "post"},
     "/api/v1/plugins/{plugin_id}": {"get", "patch", "delete"},
     "/api/v1/plugins/{plugin_id}/runs": {"post"},

@@ -106,7 +106,7 @@ app.add_middleware(
     allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "X-Requested-With", "X-API-Key", "X-Session-ID", "traceparent"],
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With", "X-API-Key", "X-Session-ID", "traceparent", "Idempotency-Key"],
     expose_headers=["X-Total-Count", "X-Request-ID", "traceparent"],
     max_age=600,
 )
@@ -145,16 +145,22 @@ async def startup_event():
     from app.telemetry.instrumentation import install_instrumentation
     install_instrumentation(engine)
     collector.start()
+    from app.delivery.runtime import workers
+    workers.start(engine)
     emit("lifecycle", "application.started")
 
 
 @app.on_event("shutdown")
 async def shutdown_telemetry():
     emit("lifecycle", "application.stopped")
+    from app.delivery.runtime import workers
+    workers.stop()
     collector.stop()
 
 
 # Include Routers
+from app.delivery.api import router as delivery_router
+app.include_router(delivery_router, prefix="/api/v1/delivery", tags=["delivery"])
 from app.api.v1 import telemetry
 app.include_router(telemetry.router, prefix="/api/v1/telemetry", tags=["telemetry"])
 from app.api.v1 import brands, products, research, generated_ads, templates, facebook, uploads, dashboard, copy_generation, profiles, ad_remix, prompts, ad_styles, auth, users, google_ads, overview, tiktok_ads, bot

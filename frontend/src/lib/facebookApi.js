@@ -1,3 +1,4 @@
+import { deliveryRequest, DELIVERY_POLL_MS } from './delivery';
 import { MEDIA_EXTENSIONS } from './campaignWizard';
 // Facebook Marketing API Integration Service
 // Now proxies through our backend with authentication
@@ -473,32 +474,20 @@ export async function createFacebookCreative(creativeData, imageHash, pageId, ad
  * Create Facebook Ad
  */
 export async function createFacebookAd(adData, adsetId, creativeId, adAccountId) {
-    try {
-        const payload = {
-            ...adData,
-            status: adData.status || 'PAUSED',
-            adset_id: adsetId,
-            creative_id: creativeId
-        };
-
-        const response = await authFetch(`${API_BASE_URL}/ads?ad_account_id=${adAccountId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Failed to create ad');
-        }
-
-        const data = await response.json();
-        return data.id;
-    } catch (error) {
-        console.error('Error creating ad:', error);
-        throw error;
+    if (!adData.id) throw new Error('A stable ad ID is required for queue submission');
+    const job = await facebookRequest(`/ads?ad_account_id=${encodeURIComponent(adAccountId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': adData.id },
+        body: JSON.stringify({name: adData.name, status: adData.status || 'PAUSED', adset_id: adsetId, creative_id: creativeId}),
+    });
+    const deadline = Date.now() + 15 * 60 * 1000;
+    let current = job;
+    while (true) {
+        if (current.status === 'succeeded') return current.results.ad_id;
+        if (['failed', 'needs_reconciliation', 'cancelled'].includes(current.status)) throw new Error(current.error_message || `Posting ${current.status}`);
+        if (Date.now() >= deadline) throw new Error('Ad remains in the posting queue. Check its status before submitting again.');
+        await new Promise(resolve => setTimeout(resolve, DELIVERY_POLL_MS));
+        current = await deliveryRequest(`/jobs/${job.id}`);
     }
 }
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { CheckCircle2, Loader } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
 import { preflightCampaign } from '../lib/facebookApi';
@@ -89,14 +90,15 @@ export function CampaignReview({ onBack }) {
             <div className="text-center py-10">
                 <CheckCircle2 size={48} className="mx-auto text-success mb-4" />
                 <h2 className="text-2xl font-bold mb-3">
-                    {state.adsData.length} paused ads created
+                    {state.adsData.length} paused ads {publishProgress.queued ? 'queued' : 'created'}
                 </h2>
                 <p className="text-secondary">
-                    Review and activate them in Meta Ads Manager when ready.
+                    {publishProgress.queued ? 'Your ads will post at the shared cadence. Follow their progress in the posting queue.' : 'Review and activate them in Meta Ads Manager when ready.'}
                 </p>
                 <p className="text-sm text-muted mt-3">
                     Campaign: {publishProgress.campaignId} · Ad set: {publishProgress.adsetId}
                 </p>
+                {publishProgress.queued && <Link to="/posting-queue" className="studio-button mt-4">View posting queue</Link>}
                 <button
                     onClick={resetWizard}
                     className="mt-6 px-5 py-3 bg-brand text-white rounded-lg"
@@ -117,7 +119,7 @@ export function CampaignReview({ onBack }) {
             )}
             <p className="text-secondary mb-6">
                 Confirm the campaign, targeting, identity, and every ad below. New objects will be
-                created PAUSED.
+                created PAUSED. Ads enter the shared posting queue after campaign and ad set setup.
             </p>
             <ValidationErrors errors={errors} />
             {loading && (
@@ -282,8 +284,8 @@ export function CampaignReview({ onBack }) {
                     className="px-6 py-3 bg-green-700 text-white rounded-lg disabled:opacity-40"
                 >
                     {publishing
-                        ? 'Creating paused ads…'
-                        : `Create ${state.adsData.length} paused ads on Facebook`}
+                        ? 'Queueing paused ads…'
+                        : `Queue ${state.adsData.length} paused ads on Facebook`}
                 </button>
             </div>
         </div>

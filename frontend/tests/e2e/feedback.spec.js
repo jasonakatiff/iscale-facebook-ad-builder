@@ -28,9 +28,9 @@ test('draft restores campaign input and clears only on discard', async ({ page }
     await expect(page.getByRole('heading', { name: 'Select Ad Account' })).toBeVisible();
 });
 
-// Uses the real app/API/PostgreSQL with Meta mocked only at its SDK transport.
+// Uses real app/API/PostgreSQL, simulated Meta SDK transport and a durable-storage response.
 for (const interrupted of [false, true]) {
-    test(`review precedes Meta writes and ${interrupted ? 'interrupted publication cannot be repeated' : 'paused publication round trips'}`, async ({
+    test(`review precedes Meta writes and ${interrupted ? 'interrupted publication cannot be repeated' : 'paused queue submission round trips'}`, async ({
         page,
         request,
     }) => {
@@ -38,6 +38,8 @@ for (const interrupted of [false, true]) {
             process.env.TEST_META_FIXTURE !== '1',
             'Requires the isolated Meta fixture server',
         );
+        expect(new URL(metaUrlForIsolation()).hostname).toMatch(/^(localhost|127\.0\.0\.1)$/);
+        await page.route('**/api/v1/uploads/', route => route.fulfill({json: {url: 'https://example.com/test-queued-media.png'}}));
         if (interrupted) await page.setViewportSize({ width: 390, height: 844 });
         const metaUrl = process.env.TEST_META_URL || 'http://127.0.0.1:8017';
         const before = await (await request.get(`${metaUrl}/test-meta-calls`)).json();
@@ -150,7 +152,7 @@ for (const interrupted of [false, true]) {
             page.getByRole('heading', { name: 'Review & Launch', exact: true }),
         ).toBeVisible();
         await expect(
-            page.getByRole('button', { name: 'Create 1 paused ads on Facebook' }),
+            page.getByRole('button', { name: 'Queue 1 paused ads on Facebook' }),
         ).toBeEnabled();
         await expect(page.getByText('test-edited-ad', { exact: true })).toBeVisible();
         await page.screenshot({
@@ -161,7 +163,8 @@ for (const interrupted of [false, true]) {
         });
         const reviewedCalls = await (await request.get(`${metaUrl}/test-meta-calls`)).json();
         expect(reviewedCalls.filter((call) => call.method === 'POST')).toHaveLength(writesBefore);
-        await page.getByRole('button', { name: 'Create 1 paused ads on Facebook' }).click();
+        const submission = interrupted ? null : page.waitForRequest(req => req.url().endsWith('/delivery/launches') && req.method() === 'POST');
+        await page.getByRole('button', { name: 'Queue 1 paused ads on Facebook' }).click();
         if (interrupted) {
             await expect(
                 page.getByText('Publication needs reconciliation', { exact: true }),
@@ -171,7 +174,7 @@ for (const interrupted of [false, true]) {
                 page.getByText('Publication needs reconciliation', { exact: true }),
             ).toBeVisible();
             await expect(
-                page.getByRole('button', { name: 'Create 1 paused ads on Facebook' }),
+                page.getByRole('button', { name: 'Queue 1 paused ads on Facebook' }),
             ).toBeDisabled();
             const interruptedCalls = await (await request.get(`${metaUrl}/test-meta-calls`)).json();
             expect(interruptedCalls.filter((call) => call.method === 'POST')).toHaveLength(
@@ -179,7 +182,7 @@ for (const interrupted of [false, true]) {
             );
             return;
         }
-        await expect(page.getByRole('heading', { name: '1 paused ads created' })).toBeVisible({
+        await expect(page.getByRole('heading', { name: '1 paused ads queued' })).toBeVisible({
             timeout: 20000,
         });
         if (nativeHeaders) {
@@ -200,16 +203,15 @@ for (const interrupted of [false, true]) {
         expect(targeting.facebook_positions).not.toContain('story');
         expect(targeting.custom_audiences).toEqual([{ id: '444' }]);
         expect(targeting.excluded_custom_audiences).toEqual([{ id: '445' }]);
-        const creative = writes.find((call) => call.path.endsWith('/adcreatives')).params;
-        const story =
-            typeof creative.object_story_spec === 'string'
-                ? JSON.parse(creative.object_story_spec)
-                : creative.object_story_spec;
-        expect(story.instagram_user_id).toBe('222');
-        expect(story.link_data.message).toBe('test-second-body');
-        expect(story.link_data.name).toBe('test-second-headline');
-        expect(creative.url_tags).toContain('ad_id={{ad.id}}');
+        const queued = (await submission).postDataJSON();
+        expect(queued.status).toBe('PAUSED');
+        expect(queued.instagram_user_id).toBe('222');
+        expect(queued.primary_text).toBe('test-second-body');
+        expect(queued.headline).toBe('test-second-headline');
+        expect(queued.url_tags).toContain('ad_id={{ad.id}}');
         await page.getByRole('button', { name: 'Start a new campaign' }).click();
         await expect(page.getByRole('heading', { name: 'Select Ad Account' })).toBeVisible();
     });
 }
+
+function metaUrlForIsolation() { return process.env.TEST_META_URL || 'http://127.0.0.1:8017'; }

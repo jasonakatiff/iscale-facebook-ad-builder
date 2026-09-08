@@ -1,10 +1,7 @@
+import { deliveryRequest, prepareQueueMedia } from './delivery';
 import {
     createFacebookCampaign,
     createFacebookAdSet,
-    createFacebookCreative,
-    createFacebookAd,
-    uploadImageToFacebook,
-    uploadVideoToFacebook,
     facebookRequest,
 } from './facebookApi';
 import { validateLeadRouterSelection } from './leadrouter';
@@ -167,55 +164,8 @@ async function publish(state, onCheckpoint, onStatus, nativeApi) {
             bodies: [state.creativeData.bodies[ad.bodyIndex]],
             headlines: [state.creativeData.headlines[ad.headlineIndex]],
         };
-        if (!item.imageHash && !item.video) {
-            onStatus(`Uploading media for ad ${index + 1} of ${state.adsData.length}…`);
-            if (isVideo)
-                item.video = await uploadVideoToFacebook(
-                    media.videoUrl || media.previewUrl,
-                    accountId,
-                );
-            else
-                item.imageHash = await uploadImageToFacebook(
-                    media.imageUrl || media.previewUrl,
-                    accountId,
-                );
-            await checkpoint();
-        }
-        if (!item.creativeId)
-            await remote(
-                `Create creative ${index + 1}`,
-                () =>
-                    createFacebookCreative(
-                        creative,
-                        item.imageHash,
-                        creative.pageId,
-                        accountId,
-                        item.video
-                            ? {
-                                  video_id: item.video.video_id,
-                                  thumbnail_url: item.video.thumbnails?.[0],
-                              }
-                            : null,
-                    ),
-                (id) => {
-                    item.creativeId = id;
-                },
-            );
-        if (!item.adId)
-            await remote(
-                `Create paused ad ${index + 1} of ${state.adsData.length}`,
-                () =>
-                    createFacebookAd(
-                        { ...ad, status: 'PAUSED' },
-                        progress.adsetId,
-                        item.creativeId,
-                        accountId,
-                    ),
-                (id) => {
-                    item.adId = id;
-                },
-            );
-        if (!item.saved) {
+        if (item.saved || item.jobId) continue;
+        if (item.adId) {
             await facebookRequest('/ads/save', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -241,8 +191,39 @@ async function publish(state, onCheckpoint, onStatus, nativeApi) {
             });
             item.saved = true;
             await checkpoint();
+            continue;
         }
+        if (!item.submission) {
+            onStatus(`Preparing media for ad ${index + 1} of ${state.adsData.length}…`);
+            const mediaUrl = await prepareQueueMedia(media);
+            item.submission = {
+                request_key: ad.id,
+                account_id: accountId,
+                name: ad.name,
+                local_adset_id: adset.id,
+                page_id: creative.pageId,
+                media_url: mediaUrl,
+                media_type: isVideo ? 'video' : 'image',
+                thumbnail_url: media.thumbnailUrl || item.video?.thumbnails?.[0] || null,
+                primary_text: creative.bodies[0],
+                headline: creative.headlines[0],
+                description: creative.description || '',
+                website_url: creative.websiteUrl,
+                cta: creative.cta || 'LEARN_MORE',
+                status: 'PAUSED',
+                instagram_user_id: creative.instagramId || null,
+                url_tags: creative.urlParameters || '',
+                generated_ad_id: media.generatedAdId || null,
+                resume_creative_id: item.creativeId || null,
+            };
+            await checkpoint();
+        }
+        onStatus(`Queueing ad ${index + 1} of ${state.adsData.length}…`);
+        const job = await deliveryRequest('/launches', { method: 'POST', body: item.submission });
+        item.jobId = job.id;
+        await checkpoint();
     }
+    progress.queued = true;
     progress.complete = true;
     await checkpoint();
     return progress;
