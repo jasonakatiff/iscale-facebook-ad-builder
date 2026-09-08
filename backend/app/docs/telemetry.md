@@ -1,8 +1,6 @@
 # Debugging Ad Studio with an agent
 
-Telemetry connects browser activity, API requests, database timings, provider calls, background work and feedback. An active administrator can create a key at `/settings/api-keys` with **Diagnostics and feedback** access. Give an agent that key through its credential store and this API base:
-
-`https://ad-builder-backend-production.up.railway.app/api/v1/telemetry`
+Telemetry connects browser activity, API requests, database timings, provider calls, background work and feedback. An active administrator can create a key at `/settings/api-keys` with **Diagnostics and feedback** access. Give an agent that key through its credential store and the Backend origin for the installation that issued it. The telemetry base is that origin plus `/api/v1/telemetry`; there is no shared public diagnostics endpoint.
 
 The **Telemetry** page is available to platform administrators. This guide is also published in Help and the downloadable documentation bundle.
 
@@ -10,11 +8,11 @@ The **Telemetry** page is available to platform administrators. This guide is al
 
 Diagnostics keys use `Authorization: Bearer` (or `X-API-Key` on telemetry endpoints), expire after 1–365 days (90 by default), and grant `telemetry:read` and `feedback:write`. Keys do not authenticate against business APIs. Only an admin's JWT session can create or revoke their keys. Raw keys appear once; only SHA-256 hashes persist. Revocation, owner deactivation and removal of the admin role take effect on the next request. Each user can hold 20 active keys across all access modes. Existing admin platform read keys can query diagnostics; platform write keys can also submit feedback. `/capabilities` reports the authenticated caller’s effective telemetry scopes. Workspace membership alone does not grant access to platform-wide telemetry.
 
-With `BREADWINNER_TELEMETRY_KEY` already present in the agent's process environment:
+With `BREADWINNER_API_URL` (the Backend HTTPS origin, without `/api/v1`) and `BREADWINNER_TELEMETRY_KEY` already present in the agent's process environment:
 
 ```bash
 curl --fail-with-body \
-  'https://ad-builder-backend-production.up.railway.app/api/v1/telemetry/capabilities' \
+  "$BREADWINNER_API_URL/api/v1/telemetry/capabilities" \
   -H "X-API-Key: $BREADWINNER_TELEMETRY_KEY"
 ```
 
@@ -35,7 +33,7 @@ Example agent feedback:
 
 ```bash
 curl --fail-with-body \
-  'https://ad-builder-backend-production.up.railway.app/api/v1/telemetry/feedback' \
+  "$BREADWINNER_API_URL/api/v1/telemetry/feedback" \
   -H "X-API-Key: $BREADWINNER_TELEMETRY_KEY" \
   -H 'Content-Type: application/json' \
   --data '{"category":"bug","message":"Generation failed after the provider timed out.","page":"/image-ads"}'
@@ -74,7 +72,7 @@ This is first-party telemetry, not a remote infrastructure console: it does not 
 
 ## Storage, limits and operation
 
-The additive Alembic migration `telemetry_20260907` follows `bw_leadrouter_001` and creates `telemetry_events`; credentials reuse the existing `api_keys` table, with time, trace, session, user, kind, error and request indexes. Railway's existing Docker startup runs `alembic upgrade head`. No existing business columns are renamed or removed.
+The additive Alembic migration `telemetry_20260907` follows `bw_leadrouter_001` and creates `telemetry_events`; credentials reuse the existing `api_keys` table, with time, trace, session, user, kind, error and request indexes. Railway's `startup.py` initializes and stamps empty databases, and applies Alembic migrations to existing versioned databases. No existing business columns are renamed or removed.
 
 | Process setting | Default / allowed range |
 | --- | --- |
