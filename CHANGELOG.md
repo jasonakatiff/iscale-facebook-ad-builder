@@ -6,6 +6,14 @@ Replace the legacy secret-writing wizard with process-environment validation and
 
 [Plan and test status](docs/plans/local-installers-v2.md): eight standalone setup checks and four isolated PostgreSQL integration tests passed locally, including actual setup reruns and provider decryption. Shell syntax and Compose configuration checks passed. All required PR checks passed, including the actual Compose stack, frontend proxy, worker, and container recreation with disposable storage. CI verified persistent owner/JWT/setup state, encrypted provider decryption, and media; all test containers, volumes, and networks were removed. Frontend checks passed 85 unit and 41 browser tests; five installation/telemetry browser tests used simulated AI. The 27 existing browser tests requiring a separate live app were skipped. No production data or paid provider calls used.
 
+## Public repository routing for agents — 2026-09-08
+
+Add canonical agent guidance for `jasonakatiff/theleadrouter-ad-studio`, require
+fetch/push and GitHub visibility checks, and treat the private repository as a
+historical reference. Align Claude instructions with the public v2 setup and
+isolated test data. Verify instruction links and repository identity; required
+GitHub checks apply to the documentation PR.
+
 ## Security: critical dependencies and exception privacy — 2026-09-08
 
 - Patch python-jose, Vitest/coverage and the transitive shell-quote dependency.

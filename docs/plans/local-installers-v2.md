@@ -49,6 +49,8 @@ Local evidence: the initial six helper tests failed because the v2 helper did no
 
 Frontend verification passed 85 unit tests, a production build, and 41 browser tests; 27 existing tests requiring a separate live app were skipped. The installation/telemetry workflow passed five browser tests with simulated AI. CodeQL and secret checks passed. Documentation support claims now correspond to verified local setup and Compose behavior. No paid AI generation, hosted deployment, or private-repository changes form part of this repair.
 
+The public repository routing guidance merged in PR #51 during verification. Preserve that guidance and its changelog entry, and update its setup references to the repaired paths. The full backend suite passed 521 tests with one existing XPASS; final documentation and main synchronization repeat the required checks before merge.
+
 ## Unresolved questions
 
 None.
