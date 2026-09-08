@@ -1,6 +1,6 @@
 # CodeQL security findings — 2026-09-08
 
-Status: in-progress
+Status: implementation verified; merge pending
 
 ## Outcome
 
@@ -29,7 +29,7 @@ unrelated dependency PR merges are included.
   bounded hostile inputs within a regression-test deadline.
 - [x] Each of the 17 critical/high alerts has a fix or an evidence-backed
   non-exploitable classification. No security alert is silently dismissed.
-- [ ] Focused regressions, the backend suite, and required GitHub checks pass.
+- [x] Focused regressions, the backend suite, and required GitHub checks pass.
 
 ## Phase 0: Tests
 
@@ -56,7 +56,17 @@ failures. After fixes, 139 focused tests passed (including an added URL-userinfo
 database tests use real local PostgreSQL. No browser UI behavior is being changed.
 The full backend suite passed: 504 passed and one pre-existing XPASS in 131.48 seconds.
 That run preceded the final redaction-order change; the affected 139-test group was
-then rerun successfully. GitHub CI will run the complete final revision.
+then rerun successfully. GitHub CI passed on implementation commit
+`d01b68ec4939e71fc48a75131d16e35602e8a447`: 505 backend tests passed with one
+pre-existing XPASS; frontend tests/build, installation journey, container
+startup/persistence, and CodeQL all passed. CodeQL reported zero new PR findings.
+Gitleaks and GitGuardian found no secrets in the patch. The optional Codecov upload
+failed because tokenless uploads are not enabled; it did not affect test execution.
+
+[PR #48 checks](https://github.com/jasonakatiff/theleadrouter-ad-studio/pull/48/checks)
+report the current revision's status. Implementation is verified; merging and
+production deployment have not been performed. Three task-owned local PostgreSQL
+databases were removed and their absence verified; no dev server remains.
 
 Detailed per-alert evidence is in
 [CodeQL triage](../security/codeql-triage-2026-09-08.md).

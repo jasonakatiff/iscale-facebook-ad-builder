@@ -8,7 +8,8 @@
   legacy video requests carry access tokens in headers.
 - Telemetry redaction avoids excessive regex backtracking on hostile strings.
 - [Plan and test status](docs/plans/security-codeql-findings.md): 139 focused tests
-  passed; backend suite passed 504 tests with one existing XPASS; GitHub CI pending. Includes evidence-based
+  passed; GitHub CI passed 505 backend tests with one existing XPASS, plus
+  frontend, installation, container persistence, and CodeQL checks. Includes evidence-based
   triage of all 17 critical/high CodeQL findings.
 
 ## README installation paths — 2026-09-08

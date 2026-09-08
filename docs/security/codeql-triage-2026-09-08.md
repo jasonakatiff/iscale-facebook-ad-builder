@@ -40,8 +40,10 @@ review. They do not establish that the entire application is vulnerability-free.
   slow redaction. Two additional API tests reproduced HTTP 500 instead of 422.
 - After implementation: 139 focused tests passed, including real local PostgreSQL
   API/OAuth/key/telemetry tests. Outbound provider transports were mocked.
-- Full backend suite: 504 passed, one existing XPASS. The final redaction-order
-  correction passed the 139-test affected group. GitHub CI status is tracked in the
+- Local backend suite: 504 passed, one existing XPASS. The final redaction-order
+  correction passed the 139-test affected group. GitHub CI then passed 505 backend
+  tests, frontend tests/build, installation, container persistence, and CodeQL
+  (zero new PR findings). Exact implementation commit and links are tracked in the
   [implementation plan](../plans/security-codeql-findings.md).
 - This task does not resolve the separate Dependabot backlog or the existing
   non-blocking Bandit/pip-audit/npm-audit workflow. Their alerts must not be treated
