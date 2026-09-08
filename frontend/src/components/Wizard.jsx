@@ -80,29 +80,29 @@ const Wizard = () => {
         <div className="max-w-6xl mx-auto">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900">Video Ad Builder</h1>
-                <p className="text-gray-600 mt-1">Create video ads with AI-generated content</p>
+                <h1 className="text-3xl font-bold text-foreground">Video Ad Builder</h1>
+                <p className="text-secondary mt-1">Create video ads with AI-generated content</p>
             </div>
 
             {/* Progress Bar */}
             <div className="mb-10">
-                <div className="flex items-center justify-between relative">
-                    <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-gray-200 -z-10"></div>
+                <div className="grid grid-cols-4 gap-y-4 sm:flex items-center justify-between relative">
+                    <div className="hidden sm:block absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-px bg-line -z-10"></div>
                     {steps.map((s) => {
                         const Icon = s.icon;
                         const isActive = s.id === step;
                         const isCompleted = s.id < step;
 
                         return (
-                            <div key={s.id} className="flex flex-col items-center bg-gray-50 px-2">
+                            <div key={s.id} className="flex flex-col items-center bg-subtle px-2">
                                 <div
-                                    className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-colors ${isActive ? 'bg-blue-600 text-white' :
-                                        isCompleted ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
+                                    className={`w-10 h-10 rounded-lg flex items-center justify-center mb-2 transition-colors ${isActive ? 'bg-brand text-white' :
+                                        isCompleted ? 'bg-green-500 text-white' : 'bg-soft text-muted'
                                         }`}
                                 >
                                     {isCompleted ? <Check size={20} /> : <Icon size={20} />}
                                 </div>
-                                <span className={`text-xs font-medium hidden md:block ${isActive ? 'text-blue-600' : 'text-gray-500'}`}>
+                                <span className={`text-xs font-medium hidden md:block ${isActive ? 'text-brand-ink' : 'text-muted'}`}>
                                     {s.name}
                                 </span>
                             </div>
@@ -112,23 +112,23 @@ const Wizard = () => {
             </div>
 
             {/* Step Content */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 min-h-[500px]">
+            <div className="bg-panel rounded-2xl shadow-sm border border-line p-8 min-h-[500px]">
 
                 {/* Step 1: Brand Selection */}
                 {step === 1 && (
                     <div>
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-2xl font-bold">Select a Brand</h2>
-                            <div className="flex bg-gray-100 p-1 rounded-lg">
+                            <div className="flex bg-inset p-1 rounded-lg">
                                 <button
                                     onClick={() => setViewMode('list')}
-                                    className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                                    className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-panel shadow-sm text-info' : 'text-muted hover:text-secondary'}`}
                                 >
                                     <List size={20} />
                                 </button>
                                 <button
                                     onClick={() => setViewMode('grid')}
-                                    className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                                    className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-panel shadow-sm text-info' : 'text-muted hover:text-secondary'}`}
                                 >
                                     <LayoutGrid size={20} />
                                 </button>
@@ -137,8 +137,8 @@ const Wizard = () => {
 
                         {brands.length === 0 ? (
                             <div className="text-center py-12">
-                                <p className="text-gray-500 mb-4">No brands found. Create a brand to get started.</p>
-                                <a href="/brands" className="text-blue-600 font-medium hover:underline">Go to Brand Management</a>
+                                <p className="text-muted mb-4">No brands found. Create a brand to get started.</p>
+                                <a href="/brands" className="text-info font-medium hover:underline">Go to Brand Management</a>
                             </div>
                         ) : (
                             <>
@@ -149,8 +149,8 @@ const Wizard = () => {
                                                 key={brand.id}
                                                 onClick={() => setActiveBrand(brand)}
                                                 className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${activeBrand?.id === brand.id
-                                                    ? 'border-blue-600 bg-blue-50'
-                                                    : 'border-gray-200 hover:border-blue-300'
+                                                    ? 'border-blue-600 bg-info-soft'
+                                                    : 'border-line hover:border-info-line'
                                                     }`}
                                             >
                                                 <div className="flex items-center gap-3 mb-3">
@@ -160,9 +160,9 @@ const Wizard = () => {
                                                     >
                                                         {brand.name.charAt(0)}
                                                     </div>
-                                                    <span className="font-bold text-gray-900">{brand.name}</span>
+                                                    <span className="font-bold text-foreground">{brand.name}</span>
                                                 </div>
-                                                <div className="text-xs text-gray-500">
+                                                <div className="text-xs text-muted">
                                                     {brand.products.length} Products • {brand.voice || 'No voice set'}
                                                 </div>
                                             </div>
@@ -188,8 +188,8 @@ const Wizard = () => {
                                                             }));
                                                         }}
                                                         className={`cursor-pointer p-4 transition-all flex items-center justify-between ${activeBrand?.id === brand.id
-                                                            ? 'border-blue-600 bg-blue-50'
-                                                            : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                                                            ? 'border-blue-600 bg-info-soft'
+                                                            : 'border-line hover:border-info-line hover:bg-subtle'
                                                             }`}
                                                     >
                                                         <div className="flex items-center gap-4">
@@ -200,8 +200,8 @@ const Wizard = () => {
                                                                 {brand.name.charAt(0)}
                                                             </div>
                                                             <div>
-                                                                <span className="font-bold text-gray-900 block">{brand.name}</span>
-                                                                <span className="text-xs text-gray-500">
+                                                                <span className="font-bold text-foreground block">{brand.name}</span>
+                                                                <span className="text-xs text-muted">
                                                                     {brand.products.length} Products • {brandProfiles.length} Profiles
                                                                 </span>
                                                             </div>
@@ -211,9 +211,9 @@ const Wizard = () => {
                                                                 <div className="w-4 h-4 rounded" style={{ backgroundColor: brand.colors.primary }}></div>
                                                                 <div className="w-4 h-4 rounded" style={{ backgroundColor: brand.colors.secondary }}></div>
                                                             </div>
-                                                            {activeBrand?.id === brand.id && <Check className="text-blue-600" size={20} />}
+                                                            {activeBrand?.id === brand.id && <Check className="text-info" size={20} />}
                                                             <ChevronRight
-                                                                className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                                                                className={`text-faint transition-transform ${isExpanded ? 'rotate-90' : ''}`}
                                                                 size={20}
                                                             />
                                                         </div>
@@ -221,22 +221,22 @@ const Wizard = () => {
 
                                                     {/* Customer Profiles (Collapsible) */}
                                                     {isExpanded && brandProfiles.length > 0 && (
-                                                        <div className="bg-gray-50 border-t border-gray-200 p-4">
-                                                            <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Customer Profiles</h4>
+                                                        <div className="bg-subtle border-t border-line p-4">
+                                                            <h4 className="text-xs font-semibold text-muted uppercase mb-2">Customer Profiles</h4>
                                                             <div className="space-y-2">
                                                                 {brandProfiles.map(profile => (
                                                                     <div
                                                                         key={profile.id}
-                                                                        className="bg-white p-3 rounded-lg border border-gray-200 text-sm"
+                                                                        className="bg-panel p-3 rounded-lg border border-line text-sm"
                                                                     >
-                                                                        <div className="font-medium text-gray-900 mb-1">{profile.name}</div>
+                                                                        <div className="font-medium text-foreground mb-1">{profile.name}</div>
                                                                         {profile.demographics && (
-                                                                            <div className="text-xs text-gray-600 mb-1">
+                                                                            <div className="text-xs text-secondary mb-1">
                                                                                 {profile.demographics}
                                                                             </div>
                                                                         )}
                                                                         {profile.pain_points && (
-                                                                            <div className="text-xs text-gray-500">
+                                                                            <div className="text-xs text-muted">
                                                                                 Pain Points: {profile.pain_points}
                                                                             </div>
                                                                         )}
@@ -258,8 +258,8 @@ const Wizard = () => {
                                 onClick={handleNext}
                                 disabled={!activeBrand}
                                 className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${activeBrand
-                                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                    ? 'bg-brand text-white hover:bg-brand-hover'
+                                    : 'bg-soft text-faint cursor-not-allowed'
                                     }`}
                             >
                                 Next Step <ChevronRight size={20} />

@@ -126,13 +126,13 @@ const BrandScrapes = () => {
 
     const getStatusBadge = (status) => {
         const styles = {
-            pending: 'bg-yellow-100 text-yellow-800',
-            scraping: 'bg-blue-100 text-blue-800',
-            completed: 'bg-green-100 text-green-800',
-            failed: 'bg-red-100 text-red-800'
+            pending: 'bg-warning-soft text-warning',
+            scraping: 'bg-info-soft text-info',
+            completed: 'bg-success-soft text-success',
+            failed: 'bg-danger-soft text-danger'
         };
         return (
-            <span className={`px-2 py-1 text-xs font-medium rounded-full ${styles[status] || 'bg-gray-100 text-gray-800'}`}>
+            <span className={`px-2 py-1 text-xs font-medium rounded-full ${styles[status] || 'bg-inset text-foreground'}`}>
                 {status}
             </span>
         );
@@ -152,12 +152,12 @@ const BrandScrapes = () => {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-amber-900">Scrape Brand Ads</h1>
-                    <p className="text-amber-600 text-sm">Download all ads from a Facebook page to R2 storage</p>
+                    <h1 className="text-2xl font-bold text-brand-ink">Scrape Brand Ads</h1>
+                    <p className="text-brand-ink text-sm">Download all ads from a Facebook page to R2 storage</p>
                 </div>
                 <button
                     onClick={fetchScrapes}
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-lg"
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-brand-ink hover:text-brand-ink hover:bg-brand-soft rounded-lg"
                 >
                     <RefreshCw size={16} />
                     Refresh
@@ -165,11 +165,11 @@ const BrandScrapes = () => {
             </div>
 
             {/* Scrape Form */}
-            <div className="bg-white rounded-xl border border-amber-200 p-6">
-                <h2 className="text-lg font-semibold text-amber-900 mb-4">New Brand Scrape</h2>
+            <div className="bg-panel rounded-xl border border-brand-line p-6">
+                <h2 className="text-lg font-semibold text-brand-ink mb-4">New Brand Scrape</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label htmlFor="brandName" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="brandName" className="block text-sm font-medium text-secondary mb-1">
                             Brand Name
                         </label>
                         <input
@@ -179,12 +179,12 @@ const BrandScrapes = () => {
                             value={brandName}
                             onChange={(e) => setBrandName(e.target.value)}
                             placeholder="e.g., Nike, Apple, etc."
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                            className="w-full px-4 py-2 border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                         />
-                        <p className="text-xs text-gray-500 mt-1">This will be the folder name on R2 storage</p>
+                        <p className="text-xs text-muted mt-1">This will be the folder name on R2 storage</p>
                     </div>
                     <div>
-                        <label htmlFor="pageInput" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="pageInput" className="block text-sm font-medium text-secondary mb-1">
                             Facebook Page ID or Ads Library URL
                         </label>
                         <input
@@ -194,16 +194,16 @@ const BrandScrapes = () => {
                             value={pageInput}
                             onChange={(e) => setPageInput(e.target.value)}
                             placeholder="123456789 or https://www.facebook.com/ads/library/?...&view_all_page_id=123456789"
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                            className="w-full px-4 py-2 border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                         />
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-muted mt-1">
                             Paste a Page ID or full Ads Library URL - we'll handle the rest
                         </p>
                     </div>
                     <button
                         type="submit"
                         disabled={loading}
-                        className="flex items-center gap-2 px-6 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:bg-amber-300 disabled:cursor-not-allowed"
+                        className="flex items-center gap-2 px-6 py-2 bg-brand text-white rounded-lg hover:bg-brand-hover disabled:bg-amber-300 disabled:cursor-not-allowed"
                     >
                         {loading ? (
                             <>
@@ -221,13 +221,13 @@ const BrandScrapes = () => {
             </div>
 
             {/* Scrapes List */}
-            <div className="bg-white rounded-xl border border-amber-200">
-                <div className="p-4 border-b border-amber-100">
-                    <h2 className="text-lg font-semibold text-amber-900">Brand Scrapes</h2>
+            <div className="bg-panel rounded-xl border border-brand-line">
+                <div className="p-4 border-b border-brand-line">
+                    <h2 className="text-lg font-semibold text-brand-ink">Brand Scrapes</h2>
                 </div>
 
                 {scrapes.length === 0 ? (
-                    <div className="p-8 text-center text-gray-500">
+                    <div className="p-8 text-center text-muted">
                         No brand scrapes yet. Start one above!
                     </div>
                 ) : (
@@ -235,11 +235,11 @@ const BrandScrapes = () => {
                         {scrapes.map((scrape) => (
                             <div key={scrape.id}>
                                 <div
-                                    className="p-4 hover:bg-amber-50 cursor-pointer flex items-center justify-between"
+                                    className="p-4 hover:bg-brand-soft cursor-pointer flex items-center justify-between"
                                     onClick={() => handleExpand(scrape.id)}
                                 >
                                     <div className="flex items-center gap-4">
-                                        <button className="text-amber-600">
+                                        <button className="text-brand-ink">
                                             {expandedScrape === scrape.id ? (
                                                 <ChevronDown size={20} />
                                             ) : (
@@ -247,23 +247,23 @@ const BrandScrapes = () => {
                                             )}
                                         </button>
                                         <div>
-                                            <h3 className="font-medium text-gray-900">{scrape.brand_name}</h3>
-                                            <p className="text-sm text-gray-500">
+                                            <h3 className="font-medium text-foreground">{scrape.brand_name}</h3>
+                                            <p className="text-sm text-muted">
                                                 {scrape.page_name || `Page ID: ${scrape.page_id}`}
                                             </p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-6">
                                         <div className="text-right">
-                                            <p className="text-sm font-medium text-gray-900">
+                                            <p className="text-sm font-medium text-foreground">
                                                 {scrape.total_ads} ads
                                             </p>
-                                            <p className="text-xs text-gray-500">
+                                            <p className="text-xs text-muted">
                                                 {scrape.media_downloaded} media files
                                             </p>
                                         </div>
                                         {getStatusBadge(scrape.status)}
-                                        <span className="text-xs text-gray-400">
+                                        <span className="text-xs text-faint">
                                             {formatDate(scrape.created_at)}
                                         </span>
                                         <button
@@ -271,7 +271,7 @@ const BrandScrapes = () => {
                                                 e.stopPropagation();
                                                 confirmDelete(scrape);
                                             }}
-                                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                                            className="p-2 text-danger hover:bg-danger-soft rounded-lg"
                                         >
                                             <Trash2 size={16} />
                                         </button>
@@ -280,9 +280,9 @@ const BrandScrapes = () => {
 
                                 {/* Expanded Details */}
                                 {expandedScrape === scrape.id && scrapeDetails && (
-                                    <div className="px-4 pb-4 bg-amber-50/50">
+                                    <div className="px-4 pb-4 bg-brand-soft/50">
                                         {scrape.error_message && (
-                                            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                                            <div className="mb-4 p-3 bg-danger-soft border border-danger-line rounded-lg text-sm text-danger">
                                                 {scrape.error_message}
                                             </div>
                                         )}
@@ -292,10 +292,10 @@ const BrandScrapes = () => {
                                                 {scrapeDetails.ads.map((ad) => (
                                                     <div
                                                         key={ad.id}
-                                                        className="bg-white rounded-lg border border-amber-200 overflow-hidden"
+                                                        className="bg-panel rounded-lg border border-brand-line overflow-hidden"
                                                     >
                                                         {/* Media Preview */}
-                                                        <div className="aspect-video bg-gray-100 relative">
+                                                        <div className="aspect-video bg-inset relative">
                                                             {ad.media_urls && ad.media_urls.length > 0 ? (
                                                                 ad.media_type === 'video' ? (
                                                                     <video
@@ -311,7 +311,7 @@ const BrandScrapes = () => {
                                                                     />
                                                                 )
                                                             ) : (
-                                                                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                                                <div className="w-full h-full flex items-center justify-center text-faint">
                                                                     <Image size={32} />
                                                                 </div>
                                                             )}
@@ -336,7 +336,7 @@ const BrandScrapes = () => {
                                                         <div className="p-3">
                                                             {ad.page_name && (
                                                                 <div className="flex items-center gap-1 mb-1">
-                                                                    <span className="text-xs font-medium text-indigo-600 truncate">
+                                                                    <span className="text-xs font-medium text-highlight truncate">
                                                                         {ad.page_name}
                                                                     </span>
                                                                     {ad.page_link && (
@@ -344,7 +344,7 @@ const BrandScrapes = () => {
                                                                             href={ad.page_link}
                                                                             target="_blank"
                                                                             rel="noopener noreferrer"
-                                                                            className="text-indigo-400 hover:text-indigo-600 flex-shrink-0"
+                                                                            className="text-highlight hover:text-highlight flex-shrink-0"
                                                                             onClick={(e) => e.stopPropagation()}
                                                                             title="View all ads from this page"
                                                                         >
@@ -354,22 +354,22 @@ const BrandScrapes = () => {
                                                                 </div>
                                                             )}
                                                             {ad.headline && (
-                                                                <p className="text-sm font-medium text-gray-900 line-clamp-2 mb-1">
+                                                                <p className="text-sm font-medium text-foreground line-clamp-2 mb-1">
                                                                     {ad.headline}
                                                                 </p>
                                                             )}
                                                             {ad.ad_copy && (
-                                                                <p className="text-xs text-gray-500 line-clamp-2 mb-1">
+                                                                <p className="text-xs text-muted line-clamp-2 mb-1">
                                                                     {ad.ad_copy}
                                                                 </p>
                                                             )}
                                                             {ad.cta_text && (
-                                                                <span className="inline-block px-2 py-0.5 text-xs bg-amber-100 text-amber-700 rounded mb-1">
+                                                                <span className="inline-block px-2 py-0.5 text-xs bg-brand-soft text-brand-ink rounded mb-1">
                                                                     {ad.cta_text}
                                                                 </span>
                                                             )}
                                                             <div className="mt-2 flex items-center justify-between">
-                                                                <span className="text-xs text-gray-400">
+                                                                <span className="text-xs text-faint">
                                                                     {ad.start_date || 'Unknown date'}
                                                                 </span>
                                                                 {ad.ad_link && (
@@ -377,7 +377,7 @@ const BrandScrapes = () => {
                                                                         href={ad.ad_link}
                                                                         target="_blank"
                                                                         rel="noopener noreferrer"
-                                                                        className="text-amber-600 hover:text-amber-800"
+                                                                        className="text-brand-ink hover:text-brand-ink"
                                                                         onClick={(e) => e.stopPropagation()}
                                                                         title="View ad in library"
                                                                     >
@@ -390,7 +390,7 @@ const BrandScrapes = () => {
                                                 ))}
                                             </div>
                                         ) : (
-                                            <div className="text-center py-8 text-gray-500">
+                                            <div className="text-center py-8 text-muted">
                                                 {scrape.status === 'scraping' ? (
                                                     <div className="flex items-center justify-center gap-2">
                                                         <Loader2 size={20} className="animate-spin" />
@@ -412,11 +412,11 @@ const BrandScrapes = () => {
             {/* Delete Confirmation Modal */}
             {showDeleteModal && scrapeToDelete && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    <div className="bg-panel rounded-xl p-6 max-w-md w-full mx-4">
+                        <h3 className="text-lg font-semibold text-foreground mb-2">
                             Delete Brand Scrape?
                         </h3>
-                        <p className="text-gray-600 mb-4">
+                        <p className="text-secondary mb-4">
                             This will delete all {scrapeToDelete.total_ads} ads and {scrapeToDelete.media_downloaded} media files from R2 storage. This action cannot be undone.
                         </p>
                         <div className="flex gap-3 justify-end">
@@ -425,7 +425,7 @@ const BrandScrapes = () => {
                                     setShowDeleteModal(false);
                                     setScrapeToDelete(null);
                                 }}
-                                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                                className="px-4 py-2 text-secondary hover:bg-inset rounded-lg"
                             >
                                 Cancel
                             </button>

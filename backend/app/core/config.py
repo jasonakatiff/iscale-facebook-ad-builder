@@ -13,6 +13,8 @@ class Settings:
     # Where to send the browser after a successful OAuth connect flow
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
+    PUBLIC_API_URL: str = os.getenv("PUBLIC_API_URL", "").rstrip("/")
+
     # Database - PostgreSQL Required
     DATABASE_URL: str = os.getenv("DATABASE_URL")
     

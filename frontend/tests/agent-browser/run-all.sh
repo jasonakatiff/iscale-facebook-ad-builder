@@ -5,6 +5,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FAILED=0
 PASSED=0
+SMOKE_SESSION_PREFIX="${AGENT_BROWSER_SESSION:-test-breadwinner-smoke}-$$"
 
 echo "================================"
 echo "Agent-Browser Smoke Tests"
@@ -26,13 +27,13 @@ run_test() {
   echo "Running: $test_name"
   echo "----------------------------------------"
 
-  if bash "$test_script"; then
+  if AGENT_BROWSER_SESSION="${SMOKE_SESSION_PREFIX}-${PASSED}-${FAILED}" bash "$test_script"; then
     echo ""
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
   else
     echo ""
     echo "FAILED: $test_name"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
   fi
 }
 

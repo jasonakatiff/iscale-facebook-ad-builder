@@ -5,11 +5,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from unittest.mock import MagicMock, patch
+from cryptography.fernet import Fernet
 
 # For tests, use a SEPARATE dev database to avoid polluting production
 # Set TEST_DATABASE_URL env var or fallback to dev database
 
-os.environ.setdefault("OAUTH_TOKEN_ENCRYPTION_KEY", "YLYPoADkMGcJu-Eqq2n3Q-mql-fZ69SOiyrUm2tlJgs=")
+os.environ.setdefault("OAUTH_TOKEN_ENCRYPTION_KEY", Fernet.generate_key().decode())
 
 from app.main import app
 from app.core.rate_limit import limiter

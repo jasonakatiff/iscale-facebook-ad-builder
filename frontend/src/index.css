@@ -1,83 +1,192 @@
+@import "./styles/studio.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #FFFAF0;
-  /* Warm Off-White */
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* BreadWinner Theme Overrides */
 @layer base {
+  :root {
+    --studio-canvas: 246 247 248;
+    --studio-panel: 255 255 255;
+    --studio-elevated: 255 255 255;
+    --studio-subtle: 247 248 250;
+    --studio-inset: 238 240 243;
+    --studio-soft: 228 232 239;
+    --studio-foreground: 34 41 54;
+    --studio-secondary: 76 86 104;
+    --studio-muted: 92 102 119;
+    --studio-faint: 102 113 132;
+    --studio-line: 221 225 231;
+    --studio-line-soft: 235 237 242;
+    --studio-line-strong: 181 190 205;
+    --studio-brand: 41 90 212;
+    --studio-brand-hover: 33 73 176;
+    --studio-brand-ink: 41 90 212;
+    --studio-brand-soft: 234 240 255;
+    --studio-brand-line: 183 202 248;
+    --studio-success: 39 113 67;
+    --studio-success-soft: 232 243 234;
+    --studio-success-line: 176 212 182;
+    --studio-danger: 175 58 48;
+    --studio-danger-soft: 253 236 232;
+    --studio-danger-line: 238 193 184;
+    --studio-info: 49 103 146;
+    --studio-info-soft: 232 241 248;
+    --studio-info-line: 179 206 226;
+    --studio-highlight: 111 81 153;
+    --studio-highlight-soft: 241 234 249;
+    --studio-highlight-line: 211 195 230;
+    --studio-warning: 147 88 18;
+    --studio-warning-soft: 252 242 218;
+    --studio-warning-line: 229 207 153;
+  }
+  :root[data-theme="dark"] {
+    --studio-canvas: 23 26 32;
+    --studio-panel: 30 34 42;
+    --studio-elevated: 40 45 54;
+    --studio-subtle: 36 41 50;
+    --studio-inset: 25 29 36;
+    --studio-soft: 48 55 67;
+    --studio-foreground: 232 236 243;
+    --studio-secondary: 192 201 218;
+    --studio-muted: 172 182 197;
+    --studio-faint: 151 163 181;
+    --studio-line: 54 61 72;
+    --studio-line-soft: 44 50 62;
+    --studio-line-strong: 77 90 111;
+    --studio-brand: 41 90 212;
+    --studio-brand-hover: 48 103 239;
+    --studio-brand-ink: 154 183 255;
+    --studio-brand-soft: 41 55 83;
+    --studio-brand-line: 71 94 142;
+    --studio-success: 140 199 151;
+    --studio-success-soft: 32 53 36;
+    --studio-success-line: 60 94 66;
+    --studio-danger: 238 159 146;
+    --studio-danger-soft: 61 35 29;
+    --studio-danger-line: 106 61 50;
+    --studio-info: 145 189 220;
+    --studio-info-soft: 28 46 57;
+    --studio-info-line: 51 83 106;
+    --studio-highlight: 192 167 221;
+    --studio-highlight-soft: 47 37 60;
+    --studio-highlight-line: 87 65 114;
+    --studio-warning: 225 185 111;
+    --studio-warning-soft: 55 45 25;
+    --studio-warning-line: 105 85 46;
+  }
+  :root {
+    font-family:
+      Inter,
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      sans-serif;
+    color: rgb(var(--studio-foreground));
+    background: rgb(var(--studio-canvas));
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
   body {
-    @apply text-amber-900 bg-[#FFFAF0];
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    margin: 0;
+    min-width: 320px;
+    background: rgb(var(--studio-canvas));
+    color: rgb(var(--studio-foreground));
   }
-
-  /* Override default focus rings to amber */
-  *:focus-visible {
-    @apply outline-none ring-2 ring-amber-500 ring-offset-2;
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+  button,
+  [role="button"] {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not(
+      [type="range"]
+    ),
+  select,
+  textarea {
+    background-color: rgb(var(--studio-inset));
+    color: rgb(var(--studio-foreground));
+    border-color: rgb(var(--studio-line-strong));
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: rgb(var(--studio-faint));
+    opacity: 1;
+  }
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: rgb(var(--studio-brand));
+  }
+  select option {
+    background: rgb(var(--studio-panel));
+    color: rgb(var(--studio-foreground));
+  }
+  :focus-visible {
+    outline: 2px solid rgb(var(--studio-brand-ink));
+    outline-offset: 3px;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    color: rgb(var(--studio-foreground));
+    letter-spacing: -0.025em;
+  }
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+  ::selection {
+    background: rgb(var(--studio-brand-line));
+    color: rgb(var(--studio-foreground));
   }
 }
-
-/* Custom Scrollbar for that artisan feel */
+input[aria-invalid="true"],
+textarea[aria-invalid="true"],
+select[aria-invalid="true"] {
+  border-color: rgb(var(--studio-danger));
+  box-shadow: 0 0 0 1px rgb(var(--studio-danger));
+}
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
-
 ::-webkit-scrollbar-track {
-  background: #FFFBEB;
+  background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: #D97706;
-  border-radius: 4px;
+  background: rgb(var(--studio-line-strong));
+  border-radius: 8px;
 }
-
-::-webkit-scrollbar-thumb:hover {
-  background: #B45309;
-}
-
-/* Toast Animations */
 @keyframes slide-in {
   from {
-    transform: translateX(100%);
+    transform: translateY(-8px);
     opacity: 0;
   }
   to {
-    transform: translateX(0);
+    transform: translateY(0);
     opacity: 1;
   }
 }
-
 .animate-slide-in {
-  animation: slide-in 0.3s ease-out;
+  animation: slide-in 160ms ease-out;
 }
-
-/* Mobile heading scale (Sprint 8): page h1s across legacy pages were built
-   desktop-first at text-3xl/2xl. One media rule shrinks every page's h1/h2
-   on phones without touching 24+ JSX files. Component-level sm: classes
-   (Overview, TikTok, PerformanceTable) already handle their own scale and
-   keep working — this only adds a smaller floor under 640px. */
-@media (max-width: 639px) {
-  main h1 {
-    font-size: 1.5rem;
-    line-height: 2rem;
-  }
-  main h2 {
-    font-size: 1.25rem;
-    line-height: 1.75rem;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

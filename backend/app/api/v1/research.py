@@ -1,3 +1,4 @@
+from app.telemetry.runtime import capture_exception
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Tuple
@@ -418,6 +419,7 @@ def get_vertical_aggregated_ads(
             if row.page_name.lower() not in blacklisted_names
         ]
     except Exception as e:
+        capture_exception(e, "research.get_vertical_aggregated_ads")
         import traceback
         print(f"Error in get_vertical_aggregated_ads: {str(e)}")
         print(traceback.format_exc())
@@ -481,6 +483,7 @@ def get_vertical_page_ads(
             for ad in ads
         ]
     except Exception as e:
+        capture_exception(e, "research.get_vertical_page_ads")
         import traceback
         print(f"Error in get_vertical_page_ads: {str(e)}")
         print(traceback.format_exc())
@@ -531,6 +534,7 @@ async def create_brand_scrape(
             if scrape_record:
                 await scraper.scrape_brand(scrape_record)
         except Exception as e:
+            capture_exception(e, "research.run_scrape")
             print(f"Background scrape error: {e}")
             scrape_record = scrape_db.query(BrandScrape).filter(BrandScrape.id == brand_scrape.id).first()
             if scrape_record:

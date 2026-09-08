@@ -2,16 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft, Check, Loader, Plus } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
 import { useToast } from '../context/ToastContext';
-import { getCampaigns, createFacebookCampaign } from '../lib/facebookApi';
+import { getCampaigns } from '../lib/facebookApi';
+import { OBJECTIVES, SPECIAL_CATEGORIES, validateWizard } from '../lib/campaignWizard';
+import { minorToMoney } from '../lib/money';
+import { ValidationErrors } from './ValidationErrors';
+import { LocationPicker } from './LocationPicker';
+import { LeadRouterPicker } from './LeadRouterPicker';
 
-const CAMPAIGN_OBJECTIVES = [
-    { value: 'OUTCOME_SALES', label: 'Sales - Drive purchases and conversions' },
-    { value: 'OUTCOME_TRAFFIC', label: 'Traffic - Send people to your website' },
-    { value: 'OUTCOME_LEADS', label: 'Leads - Collect leads for your business' },
-    { value: 'OUTCOME_ENGAGEMENT', label: 'Engagement - Get more messages, video views, etc.' },
-    { value: 'OUTCOME_AWARENESS', label: 'Awareness - Reach people near your business' },
-    { value: 'OUTCOME_APP_PROMOTION', label: 'App Promotion - Get more app installs' }
-];
+const CAMPAIGN_OBJECTIVES = Object.entries(OBJECTIVES).map(([value, config]) => ({ value, label: config.label }));
 
 const BID_STRATEGIES = [
     { value: 'LOWEST_COST_WITHOUT_CAP', label: 'Lowest Cost (Highest Volume or Value, No Cap)' },
@@ -20,41 +18,29 @@ const BID_STRATEGIES = [
 ];
 
 const CampaignStep = ({ onNext, onBack }) => {
-    const { campaignData, setCampaignData, selectedAdAccount, setSelectedAdAccount } = useCampaign();
-    const { showError, showWarning } = useToast();
-    const [mode, setMode] = useState('new'); // 'new' or 'existing'
+    const { state, campaignData, setCampaignData, selectedAdAccount, leadRouter, setLeadRouter } = useCampaign();
+    const { showError } = useToast();
+    const [mode, setMode] = useState(campaignData.isExisting ? 'existing' : 'new'); // 'new' or 'existing'
     const [existingCampaigns, setExistingCampaigns] = useState([]);
-    const [selectedCampaign, setSelectedCampaign] = useState(null);
-    const [loading, setLoading] = useState(false);
+    const [selectedCampaign, setSelectedCampaign] = useState(campaignData.isExisting ? campaignData : null);
+    const [errors, setErrors] = useState([]);
+    const loading = false;
     const [loadingCampaigns, setLoadingCampaigns] = useState(false);
 
     useEffect(() => {
-        // Fetch campaigns when switching to existing mode
-        if (mode === 'existing' && selectedAdAccount) {
-            fetchExistingCampaigns();
-        }
-    }, [mode, selectedAdAccount]);
-
-    const fetchExistingCampaigns = async () => {
-        if (!selectedAdAccount) return;
-
-        setLoadingCampaigns(true);
-        try {
-            const campaigns = await getCampaigns(selectedAdAccount.id);
-            setExistingCampaigns(campaigns);
-        } catch (error) {
-            console.error('Error fetching campaigns:', error);
-            showError(`Error fetching campaigns: ${error.message}`);
-        } finally {
-            setLoadingCampaigns(false);
-        }
-    };
+        if (mode !== 'existing' || !selectedAdAccount) return;
+        let active = true;
+        getCampaigns(selectedAdAccount.id).then(campaigns => { if (active) setExistingCampaigns(campaigns); })
+            .catch(error => { if (active) showError(`Error fetching campaigns: ${error.message}`); })
+            .finally(() => { if (active) setLoadingCampaigns(false); });
+        return () => { active = false; };
+    }, [mode, selectedAdAccount, showError]);
 
     const handleSelectExisting = (campaign) => {
         setSelectedCampaign(campaign);
 
-        const dailyBudget = campaign.dailyBudget ? parseInt(campaign.dailyBudget) / 100 : 0;
-        const lifetimeBudget = campaign.lifetimeBudget ? parseInt(campaign.lifetimeBudget) / 100 : 0;
+        const dailyBudget = minorToMoney(campaign.dailyBudget || 0);
+        const lifetimeBudget = campaign.lifetimeBudget || '0';
 
         // CBO campaigns have budget set at campaign level
         // ABO campaigns have budget set at ad set level (campaign budget is 0 or null)
@@ -78,77 +64,48 @@ const CampaignStep = ({ onNext, onBack }) => {
         }));
     };
 
-    const handleNext = async () => {
-        if (mode === 'existing' && !selectedCampaign) {
-            showWarning('Please select a campaign');
-            return;
-        }
-
-        if (mode === 'existing') {
-            // For existing campaigns, we just use the selected data
-            // No need to call API or create anything new
-            // The data is already set in handleSelectExisting
-        }
-
-        if (mode === 'new') {
-            if (!campaignData.name || !campaignData.objective) {
-                showWarning('Please fill in all required fields');
-                return;
-            }
-
-            if (campaignData.budgetType === 'CBO' && (!campaignData.dailyBudget || campaignData.dailyBudget <= 0)) {
-                showWarning('Please enter a valid Daily Budget for CBO campaign');
-                return;
-            }
-
-            // Validate Bid Amount if strategy requires it (for CBO campaigns)
-            if (campaignData.budgetType === 'CBO' &&
-                (campaignData.bidStrategy === 'LOWEST_COST_WITH_BID_CAP' || campaignData.bidStrategy === 'COST_CAP') &&
-                (!campaignData.bidAmount || campaignData.bidAmount <= 0)) {
-                showWarning('Please enter a valid Bid Amount for the selected bid strategy');
-                return;
-            }
-
-            // For new campaigns, we just prepare the data
-            // The actual creation happens in the final step (BulkAdCreation)
-            const id = `camp_${Date.now()}`;
-            setCampaignData(prev => ({ ...prev, id }));
-        }
-
+    const handleNext = () => {
+        const found = mode === 'existing' && !selectedCampaign ? [{ field: 'campaignData.name', message: 'Select a campaign.' }] : validateWizard(state, 2);
+        setErrors(found);
+        if (found.length) { document.getElementById(found[0].field)?.focus(); return; }
+        if (!campaignData.id) setCampaignData(previous => ({ ...previous, id: crypto.randomUUID() }));
         onNext();
     };
 
     return (
-        <div>
-            <h2 className="text-2xl font-bold mb-6">Campaign Setup</h2>
+        <div className="campaign-setup">
+            <h2 className="text-lg font-semibold mb-3">Campaign Setup</h2>
+            <ValidationErrors errors={errors} />
+            <div className="mb-3"><LeadRouterPicker value={leadRouter} onChange={setLeadRouter} /></div>
 
             {/* Mode Toggle */}
-            <div className="flex gap-4 mb-6">
+            <div className="campaign-mode flex gap-3 mb-4">
                 <button
                     onClick={() => {
                         setMode('new');
                         setCampaignData(prev => ({
                             ...prev,
+                            id: null,
                             isExisting: false,
                             fbCampaignId: null
                         }));
                     }}
-                    className={`flex-1 p-4 rounded-xl border-2 transition-all ${mode === 'new'
-                        ? 'border-amber-600 bg-amber-50'
-                        : 'border-gray-200 hover:border-amber-300'
+                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border transition-all ${mode === 'new'
+                        ? 'border-amber-600 bg-brand-soft'
+                        : 'border-line hover:border-brand-line'
                         }`}
                 >
-                    <Plus className="mx-auto mb-2" size={24} />
+                    <Plus size={18} />
                     <div className="font-semibold">Create New Campaign</div>
                 </button>
                 <button
-                    onClick={() => setMode('existing')}
-                    className={`flex-1 p-4 rounded-xl border-2 transition-all ${mode === 'existing'
-                        ? 'border-amber-600 bg-amber-50'
-                        : 'border-gray-200 hover:border-amber-300'
+                    onClick={() => { setLoadingCampaigns(true); setMode('existing'); }}
+                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border transition-all ${mode === 'existing'
+                        ? 'border-amber-600 bg-brand-soft'
+                        : 'border-line hover:border-brand-line'
                         }`}
                 >
-                    <Check className="mx-auto mb-2" size={24} />
+                    <Check size={18} />
                     <div className="font-semibold">Use Existing Campaign</div>
                 </button>
             </div>
@@ -158,37 +115,37 @@ const CampaignStep = ({ onNext, onBack }) => {
                 <div className="space-y-4 mb-6">
                     {/* Existing Campaigns */}
                     <div>
-                        <h3 className="font-semibold text-gray-700 mb-3">Select a Campaign</h3>
+                        <h3 className="font-semibold text-secondary mb-3">Select a Campaign</h3>
                         {loadingCampaigns ? (
-                            <div className="flex items-center justify-center gap-2 text-gray-500 py-8">
+                            <div className="flex items-center justify-center gap-2 text-muted py-8">
                                 <Loader className="animate-spin" size={20} />
                                 <span>Loading campaigns from Facebook...</span>
                             </div>
                         ) : existingCampaigns.length === 0 ? (
-                            <p className="text-gray-500 text-center py-8">No campaigns found in this ad account.</p>
+                            <p className="text-muted text-center py-8">No campaigns found in this ad account.</p>
                         ) : (
                             existingCampaigns.map(campaign => (
                                 <div
                                     key={campaign.id}
                                     onClick={() => handleSelectExisting(campaign)}
                                     className={`p-4 rounded-xl border-2 cursor-pointer transition-all mb-2 ${selectedCampaign?.id === campaign.id
-                                        ? 'border-amber-600 bg-amber-50'
-                                        : 'border-gray-200 hover:border-amber-300'
+                                        ? 'border-amber-600 bg-brand-soft'
+                                        : 'border-line hover:border-brand-line'
                                         }`}
                                 >
                                     <div className="flex justify-between items-start">
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2">
-                                                <div className="font-bold text-gray-900">{campaign.name}</div>
-                                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${campaign.status === 'ACTIVE' ? 'bg-green-100 text-green-700' :
-                                                    campaign.status === 'PAUSED' ? 'bg-yellow-100 text-yellow-700' :
-                                                        'bg-gray-100 text-gray-700'
+                                                <div className="font-bold text-foreground">{campaign.name}</div>
+                                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${campaign.status === 'ACTIVE' ? 'bg-success-soft text-success' :
+                                                    campaign.status === 'PAUSED' ? 'bg-warning-soft text-warning' :
+                                                        'bg-inset text-secondary'
                                                     }`}>
                                                     {campaign.status}
                                                 </span>
                                             </div>
-                                            <div className="text-sm text-gray-500 mt-1">
-                                                <span className="font-medium text-gray-700">
+                                            <div className="text-sm text-muted mt-1">
+                                                <span className="font-medium text-secondary">
                                                     {(campaign.dailyBudget || campaign.lifetimeBudget) ? 'CBO' : 'ABO'}
                                                 </span>
                                                 {' • '}{campaign.objective}
@@ -197,7 +154,7 @@ const CampaignStep = ({ onNext, onBack }) => {
                                             </div>
                                         </div>
                                         {selectedCampaign?.id === campaign.id && (
-                                            <Check className="text-amber-600" size={20} />
+                                            <Check className="text-brand-ink" size={20} />
                                         )}
                                     </div>
                                 </div>
@@ -209,28 +166,28 @@ const CampaignStep = ({ onNext, onBack }) => {
 
             {/* New Campaign Form */}
             {mode === 'new' && (
-                <div className="space-y-4">
+                <div className="campaign-fields">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="campaignData.name" className="block text-sm font-medium text-secondary mb-2">
                             Campaign Name *
                         </label>
                         <input
                             type="text"
-                            value={campaignData.name}
+                            id="campaignData.name" aria-invalid={errors.some(error => error.field === 'campaignData.name')} value={campaignData.name}
                             onChange={(e) => handleInputChange('name', e.target.value)}
                             placeholder="Summer Sale Campaign"
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                            className="w-full px-4 py-2 border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="campaignData.objective" className="block text-sm font-medium text-secondary mb-2">
                             Campaign Objective *
                         </label>
                         <select
-                            value={campaignData.objective}
+                            id="campaignData.objective" aria-invalid={errors.some(error => error.field === 'campaignData.objective')} value={campaignData.objective}
                             onChange={(e) => handleInputChange('objective', e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                            className="w-full px-4 py-2 border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                         >
                             <option value="">Select objective...</option>
                             {CAMPAIGN_OBJECTIVES.map(obj => (
@@ -239,8 +196,15 @@ const CampaignStep = ({ onNext, onBack }) => {
                         </select>
                     </div>
 
+                    <fieldset className="campaign-categories space-y-2 border-t border-line pt-3">
+                        <legend className="text-sm font-medium">Special Ad Category</legend>
+                        <p className="text-xs text-muted">Select every category that applies to this campaign.</p>
+                        <div className="flex flex-wrap gap-x-5 gap-y-2">{SPECIAL_CATEGORIES.map(category => <label key={category} className="flex gap-2 text-sm"><input type="checkbox" checked={campaignData.specialAdCategories?.includes(category) || false} onChange={event => handleInputChange('specialAdCategories', event.target.checked ? [...(campaignData.specialAdCategories || []), category] : campaignData.specialAdCategories.filter(value => value !== category))} />{category.replaceAll('_', ' ')}</label>)}</div>
+                        {!!campaignData.specialAdCategories?.length && <LocationPicker countriesOnly accountId={selectedAdAccount.id} targeting={{ geo_locations: { countries: campaignData.specialAdCategoryCountries || [] } }} onChange={targeting => handleInputChange('specialAdCategoryCountries', targeting.geo_locations.countries)} />}
+                    </fieldset>
+
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-secondary mb-2">
                             Budget Type *
                         </label>
                         <div className="grid grid-cols-2 gap-4">
@@ -248,23 +212,23 @@ const CampaignStep = ({ onNext, onBack }) => {
                                 type="button"
                                 onClick={() => handleInputChange('budgetType', 'ABO')}
                                 className={`p-3 rounded-lg border-2 transition-all ${campaignData.budgetType === 'ABO'
-                                    ? 'border-amber-600 bg-amber-50'
-                                    : 'border-gray-200 hover:border-amber-300'
+                                    ? 'border-amber-600 bg-brand-soft'
+                                    : 'border-line hover:border-brand-line'
                                     }`}
                             >
                                 <div className="font-semibold">ABO</div>
-                                <div className="text-xs text-gray-500">Ad Set Budget</div>
+                                <div className="text-xs text-muted">Ad Set Budget</div>
                             </button>
                             <button
                                 type="button"
                                 onClick={() => handleInputChange('budgetType', 'CBO')}
                                 className={`p-3 rounded-lg border-2 transition-all ${campaignData.budgetType === 'CBO'
-                                    ? 'border-amber-600 bg-amber-50'
-                                    : 'border-gray-200 hover:border-amber-300'
+                                    ? 'border-amber-600 bg-brand-soft'
+                                    : 'border-line hover:border-brand-line'
                                     }`}
                             >
                                 <div className="font-semibold">CBO</div>
-                                <div className="text-xs text-gray-500">Campaign Budget</div>
+                                <div className="text-xs text-muted">Campaign Budget</div>
                             </button>
                         </div>
                     </div>
@@ -272,33 +236,33 @@ const CampaignStep = ({ onNext, onBack }) => {
                     {campaignData.budgetType === 'CBO' && (
                         <>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Daily Budget (USD)
+                                <label className="block text-sm font-medium text-secondary mb-2">
+                                    Daily Budget ({selectedAdAccount?.currency || 'USD'})
                                 </label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <span className="text-gray-500">$</span>
+                                        <span className="text-muted">$</span>
                                     </div>
                                     <input
                                         type="number"
-                                        value={campaignData.dailyBudget || ''}
-                                        onChange={(e) => handleInputChange('dailyBudget', parseInt(e.target.value) || 0)}
+                                        id="campaignData.dailyBudget" aria-invalid={errors.some(error => error.field === 'campaignData.dailyBudget')} value={campaignData.dailyBudget || ''}
+                                        onChange={(e) => handleInputChange('dailyBudget', e.target.value)}
                                         placeholder="100"
-                                        min="1"
-                                        step="1"
-                                        className="w-full pl-7 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                        min={minorToMoney(selectedAdAccount?.minDailyBudget || 1)}
+                                        step="0.01"
+                                        className="w-full pl-7 pr-4 py-2 border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-secondary mb-2">
                                     Bid Strategy
                                 </label>
                                 <select
                                     value={campaignData.bidStrategy}
                                     onChange={(e) => handleInputChange('bidStrategy', e.target.value)}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                    className="w-full px-4 py-2 border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                                 >
                                     <option value="">Select bid strategy...</option>
                                     {BID_STRATEGIES.map(strategy => (
@@ -310,24 +274,24 @@ const CampaignStep = ({ onNext, onBack }) => {
                             {/* Bid Amount - Required for Cost Cap and Bid Cap strategies */}
                             {(campaignData.bidStrategy === 'COST_CAP' || campaignData.bidStrategy === 'LOWEST_COST_WITH_BID_CAP') && (
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-secondary mb-2">
                                         {campaignData.bidStrategy === 'COST_CAP' ? 'Cost Cap Amount (USD)' : 'Bid Cap Amount (USD)'} *
                                     </label>
                                     <div className="relative">
                                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <span className="text-gray-500">$</span>
+                                            <span className="text-muted">$</span>
                                         </div>
                                         <input
                                             type="number"
-                                            value={campaignData.bidAmount || ''}
-                                            onChange={(e) => handleInputChange('bidAmount', parseFloat(e.target.value) || 0)}
+                                            id="campaignData.bidAmount" aria-invalid={errors.some(error => error.field === 'campaignData.bidAmount')} value={campaignData.bidAmount || ''}
+                                            onChange={(e) => handleInputChange('bidAmount', e.target.value)}
                                             placeholder="10.00"
                                             min="0.01"
                                             step="0.01"
-                                            className="w-full pl-7 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                            className="w-full pl-7 pr-4 py-2 border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                                         />
                                     </div>
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <p className="text-xs text-muted mt-1">
                                         {campaignData.bidStrategy === 'COST_CAP'
                                             ? 'Maximum average cost per result you want to maintain'
                                             : 'Maximum bid amount for each auction'}
@@ -340,11 +304,11 @@ const CampaignStep = ({ onNext, onBack }) => {
             )}
 
             {/* Navigation */}
-            <div className="mt-8 flex justify-between">
+            <div className="campaign-actions mt-4 flex justify-between border-t border-line pt-3">
                 {onBack && (
                     <button
                         onClick={onBack}
-                        className="px-6 py-3 text-gray-600 hover:text-gray-800 font-medium"
+                        className="px-4 py-2.5 text-secondary hover:text-foreground font-medium"
                     >
                         Back
                     </button>
@@ -352,7 +316,7 @@ const CampaignStep = ({ onNext, onBack }) => {
                 <button
                     onClick={handleNext}
                     disabled={loading}
-                    className="ml-auto flex items-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    className="ml-auto flex items-center gap-2 px-4 py-2.5 bg-brand text-white rounded-lg font-medium hover:bg-brand-hover disabled:bg-line-strong disabled:cursor-not-allowed"
                 >
                     {loading ? 'Saving...' : 'Next Step'} <ChevronRight size={20} />
                 </button>

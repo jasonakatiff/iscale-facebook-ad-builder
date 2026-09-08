@@ -8,14 +8,18 @@ Email: jason@jasonakatiff.com
 """
 
 import os
-import re
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import request_validation_exception_handler
+from app.core.installation import InstallationError
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from app.telemetry.middleware import TelemetryMiddleware
+from app.telemetry.runtime import collector, emit
 from app.core.config import settings
 from app.core.rate_limit import limiter
 from app.core.oauth_state import clear_oauth_state_cookie
@@ -25,12 +29,28 @@ from app.core.oauth_state import clear_oauth_state_cookie
 from app.core import token_encryption  # noqa: F401
 
 app = FastAPI(
-    title="Facebook Ad Automation API",
+    title="BreadWinner API by theLeadRouter.com",
+    description="Automate research, creative generation, campaigns, reporting, and workspaces. Use a user API key in the Bearer Authorization header; keys inherit current user permissions. Download Markdown guides and the OpenAPI bundle from /api/v1/help/download.",
+    contact={"name": "theLeadRouter.com", "url": "https://theleadrouter.com"},
     version="1.0.0",
     openapi_url="/api/v1/openapi.json",
     docs_url="/api/v1/docs",
     redoc_url="/api/v1/redoc",
 )
+
+@app.exception_handler(InstallationError)
+async def installation_error_handler(request, exc):
+    return JSONResponse(status_code=exc.status_code, content=exc.body(), headers={"Cache-Control": "no-store"})
+
+
+@app.exception_handler(RequestValidationError)
+async def safe_validation_handler(request, exc):
+    if request.url.path.startswith("/api/v1/installation"):
+        return JSONResponse(status_code=422, content={"error": {
+            "code": "invalid_input", "message": "Check the form values and paste a complete API key without spaces.",
+            "details": None}}, headers={"Cache-Control": "no-store"})
+    return await request_validation_exception_handler(request, exc)
+
 
 # Register rate limiter
 app.state.limiter = limiter
@@ -69,6 +89,8 @@ async def add_security_headers(request: Request, call_next):
 trusted_proxies = os.getenv("TRUSTED_PROXIES", "*")
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=[trusted_proxies] if trusted_proxies != "*" else ["*"])
 
+app.add_middleware(TelemetryMiddleware)
+
 # CORS origins from env var or defaults
 default_origins = [
     "http://localhost:5173",
@@ -84,8 +106,8 @@ app.add_middleware(
     allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
-    expose_headers=["X-Total-Count"],
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With", "X-API-Key", "X-Session-ID", "traceparent"],
+    expose_headers=["X-Total-Count", "X-Request-ID", "traceparent"],
     max_age=600,
 )
 
@@ -97,13 +119,19 @@ async def root():
 async def health_check():
     return {"status": "healthy"}
 
+@app.get("/health/ready")
+def readiness():
+    from app.services.installation_health import installation_ready
+    ready = installation_ready()
+    return JSONResponse(status_code=200 if ready else 503, content={"status": "ready" if ready else "not_ready"})
+
 # Database Connection Validation
 @app.on_event("startup")
 async def startup_event():
     """Validate PostgreSQL connection on startup"""
     from app.database import engine
     from sqlalchemy import text
-    
+
     try:
         with engine.connect() as conn:
             result = conn.execute(text("SELECT version()"))
@@ -111,14 +139,24 @@ async def startup_event():
             print(f"✅ Connected to PostgreSQL")
             print(f"   Version: {version}")
     except Exception as e:
-        # Sanitize DATABASE_URL - hide password
-        sanitized_url = re.sub(r'://[^:]+:[^@]+@', '://***:***@', settings.DATABASE_URL)
-        print(f"❌ Failed to connect to database: {e}")
-        print(f"   DATABASE_URL: {sanitized_url}")
-        raise RuntimeError(f"Database connection failed: {e}")
+        print(f"Database connection failed: {type(e).__name__}")
+        raise RuntimeError("Database connection failed; check database configuration") from None
+
+    from app.telemetry.instrumentation import install_instrumentation
+    install_instrumentation(engine)
+    collector.start()
+    emit("lifecycle", "application.started")
+
+
+@app.on_event("shutdown")
+async def shutdown_telemetry():
+    emit("lifecycle", "application.stopped")
+    collector.stop()
 
 
 # Include Routers
+from app.api.v1 import telemetry
+app.include_router(telemetry.router, prefix="/api/v1/telemetry", tags=["telemetry"])
 from app.api.v1 import brands, products, research, generated_ads, templates, facebook, uploads, dashboard, copy_generation, profiles, ad_remix, prompts, ad_styles, auth, users, google_ads, overview, tiktok_ads, bot
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
@@ -141,8 +179,26 @@ app.include_router(overview.router, prefix="/api/v1/overview", tags=["overview"]
 app.include_router(tiktok_ads.router, prefix="/api/v1/tiktok-ads", tags=["tiktok-ads"])
 app.include_router(bot.router, prefix="/api/v1/bot", tags=["bot"])
 
+from app.api.v2 import workspaces
+
+app.include_router(workspaces.router, prefix="/api/v2", tags=["workspace accounts"])
+
+from app.api.v1 import api_keys, themes, help, leadrouter, plugins
+app.include_router(plugins.router, prefix="/api/v1/plugins", tags=["plugin library"])
+app.include_router(plugins.worker_router, prefix="/api/v1/plugin-worker", tags=["plugin services"])
+app.include_router(leadrouter.router, prefix="/api/v1/leadrouter", tags=["native LeadRouter"])
+app.include_router(api_keys.router, prefix="/api/v1/api-keys", tags=["user API keys"])
+
+app.include_router(themes.router, prefix="/api/v1/themes", tags=["theme library"])
+
+app.include_router(help.router, prefix="/api/v1/help", tags=["help and documentation"])
+
+from app.api.v1 import installation
+app.include_router(installation.router, prefix="/api/v1/installation", tags=["installation and service connections"])
+
 # Mount static files for uploads
 import os
-uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
+from app.api.v1.uploads import UPLOAD_DIR
+uploads_dir = str(UPLOAD_DIR)
 os.makedirs(uploads_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")

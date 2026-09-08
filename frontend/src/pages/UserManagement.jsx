@@ -238,7 +238,7 @@ const UserManagement = () => {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <svg className="animate-spin h-10 w-10 text-amber-600" viewBox="0 0 24 24">
+                <svg className="animate-spin h-10 w-10 text-brand-ink" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
@@ -251,19 +251,19 @@ const UserManagement = () => {
             {/* Header */}
             <div className="flex justify-between items-center mb-8">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                        <Users size={32} className="text-amber-600" />
+                    <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
+                        <Users size={32} className="text-brand-ink" />
                         User Management
                     </h1>
-                    <p className="text-gray-600 mt-2">Manage users, roles, and permissions.</p>
+                    <p className="text-secondary mt-2">Manage users, roles, and permissions.</p>
                 </div>
                 <div className="flex items-center gap-4">
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-muted">
                         {users.length} user{users.length !== 1 ? 's' : ''}
                     </span>
                     <button
                         onClick={() => setShowAddModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors font-medium shadow-sm"
+                        className="flex items-center gap-2 px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand-hover transition-colors font-medium shadow-sm"
                     >
                         <Plus size={20} />
                         Add User
@@ -272,77 +272,77 @@ const UserManagement = () => {
             </div>
 
             {/* Users Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="bg-panel rounded-xl shadow-sm border border-line overflow-hidden">
                 <table className="w-full text-left">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+                    <thead className="bg-subtle border-b border-line">
                         <tr>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">User</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Roles</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Created</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-muted uppercase tracking-wider">User</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-muted uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-muted uppercase tracking-wider">Roles</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-muted uppercase tracking-wider">Created</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-muted uppercase tracking-wider text-right">Actions</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody className="divide-y divide-line">
                         {users.map((user) => (
-                            <tr key={user.id} className="hover:bg-amber-50 transition-colors">
+                            <tr key={user.id} className="hover:bg-brand-soft transition-colors">
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700 font-bold text-sm">
+                                        <div className="w-10 h-10 rounded-lg bg-brand-soft flex items-center justify-center text-brand-ink font-bold text-sm">
                                             {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
                                         </div>
                                         <div>
-                                            <div className="font-medium text-gray-900 flex items-center gap-2">
+                                            <div className="font-medium text-foreground flex items-center gap-2">
                                                 {user.name || 'No name'}
                                                 {user.is_superuser && (
-                                                    <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full font-medium">
+                                                    <span className="px-2 py-0.5 text-xs bg-highlight-soft text-highlight rounded-full font-medium">
                                                         Superuser
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="text-sm text-gray-500">{user.email}</div>
+                                            <div className="text-sm text-muted">{user.email}</div>
                                         </div>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.is_active ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'}`}>
                                         {user.is_active ? 'Active' : 'Inactive'}
                                     </span>
                                 </td>
                                 <td className="px-6 py-4">
                                     <div className="flex flex-wrap gap-1">
                                         {user.roles.map((role) => (
-                                            <span key={role.id} className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full">
+                                            <span key={role.id} className="px-2 py-0.5 text-xs bg-inset text-secondary rounded-full">
                                                 {role.name}
                                             </span>
                                         ))}
                                         {user.roles.length === 0 && (
-                                            <span className="text-gray-400 text-sm italic">No roles</span>
+                                            <span className="text-faint text-sm italic">No roles</span>
                                         )}
                                     </div>
                                 </td>
-                                <td className="px-6 py-4 text-sm text-gray-500">
+                                <td className="px-6 py-4 text-sm text-muted">
                                     {new Date(user.created_at).toLocaleDateString()}
                                 </td>
                                 <td className="px-6 py-4">
                                     <div className="flex items-center justify-end gap-1">
                                         <button
                                             onClick={() => handleEditUserClick(user)}
-                                            className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                            className="p-2 text-muted hover:text-info hover:bg-info-soft rounded-lg transition-colors"
                                             title="Edit user details"
                                         >
                                             <Pencil size={16} />
                                         </button>
                                         <button
                                             onClick={() => handleEditRoles(user)}
-                                            className="p-2 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                                            className="p-2 text-muted hover:text-brand-ink hover:bg-brand-soft rounded-lg transition-colors"
                                             title="Edit roles"
                                         >
                                             <Shield size={16} />
                                         </button>
                                         <button
                                             onClick={() => handleToggleActive(user)}
-                                            className={`p-2 rounded-lg transition-colors ${user.is_active ? 'text-gray-500 hover:text-yellow-600 hover:bg-yellow-50' : 'text-gray-500 hover:text-green-600 hover:bg-green-50'}`}
+                                            className={`p-2 rounded-lg transition-colors ${user.is_active ? 'text-muted hover:text-warning hover:bg-warning-soft' : 'text-muted hover:text-success hover:bg-success-soft'}`}
                                             title={user.is_active ? 'Deactivate' : 'Activate'}
                                             disabled={user.id === currentUser?.id}
                                         >
@@ -350,7 +350,7 @@ const UserManagement = () => {
                                         </button>
                                         <button
                                             onClick={() => handleDeleteClick(user)}
-                                            className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                            className="p-2 text-muted hover:text-danger hover:bg-danger-soft rounded-lg transition-colors"
                                             title="Delete user"
                                             disabled={user.id === currentUser?.id}
                                         >
@@ -367,20 +367,20 @@ const UserManagement = () => {
             {/* Edit Roles Modal */}
             {editingUser && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setEditingUser(null)}>
-                    <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+                    <div className="bg-panel rounded-xl max-w-md w-full p-6 shadow-xl" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                                    <Shield className="text-amber-600" size={20} />
+                                <div className="w-10 h-10 rounded-full bg-brand-soft flex items-center justify-center">
+                                    <Shield className="text-brand-ink" size={20} />
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-bold text-gray-900">Edit Roles</h3>
-                                    <p className="text-sm text-gray-500">{editingUser.email}</p>
+                                    <h3 className="text-lg font-bold text-foreground">Edit Roles</h3>
+                                    <p className="text-sm text-muted">{editingUser.email}</p>
                                 </div>
                             </div>
                             <button
                                 onClick={() => setEditingUser(null)}
-                                className="text-gray-400 hover:text-gray-500"
+                                className="text-faint hover:text-muted"
                             >
                                 <X size={20} />
                             </button>
@@ -389,18 +389,18 @@ const UserManagement = () => {
                             {roles.map((role) => (
                                 <label
                                     key={role.id}
-                                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+                                    className="flex items-center gap-3 p-3 bg-subtle rounded-lg cursor-pointer hover:bg-inset transition-colors"
                                 >
                                     <input
                                         type="checkbox"
                                         checked={selectedRoles.includes(role.id)}
                                         onChange={() => toggleRole(role.id)}
-                                        className="w-4 h-4 text-amber-600 bg-white border-gray-300 rounded focus:ring-amber-500"
+                                        className="w-4 h-4 text-brand-ink bg-panel border-line-strong rounded focus:ring-amber-500"
                                     />
                                     <div>
-                                        <div className="font-medium text-gray-900">{role.name}</div>
+                                        <div className="font-medium text-foreground">{role.name}</div>
                                         {role.description && (
-                                            <div className="text-xs text-gray-500">{role.description}</div>
+                                            <div className="text-xs text-muted">{role.description}</div>
                                         )}
                                     </div>
                                 </label>
@@ -409,13 +409,13 @@ const UserManagement = () => {
                         <div className="flex justify-end gap-3">
                             <button
                                 onClick={() => setEditingUser(null)}
-                                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium"
+                                className="px-4 py-2 text-secondary hover:bg-inset rounded-lg transition-colors font-medium"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleSaveRoles}
-                                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors font-medium shadow-sm flex items-center gap-2"
+                                className="px-4 py-2 bg-brand hover:bg-brand-hover text-white rounded-lg transition-colors font-medium shadow-sm flex items-center gap-2"
                             >
                                 <Check size={16} />
                                 Save Changes
@@ -428,20 +428,20 @@ const UserManagement = () => {
             {/* Add User Modal */}
             {showAddModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAddModal(false)}>
-                    <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+                    <div className="bg-panel rounded-xl max-w-md w-full p-6 shadow-xl" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                                    <Plus className="text-amber-600" size={20} />
+                                <div className="w-10 h-10 rounded-full bg-brand-soft flex items-center justify-center">
+                                    <Plus className="text-brand-ink" size={20} />
                                 </div>
-                                <h3 className="text-lg font-bold text-gray-900">Add New User</h3>
+                                <h3 className="text-lg font-bold text-foreground">Add New User</h3>
                             </div>
                             <button
                                 onClick={() => {
                                     setShowAddModal(false);
                                     setNewUser({ name: '', email: '', password: '', role_ids: [] });
                                 }}
-                                className="text-gray-400 hover:text-gray-500"
+                                className="text-faint hover:text-muted"
                             >
                                 <X size={20} />
                             </button>
@@ -449,41 +449,41 @@ const UserManagement = () => {
 
                         <form onSubmit={handleAddUser} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label className="block text-sm font-medium text-secondary mb-1">
                                     Name
                                 </label>
                                 <input
                                     type="text"
                                     value={newUser.name}
                                     onChange={(e) => setNewUser(prev => ({ ...prev, name: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                                     placeholder="John Doe"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Email <span className="text-red-500">*</span>
+                                <label className="block text-sm font-medium text-secondary mb-1">
+                                    Email <span className="text-danger">*</span>
                                 </label>
                                 <input
                                     type="email"
                                     value={newUser.email}
                                     onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                                     placeholder="user@example.com"
                                     required
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Password <span className="text-red-500">*</span>
+                                <label className="block text-sm font-medium text-secondary mb-1">
+                                    Password <span className="text-danger">*</span>
                                 </label>
                                 <input
                                     type="password"
                                     value={newUser.password}
                                     onChange={(e) => setNewUser(prev => ({ ...prev, password: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                                     placeholder="••••••••"
                                     required
                                     minLength={6}
@@ -491,25 +491,25 @@ const UserManagement = () => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-secondary mb-2">
                                     Roles
                                 </label>
                                 <div className="space-y-2">
                                     {roles.map((role) => (
                                         <label
                                             key={role.id}
-                                            className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+                                            className="flex items-center gap-3 p-3 bg-subtle rounded-lg cursor-pointer hover:bg-inset transition-colors"
                                         >
                                             <input
                                                 type="checkbox"
                                                 checked={newUser.role_ids.includes(role.id)}
                                                 onChange={() => toggleNewUserRole(role.id)}
-                                                className="w-4 h-4 text-amber-600 bg-white border-gray-300 rounded focus:ring-amber-500"
+                                                className="w-4 h-4 text-brand-ink bg-panel border-line-strong rounded focus:ring-amber-500"
                                             />
                                             <div>
-                                                <div className="font-medium text-gray-900">{role.name}</div>
+                                                <div className="font-medium text-foreground">{role.name}</div>
                                                 {role.description && (
-                                                    <div className="text-xs text-gray-500">{role.description}</div>
+                                                    <div className="text-xs text-muted">{role.description}</div>
                                                 )}
                                             </div>
                                         </label>
@@ -524,14 +524,14 @@ const UserManagement = () => {
                                         setShowAddModal(false);
                                         setNewUser({ name: '', email: '', password: '', role_ids: [] });
                                     }}
-                                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium"
+                                    className="px-4 py-2 text-secondary hover:bg-inset rounded-lg transition-colors font-medium"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={addingUser}
-                                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-medium shadow-sm flex items-center gap-2"
+                                    className="px-4 py-2 bg-brand hover:bg-brand-hover disabled:bg-amber-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-medium shadow-sm flex items-center gap-2"
                                 >
                                     {addingUser ? (
                                         <>
@@ -557,17 +557,17 @@ const UserManagement = () => {
             {/* Edit User Modal */}
             {showEditUserModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowEditUserModal(false)}>
-                    <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+                    <div className="bg-panel rounded-xl max-w-md w-full p-6 shadow-xl" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                    <Pencil className="text-blue-600" size={20} />
+                                <div className="w-10 h-10 rounded-full bg-info-soft flex items-center justify-center">
+                                    <Pencil className="text-info" size={20} />
                                 </div>
-                                <h3 className="text-lg font-bold text-gray-900">Edit User</h3>
+                                <h3 className="text-lg font-bold text-foreground">Edit User</h3>
                             </div>
                             <button
                                 onClick={() => setShowEditUserModal(false)}
-                                className="text-gray-400 hover:text-gray-500"
+                                className="text-faint hover:text-muted"
                             >
                                 <X size={20} />
                             </button>
@@ -575,41 +575,41 @@ const UserManagement = () => {
 
                         <form onSubmit={handleUpdateUser} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label className="block text-sm font-medium text-secondary mb-1">
                                     Name
                                 </label>
                                 <input
                                     type="text"
                                     value={editUserFormData.name}
                                     onChange={(e) => setEditUserFormData(prev => ({ ...prev, name: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 border border-line-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     placeholder="John Doe"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Email <span className="text-red-500">*</span>
+                                <label className="block text-sm font-medium text-secondary mb-1">
+                                    Email <span className="text-danger">*</span>
                                 </label>
                                 <input
                                     type="email"
                                     value={editUserFormData.email}
                                     onChange={(e) => setEditUserFormData(prev => ({ ...prev, email: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 border border-line-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     placeholder="user@example.com"
                                     required
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    New Password <span className="text-gray-400 font-normal">(optional)</span>
+                                <label className="block text-sm font-medium text-secondary mb-1">
+                                    New Password <span className="text-faint font-normal">(optional)</span>
                                 </label>
                                 <input
                                     type="password"
                                     value={editUserFormData.password}
                                     onChange={(e) => setEditUserFormData(prev => ({ ...prev, password: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 border border-line-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     placeholder="Leave blank to keep current"
                                     minLength={6}
                                 />
@@ -619,14 +619,14 @@ const UserManagement = () => {
                                 <button
                                     type="button"
                                     onClick={() => setShowEditUserModal(false)}
-                                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium"
+                                    className="px-4 py-2 text-secondary hover:bg-inset rounded-lg transition-colors font-medium"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={updatingUser}
-                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-medium shadow-sm flex items-center gap-2"
+                                    className="px-4 py-2 bg-brand hover:bg-brand-hover disabled:bg-blue-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-medium shadow-sm flex items-center gap-2"
                                 >
                                     {updatingUser ? (
                                         <>

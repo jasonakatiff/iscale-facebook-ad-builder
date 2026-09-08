@@ -1,10 +1,22 @@
 import { test, expect } from '@playwright/test';
 import { testUser, testBrand, mockLoginSuccess, blockBrowserDialogs } from '../fixtures/test-data.js';
 
+test.beforeEach(async ({ page }) => {
+  // These are existing-workspace fixtures; first-run setup is covered separately.
+  await page.route('**/api/v1/installation', route => route.fulfill({
+    json: { installation_id: 'test-existing-workspace', can_manage: false,
+      setup_required: false, status: 'complete', step: 'welcome', capabilities: {},
+      worker: { last_seen_at: null, online: false } },
+  }));
+});
+
 test.describe('Brand Management', () => {
 
   test.beforeEach(async ({ page }) => {
     blockBrowserDialogs(page);
+    await page.route('**/api/v1/profiles', route => {
+      route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+    });
 
     // Mock login endpoint
     await page.route('**/api/v1/auth/login/json', route => {
@@ -40,7 +52,7 @@ test.describe('Brand Management', () => {
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify([
-            { id: 'brand-1', name: 'Existing Brand', colors: { primary: '#FF0000', secondary: '#00FF00', highlight: '#0000FF' } }
+            { id: 'brand-1', name: 'Existing Brand', products: [], colors: { primary: '#FF0000', secondary: '#00FF00', highlight: '#0000FF' } }
           ])
         });
       } else if (route.request().method() === 'POST') {
@@ -76,12 +88,8 @@ test.describe('Brand Management', () => {
     await page.goto('/brands');
     await page.waitForLoadState('networkidle');
 
-    // Should see the brands list or page load successfully
-    await expect(page).not.toHaveURL(/error/);
-    // Check for brand name or page title
-    const brandVisible = await page.getByText('Existing Brand').isVisible().catch(() => false);
-    const pageTitle = await page.getByText(/brands/i).first().isVisible().catch(() => false);
-    expect(brandVisible || pageTitle).toBeTruthy();
+    await expect(page.getByRole('heading', { name: 'Brand Management', exact: true })).toBeVisible();
+    await expect(page.getByText('Existing Brand', { exact: true })).toBeVisible();
   });
 
   test('create brand modal opens', async ({ page }) => {
@@ -146,6 +154,9 @@ test.describe('Brand Form Validation', () => {
 
   test.beforeEach(async ({ page }) => {
     blockBrowserDialogs(page);
+    await page.route('**/api/v1/profiles', route => {
+      route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+    });
 
     // Mock login
     await page.route('**/api/v1/auth/login/json', route => {

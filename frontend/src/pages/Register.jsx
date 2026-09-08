@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { BrandMark } from '../components/BrandMark';
+import { PoweredBy } from '../components/PoweredBy';
 import { UserPlus, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 
 const Register = () => {
@@ -46,6 +48,7 @@ const Register = () => {
         <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
             <div className="max-w-md w-full">
                 <div className="bg-gray-800 rounded-lg shadow-xl p-8">
+                    <div className="flex justify-center mb-6"><BrandMark /></div>
                     {/* Header */}
                     <div className="text-center mb-8">
                         <div className="inline-flex items-center justify-center w-16 h-16 bg-green-600 rounded-full mb-4">
@@ -178,6 +181,7 @@ const Register = () => {
                         </button>
                     </form>
 
+                    <PoweredBy className="mt-6 text-center" />
                     {/* Login Link */}
                     <div className="mt-6 text-center">
                         <p className="text-gray-400">

@@ -17,4 +17,4 @@ email-validator>=2.0.0
 boto3>=1.34.0
 alembic
 google-ads>=24.1.0
-
+grpcio-status==1.71.2

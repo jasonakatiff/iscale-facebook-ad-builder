@@ -1,4 +1,5 @@
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Text, JSON, Table, Boolean
+from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Text, JSON, Table, Boolean, Float
+from sqlalchemy import CheckConstraint, ForeignKeyConstraint, Index, UniqueConstraint, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -6,6 +7,37 @@ import uuid
 
 def generate_uuid():
     return str(uuid.uuid4())
+
+class TelemetryEvent(Base):
+    __tablename__ = "telemetry_events"
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    trace_id = Column(String(32), nullable=False)
+    span_id = Column(String(16), nullable=False)
+    parent_span_id = Column(String(16), nullable=True)
+    request_id = Column(String(36), nullable=True)
+    session_id = Column(String(36), nullable=True)
+    user_id = Column(String, nullable=True)
+    kind = Column(String(32), nullable=False)
+    level = Column(String(10), nullable=False)
+    name = Column(String(200), nullable=False)
+    message = Column(Text, nullable=True)
+    duration_ms = Column(Float, nullable=True)
+    status_code = Column(Integer, nullable=True)
+    fingerprint = Column(String(64), nullable=True)
+    attributes = Column(JSON, nullable=False, default=dict)
+    environment = Column(String(80), nullable=False)
+    release = Column(String(80), nullable=True)
+    __table_args__ = (
+        Index("ix_telemetry_created", "created_at", "id"),
+        Index("ix_telemetry_trace", "trace_id", "created_at"),
+        Index("ix_telemetry_session", "session_id", "created_at"),
+        Index("ix_telemetry_user", "user_id", "created_at"),
+        Index("ix_telemetry_kind", "kind", "created_at"),
+        Index("ix_telemetry_errors", "level", "fingerprint", "created_at"),
+        Index("ix_telemetry_request", "request_id"),
+    )
+
 
 # Many-to-Many relationship table for User <-> Role
 user_roles = Table(
@@ -153,6 +185,56 @@ class CustomerProfile(Base):
 
     brands = relationship("Brand", secondary=brand_profiles, back_populates="profiles")
 
+class CampaignPreset(Base):
+    __tablename__ = 'campaign_presets'
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    ad_account_id = Column(String, nullable=False, index=True)
+    name = Column(String, nullable=False)
+    vertical = Column(String, nullable=False, default='')
+    settings = Column(JSON, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class CampaignPreference(Base):
+    __tablename__ = 'campaign_preferences'
+
+    id = Column(String, primary_key=True)
+    settings = Column(JSON, nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class LeadRouterConnection(Base):
+    __tablename__ = "leadrouter_connections"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    account_type = Column(String, nullable=False)
+    account_name = Column(String, nullable=False)
+    partner_id = Column(String, nullable=True)
+    encrypted_api_key = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    __table_args__ = (CheckConstraint("account_type IN ('partner', 'organization')", name="ck_leadrouter_account_type"),)
+
+
+class LeadRouterDefault(Base):
+    __tablename__ = "leadrouter_defaults"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    connection_id = Column(String, ForeignKey("leadrouter_connections.id", ondelete="CASCADE"), nullable=False)
+    resource_type = Column(String, nullable=False)
+    resource_id = Column(String, nullable=False)
+    campaign_id = Column(String, nullable=False)
+    campaign = Column(JSON, nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    __table_args__ = (
+        UniqueConstraint("connection_id", "resource_type", "resource_id", name="uq_leadrouter_default"),
+        CheckConstraint("resource_type IN ('brand', 'product', 'campaign')", name="ck_leadrouter_resource_type"),
+    )
+
+
 class FacebookCampaign(Base):
     __tablename__ = "facebook_campaigns"
 
@@ -161,6 +243,7 @@ class FacebookCampaign(Base):
     objective = Column(String, nullable=False)
     budget_type = Column(String, nullable=False)
     daily_budget = Column(Integer, nullable=True)
+    daily_budget_minor = Column(Integer, nullable=True)
     bid_strategy = Column(String, nullable=True)
     status = Column(String, default='PAUSED')
     fb_campaign_id = Column(String, nullable=True)
@@ -177,8 +260,10 @@ class FacebookAdSet(Base):
     name = Column(String, nullable=False)
     optimization_goal = Column(String, nullable=False)
     daily_budget = Column(Integer, nullable=True)
+    daily_budget_minor = Column(Integer, nullable=True)
     bid_strategy = Column(String, nullable=True)
     bid_amount = Column(Integer, nullable=True)
+    bid_amount_minor = Column(Integer, nullable=True)
     targeting = Column(JSON, nullable=True)
     pixel_id = Column(String, nullable=True)
     conversion_event = Column(String, nullable=True)
@@ -482,6 +567,51 @@ class BrandScrapedAd(Base):
     brand_scrape = relationship("BrandScrape", back_populates="ads")
 
 
+class PluginInstallation(Base):
+    __tablename__ = "plugin_installations"
+    id = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    slug = Column(String, nullable=False)
+    version = Column(String, nullable=False)
+    document = Column(JSON, nullable=False)
+    package_digest = Column(String, nullable=False)
+    enabled = Column(Boolean, nullable=False, default=True, server_default="true")
+    configuration = Column(JSON, nullable=False, default=dict)
+    worker_key_hash = Column(String, nullable=True, unique=True)
+    worker_key_prefix = Column(String, nullable=True)
+    worker_key_expires_at = Column(DateTime(timezone=True), nullable=True)
+    worker_last_seen_at = Column(DateTime(timezone=True), nullable=True)
+    worker_generation = Column(Integer, nullable=False, default=0, server_default="0")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    archived_at = Column(DateTime(timezone=True), nullable=True)
+    __table_args__ = (UniqueConstraint("user_id", "slug", "version", name="uq_plugin_release"),)
+
+
+class PluginRun(Base):
+    __tablename__ = "plugin_runs"
+    id = Column(String, primary_key=True, default=generate_uuid)
+    installation_id = Column(String, ForeignKey("plugin_installations.id", ondelete="CASCADE"), nullable=False, index=True)
+    request_id = Column(String, nullable=False)
+    input_digest = Column(String, nullable=False)
+    package_digest = Column(String, nullable=False)
+    inputs = Column(JSON, nullable=False)
+    configuration = Column(JSON, nullable=False)
+    status = Column(String, nullable=False)
+    output = Column(JSON, nullable=True)
+    error = Column(String, nullable=True)
+    lease_hash = Column(String, nullable=True)
+    lease_expires_at = Column(DateTime(timezone=True), nullable=True)
+    worker_generation = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    __table_args__ = (
+        UniqueConstraint("installation_id", "request_id", name="uq_plugin_run_request"),
+        CheckConstraint("status IN ('queued','running','succeeded','failed','cancelled','expired')", name="ck_plugin_run_status"),
+    )
+
+
 class ApiKey(Base):
     """Machine-to-machine key (e.g. the Hermes Telegram bot). Hashed at rest —
     the plaintext key is shown once at creation time and never stored or logged."""
@@ -490,13 +620,15 @@ class ApiKey(Base):
     id = Column(String, primary_key=True, default=generate_uuid)
     name = Column(String, nullable=False)
     key_hash = Column(String, unique=True, nullable=False, index=True)
-    # Allowed values: "ads:read", "ads:draft". "ads:publish" / "ads:spend" do not
-    # exist as scopes for bot keys — enforced in app.core.deps, not just policy text.
+    # Platform keys and legacy bot keys use distinct, enforced scope sets.
     scopes = Column(JSON, nullable=False, default=list)
     created_by_user_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_used_at = Column(DateTime(timezone=True), nullable=True)
     revoked_at = Column(DateTime(timezone=True), nullable=True)
+
+    key_prefix = Column(String(20), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
 
     created_by = relationship("User")
 
@@ -554,3 +686,239 @@ class TikTokAdsConnection(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     user = relationship("User")
+
+
+class Workspace(Base):
+    __tablename__ = "workspaces"
+    id = Column(String, primary_key=True, default=generate_uuid)
+    name = Column(String(120), nullable=False)
+    is_active = Column(Boolean, nullable=False, server_default="true")
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class WorkspaceMembership(Base):
+    __tablename__ = "workspace_memberships"
+    workspace_id = Column(
+        String, ForeignKey("workspaces.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id = Column(
+        String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    role = Column(String(32), nullable=False)
+    is_active = Column(Boolean, nullable=False, server_default="true")
+    version = Column(Integer, nullable=False, server_default="1")
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('viewer','creative_editor','buyer','publisher','admin')",
+            name="ck_workspace_member_role",
+        ),
+        CheckConstraint("version > 0", name="ck_workspace_member_version"),
+    )
+
+
+class WorkspaceAccount(Base):
+    __tablename__ = "workspace_accounts"
+    id = Column(String, primary_key=True, default=generate_uuid)
+    workspace_id = Column(
+        String, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
+    )
+    provider = Column(String(20), nullable=False, server_default="meta")
+    external_account_id = Column(String(100), nullable=False)
+    meta_connection_id = Column(
+        String,
+        ForeignKey("meta_ads_connections.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    is_active = Column(Boolean, nullable=False, server_default="true")
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "id", name="uq_workspace_account_scope"),
+        UniqueConstraint(
+            "workspace_id",
+            "provider",
+            "external_account_id",
+            name="uq_workspace_provider_account",
+        ),
+        CheckConstraint("provider = 'meta'", name="ck_workspace_account_provider"),
+    )
+
+
+class WorkspaceAccountGrant(Base):
+    __tablename__ = "workspace_account_grants"
+    workspace_id = Column(String, primary_key=True)
+    account_id = Column(String, primary_key=True)
+    user_id = Column(String, primary_key=True)
+    can_sync = Column(Boolean, nullable=False, server_default="false")
+    is_active = Column(Boolean, nullable=False, server_default="true")
+    version = Column(Integer, nullable=False, server_default="1")
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["workspace_id", "account_id"],
+            ["workspace_accounts.workspace_id", "workspace_accounts.id"],
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "user_id"],
+            ["workspace_memberships.workspace_id", "workspace_memberships.user_id"],
+            ondelete="CASCADE",
+        ),
+        CheckConstraint("version > 0", name="ck_workspace_grant_version"),
+    )
+
+
+class AccountSyncJob(Base):
+    __tablename__ = "account_sync_jobs"
+    id = Column(String, primary_key=True, default=generate_uuid)
+    workspace_id = Column(String, nullable=False)
+    account_id = Column(String, nullable=False)
+    resource = Column(String(32), nullable=False, server_default="campaigns")
+    requested_by_user_id = Column(
+        String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    membership_version = Column(Integer, nullable=False)
+    grant_version = Column(Integer, nullable=False)
+    connection_id = Column(
+        String,
+        ForeignKey("meta_ads_connections.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    credential_owner_version = Column(Integer, nullable=False)
+    status = Column(String(20), nullable=False, server_default="queued")
+    attempts = Column(Integer, nullable=False, server_default="0")
+    pages_fetched = Column(Integer, nullable=False, server_default="0")
+    worker_id = Column(String(120), nullable=True)
+    lease_token = Column(String, nullable=True)
+    lease_expires_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    error_code = Column(String(40), nullable=True)
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["workspace_id", "account_id"],
+            ["workspace_accounts.workspace_id", "workspace_accounts.id"],
+            ondelete="CASCADE",
+        ),
+        UniqueConstraint(
+            "workspace_id", "account_id", "id", name="uq_account_job_scope"
+        ),
+        CheckConstraint("resource = 'campaigns'", name="ck_account_job_resource"),
+        CheckConstraint(
+            "status IN ('queued','running','succeeded','failed','blocked')",
+            name="ck_account_job_status",
+        ),
+        CheckConstraint(
+            "attempts >= 0 AND pages_fetched >= 0", name="ck_account_job_counts"
+        ),
+        CheckConstraint(
+            "(status = 'running' AND lease_token IS NOT NULL AND lease_expires_at IS NOT NULL) OR (status <> 'running' AND lease_token IS NULL AND lease_expires_at IS NULL)",
+            name="ck_account_job_lease",
+        ),
+        Index(
+            "uq_active_account_sync",
+            "workspace_id",
+            "account_id",
+            "resource",
+            unique=True,
+            postgresql_where=text("status IN ('queued','running')"),
+        ),
+        Index("ix_account_sync_claim", "status", "created_at"),
+    )
+
+
+class AccountSnapshot(Base):
+    __tablename__ = "account_snapshots"
+    workspace_id = Column(String, primary_key=True)
+    account_id = Column(String, primary_key=True)
+    resource = Column(String(32), primary_key=True)
+    generation_id = Column(String, nullable=False)
+    items = Column(JSON, nullable=False)
+    last_success_at = Column(DateTime(timezone=True), nullable=False)
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["workspace_id", "account_id"],
+            ["workspace_accounts.workspace_id", "workspace_accounts.id"],
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "account_id", "generation_id"],
+            [
+                "account_sync_jobs.workspace_id",
+                "account_sync_jobs.account_id",
+                "account_sync_jobs.id",
+            ],
+            ondelete="CASCADE",
+        ),
+        CheckConstraint("resource = 'campaigns'", name="ck_account_snapshot_resource"),
+    )
+
+
+class WorkspaceAuditEvent(Base):
+    __tablename__ = "workspace_audit_events"
+    id = Column(String, primary_key=True, default=generate_uuid)
+    workspace_id = Column(
+        String,
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    actor_user_id = Column(
+        String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    action = Column(String(64), nullable=False)
+    resource_id = Column(String, nullable=False)
+    details = Column(JSON, nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class UserTheme(Base):
+    __tablename__ = "user_themes"
+    id = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    document = Column(JSON, nullable=False)
+    github_url = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class InstallationState(Base):
+    __tablename__ = "installation_state"
+    id = Column(Integer, primary_key=True)
+    installation_id = Column(String, nullable=False, unique=True, default=generate_uuid)
+    initialized = Column(Boolean, nullable=False, default=False)
+    setup_status = Column(String(20), nullable=False, default="pending")
+    setup_step = Column(String(20), nullable=False, default="welcome")
+    worker_heartbeat_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_installation_singleton"),
+        CheckConstraint("setup_status IN ('pending','in_progress','deferred','complete')", name="ck_installation_status"),
+        CheckConstraint("setup_step IN ('welcome','providers','brand','create')", name="ck_installation_step"),
+    )
+
+
+class ProviderConnection(Base):
+    __tablename__ = "provider_connections"
+    provider = Column(String(20), primary_key=True)
+    encrypted_key = Column(Text, nullable=True)
+    key_hint = Column(String(4), nullable=True)
+    disabled = Column(Boolean, nullable=False, default=False)
+    version = Column(Integer, nullable=False, default=1)
+    status = Column(String(32), nullable=False, default="saved_unverified")
+    status_message = Column(String(300), nullable=True)
+    last_checked_at = Column(DateTime(timezone=True), nullable=True)
+    updated_by_user_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    __table_args__ = (
+        CheckConstraint("provider IN ('gemini','fal','kie')", name="ck_provider_name"),
+        CheckConstraint("status IN ('not_configured','saved_unverified','connected','invalid','insufficient_credit','temporarily_unavailable')", name="ck_provider_status"),
+    )

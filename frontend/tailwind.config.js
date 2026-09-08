@@ -39,16 +39,79 @@ const accent = {
 };
 
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  darkMode: 'class',
   theme: {
     extend: {
-      colors: {
-        amber: accent,
+      colors: { amber: accent, ...Object.fromEntries(
+        [
+          'canvas',
+          'panel',
+          'elevated',
+          'subtle',
+          'inset',
+          'soft',
+          'foreground',
+          'secondary',
+          'muted',
+          'faint',
+          'line',
+          'line-soft',
+          'line-strong',
+          'brand',
+          'brand-hover',
+          'brand-ink',
+          'brand-soft',
+          'brand-line',
+          'success',
+          'success-soft',
+          'success-line',
+          'danger',
+          'danger-soft',
+          'danger-line',
+          'info',
+          'info-soft',
+          'info-line',
+          'highlight',
+          'highlight-soft',
+          'highlight-line',
+          'warning',
+          'warning-soft',
+          'warning-line',
+        ].map((name) => [name, `rgb(var(--studio-${name}) / <alpha-value>)`]),
+      ) },
+      boxShadow: {
+        sm: '0 1px 2px rgb(15 20 12 / 0.03)',
+        lg: '0 10px 30px rgb(15 20 12 / 0.1)',
+        xl: '0 16px 48px rgb(15 20 12 / 0.14)',
+      },
+      fontFamily: {
+        sans: [
+          'Inter',
+          'ui-sans-serif',
+          'system-ui',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          'Segoe UI',
+          'sans-serif',
+        ],
       },
     },
   },
-  plugins: [],
-}
+  plugins: [({ addBase }) => {
+    if (!/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(process.env.VITE_APP_ACCENT || '')) return;
+    const channels = (amount) => hexToRgb(shade(accentRgb, amount)).join(' ');
+    addBase({
+      ':root': {
+        '--studio-brand': channels(0), '--studio-brand-hover': channels(-0.15),
+        '--studio-brand-ink': channels(-0.25), '--studio-brand-soft': channels(0.92),
+        '--studio-brand-line': channels(0.65),
+      },
+      ':root[data-theme="dark"]': {
+        '--studio-brand': channels(0), '--studio-brand-hover': channels(0.1),
+        '--studio-brand-ink': channels(0.55), '--studio-brand-soft': channels(-0.65),
+        '--studio-brand-line': channels(-0.25),
+      },
+    });
+  }],
+};

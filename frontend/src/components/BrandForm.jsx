@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { LeadRouterDefault } from './LeadRouterDefault';
 import { X, Plus, Trash2, Link as LinkIcon, Unlink } from 'lucide-react';
 import { useBrands } from '../context/BrandContext';
 import { useToast } from '../context/ToastContext';
@@ -70,7 +71,7 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
         });
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         try {
             // Validate all fields
@@ -86,7 +87,7 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
                 products: formData.products || [],
                 profileIds: formData.profileIds || []
             };
-            onSave(validatedData);
+            await onSave(validatedData);
         } catch (err) {
             showError(err.message);
         }
@@ -94,12 +95,12 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center p-6 border-b border-gray-100">
-                    <h2 className="text-xl font-bold text-gray-900">
+            <div role="dialog" aria-modal="true" aria-label="Brand details" className="bg-panel rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center p-6 border-b border-line-soft">
+                    <h2 className="text-xl font-bold text-foreground">
                         {initialData ? 'Edit Brand' : 'Add New Brand'}
                     </h2>
-                    <button onClick={onClose} className="text-gray-500 hover:bg-gray-100 p-2 rounded-full">
+                    <button onClick={onClose} className="text-muted hover:bg-inset p-2 rounded-full">
                         <X size={20} />
                     </button>
                 </div>
@@ -108,25 +109,25 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
                     {/* Basic Info */}
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Brand Name</label>
+                            <label htmlFor="brand-name" className="block text-sm font-medium text-secondary mb-1">Brand Name</label>
                             <input
                                 required
                                 type="text"
                                 maxLength={100}
-                                value={formData.name}
+                                id="brand-name" value={formData.name}
                                 onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                className="w-full p-2 border border-line-strong rounded-lg focus:ring-2 focus:ring-blue-500"
                                 placeholder="e.g. Acme Corp"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Brand Voice/Tone</label>
+                            <label htmlFor="brand-voice" className="block text-sm font-medium text-secondary mb-1">Brand Voice/Tone</label>
                             <textarea
-                                value={formData.voice}
+                                id="brand-voice" value={formData.voice}
                                 maxLength={500}
                                 onChange={e => setFormData({ ...formData, voice: e.target.value })}
-                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                className="w-full p-2 border border-line-strong rounded-lg focus:ring-2 focus:ring-blue-500"
                                 rows="2"
                                 placeholder="e.g. Professional, Friendly, Witty..."
                             />
@@ -135,10 +136,10 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
 
                     {/* Colors */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Brand Colors</label>
+                        <label className="block text-sm font-medium text-secondary mb-2">Brand Colors</label>
                         <div className="flex gap-4">
                             <div>
-                                <label className="text-xs text-gray-500 block mb-1">Primary</label>
+                                <label className="text-xs text-muted block mb-1">Primary</label>
                                 <div className="flex items-center gap-2">
                                     <input
                                         type="color"
@@ -146,11 +147,11 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
                                         onChange={e => setFormData({ ...formData, colors: { ...formData.colors, primary: e.target.value } })}
                                         className="h-10 w-10 rounded cursor-pointer border-0"
                                     />
-                                    <span className="text-sm text-gray-600 font-mono">{formData.colors.primary}</span>
+                                    <span className="text-sm text-secondary font-mono">{formData.colors.primary}</span>
                                 </div>
                             </div>
                             <div>
-                                <label className="text-xs text-gray-500 block mb-1">Secondary</label>
+                                <label className="text-xs text-muted block mb-1">Secondary</label>
                                 <div className="flex items-center gap-2">
                                     <input
                                         type="color"
@@ -158,11 +159,11 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
                                         onChange={e => setFormData({ ...formData, colors: { ...formData.colors, secondary: e.target.value } })}
                                         className="h-10 w-10 rounded cursor-pointer border-0"
                                     />
-                                    <span className="text-sm text-gray-600 font-mono">{formData.colors.secondary}</span>
+                                    <span className="text-sm text-secondary font-mono">{formData.colors.secondary}</span>
                                 </div>
                             </div>
                             <div>
-                                <label className="text-xs text-gray-500 block mb-1">Highlight</label>
+                                <label className="text-xs text-muted block mb-1">Highlight</label>
                                 <div className="flex items-center gap-2">
                                     <input
                                         type="color"
@@ -170,7 +171,7 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
                                         onChange={e => setFormData({ ...formData, colors: { ...formData.colors, highlight: e.target.value } })}
                                         className="h-10 w-10 rounded cursor-pointer border-0"
                                     />
-                                    <span className="text-sm text-gray-600 font-mono">{formData.colors.highlight}</span>
+                                    <span className="text-sm text-secondary font-mono">{formData.colors.highlight}</span>
                                 </div>
                             </div>
                         </div>
@@ -178,13 +179,13 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
 
                     {/* Products */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Products</label>
-                        <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                        <label className="block text-sm font-medium text-secondary mb-2">Products</label>
+                        <div className="bg-subtle p-4 rounded-lg space-y-3">
                             <div className="flex gap-2">
                                 <select
                                     value={selectedProductId}
                                     onChange={(e) => setSelectedProductId(e.target.value)}
-                                    className="flex-1 p-2 border border-gray-300 rounded-lg text-sm"
+                                    className="flex-1 p-2 border border-line-strong rounded-lg text-sm"
                                 >
                                     <option value="">Select a product to assign...</option>
                                     {allProducts
@@ -200,7 +201,7 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
                                     type="button"
                                     onClick={handleLinkProduct}
                                     disabled={!selectedProductId}
-                                    className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                    className="bg-brand text-white p-2 rounded-lg hover:bg-brand-hover disabled:bg-line-strong disabled:cursor-not-allowed"
                                 >
                                     <LinkIcon size={20} />
                                 </button>
@@ -209,15 +210,15 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
                             {formData.products.length > 0 && (
                                 <div className="space-y-2 mt-2">
                                     {formData.products.map(product => (
-                                        <div key={product.id} className="flex items-center justify-between bg-white p-3 rounded border border-gray-200">
+                                        <div key={product.id} className="flex items-center justify-between bg-panel p-3 rounded border border-line">
                                             <div>
                                                 <div className="font-medium text-sm">{product.name}</div>
-                                                <div className="text-xs text-gray-500">{product.description}</div>
+                                                <div className="text-xs text-muted">{product.description}</div>
                                             </div>
                                             <button
                                                 type="button"
                                                 onClick={() => removeProduct(product.id)}
-                                                className="text-red-500 hover:bg-red-50 p-1 rounded"
+                                                className="text-danger hover:bg-danger-soft p-1 rounded"
                                                 title="Remove Product"
                                             >
                                                 <Unlink size={16} />
@@ -227,7 +228,7 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
                                 </div>
                             )}
                             {allProducts.length === 0 && (
-                                <p className="text-xs text-gray-500 mt-1">
+                                <p className="text-xs text-muted mt-1">
                                     No products available. Create them in the Products page first.
                                 </p>
                             )}
@@ -236,13 +237,13 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
 
                     {/* Customer Profiles */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Linked Customer Profiles</label>
-                        <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                        <label className="block text-sm font-medium text-secondary mb-2">Linked Customer Profiles</label>
+                        <div className="bg-subtle p-4 rounded-lg space-y-3">
                             <div className="flex gap-2">
                                 <select
                                     value={selectedProfileId}
                                     onChange={(e) => setSelectedProfileId(e.target.value)}
-                                    className="flex-1 p-2 border border-gray-300 rounded-lg text-sm"
+                                    className="flex-1 p-2 border border-line-strong rounded-lg text-sm"
                                 >
                                     <option value="">Select a profile to link...</option>
                                     {customerProfiles
@@ -258,7 +259,7 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
                                     type="button"
                                     onClick={handleLinkProfile}
                                     disabled={!selectedProfileId}
-                                    className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                    className="bg-brand text-white p-2 rounded-lg hover:bg-brand-hover disabled:bg-line-strong disabled:cursor-not-allowed"
                                 >
                                     <LinkIcon size={20} />
                                 </button>
@@ -270,15 +271,15 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
                                         const profile = customerProfiles.find(p => p.id === profileId);
                                         if (!profile) return null;
                                         return (
-                                            <div key={profile.id} className="flex items-center justify-between bg-white p-3 rounded border border-gray-200">
+                                            <div key={profile.id} className="flex items-center justify-between bg-panel p-3 rounded border border-line">
                                                 <div>
                                                     <div className="font-medium text-sm">{profile.name}</div>
-                                                    <div className="text-xs text-gray-500">{profile.demographics}</div>
+                                                    <div className="text-xs text-muted">{profile.demographics}</div>
                                                 </div>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleUnlinkProfile(profile.id)}
-                                                    className="text-red-500 hover:bg-red-50 p-1 rounded"
+                                                    className="text-danger hover:bg-danger-soft p-1 rounded"
                                                     title="Unlink Profile"
                                                 >
                                                     <Unlink size={16} />
@@ -289,24 +290,25 @@ const BrandForm = ({ onClose, onSave, initialData = null }) => {
                                 </div>
                             )}
                             {customerProfiles.length === 0 && (
-                                <p className="text-xs text-gray-500 mt-1">
+                                <p className="text-xs text-muted mt-1">
                                     No profiles available. Create them in the Customer Profiles page first.
                                 </p>
                             )}
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                    {initialData?.id && <LeadRouterDefault resourceType="brand" resourceId={initialData.id} />}
+                    <div className="flex justify-end gap-3 pt-4 border-t border-line-soft">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                            className="px-4 py-2 text-secondary hover:bg-inset rounded-lg"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                            className="px-6 py-2 bg-brand text-white rounded-lg hover:bg-brand-hover font-medium"
                         >
                             Save Brand
                         </button>

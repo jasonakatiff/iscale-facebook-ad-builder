@@ -1,25 +1,24 @@
+from app.telemetry.runtime import capture_exception
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
-import google.generativeai as genai
-import os
+from app.services.generation_provider import generate_gemini_text
+from app.services.provider_settings import require_provider_key
+from app.core.installation import InstallationError
+from app.database import get_db
+from sqlalchemy.orm import Session
 import json
 from app.models import User
-from app.core.deps import get_current_active_user
+from app.core.deps import require_permission
 
 router = APIRouter()
-
-# Configure Gemini
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("VITE_GEMINI_API_KEY")
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
 
 class CopyGenerationRequest(BaseModel):
     brand: Dict[str, Any]
     product: Dict[str, Any]
     profile: Dict[str, Any]
     template: Optional[Dict[str, Any]] = None
-    variationCount: int = 3
+    variationCount: int = Field(default=3, ge=1, le=10)
     campaignDetails: Dict[str, str]
     customPrompt: Optional[str] = None
 
@@ -33,11 +32,10 @@ class FieldRegenerationRequest(BaseModel):
     campaignDetails: Dict[str, str]
 
 @router.post("/generate")
-async def generate_copy(request: CopyGenerationRequest, current_user: User = Depends(get_current_active_user)):
+async def generate_copy(request: CopyGenerationRequest, current_user: User = Depends(require_permission("ads:write")), db: Session = Depends(get_db)):
     """Generate ad copy variations using Gemini AI"""
     
-    if not GEMINI_API_KEY:
-        raise HTTPException(status_code=500, detail="Gemini API key not configured")
+    require_provider_key("gemini", db)
     
     try:
         # Build the prompt
@@ -103,11 +101,10 @@ Return ONLY valid JSON in this exact format:
             prompt = request.customPrompt
         
         # Generate with Gemini
-        model = genai.GenerativeModel('gemini-flash-latest')
-        response = model.generate_content(prompt)
+        response_text = await generate_gemini_text(prompt, db)
         
         # Parse the response
-        response_text = response.text.strip()
+        response_text = response_text.strip()
         
         # Remove markdown code blocks if present
         if response_text.startswith('```json'):
@@ -124,20 +121,20 @@ Return ONLY valid JSON in this exact format:
         
         return result
         
-    except json.JSONDecodeError as e:
-        print(f"JSON Parse Error: {e}")
-        print(f"Response text: {response_text}")
-        raise HTTPException(status_code=500, detail=f"Failed to parse AI response as JSON: {str(e)}")
-    except Exception as e:
-        print(f"Copy generation error: {e}")
-        raise HTTPException(status_code=500, detail=f"Copy generation failed: {str(e)}")
+    except json.JSONDecodeError as exc:
+        capture_exception(exc, "copy_generation.generate_copy", message="The provider returned unusable copy.")
+        raise HTTPException(status_code=502, detail="The provider returned unusable copy. Try adjusting the prompt.") from None
+    except InstallationError:
+        raise
+    except Exception as exc:
+        capture_exception(exc, "copy_generation.generate_copy", message="Copy generation failed.")
+        raise HTTPException(status_code=502, detail="The provider returned unusable copy. Try adjusting the prompt.") from None
 
 @router.post("/regenerate-field")
-async def regenerate_field(request: FieldRegenerationRequest, current_user: User = Depends(get_current_active_user)):
+async def regenerate_field(request: FieldRegenerationRequest, current_user: User = Depends(require_permission("ads:write")), db: Session = Depends(get_db)):
     """Regenerate a specific field (headline, body, or cta)"""
     
-    if not GEMINI_API_KEY:
-        raise HTTPException(status_code=500, detail="Gemini API key not configured")
+    require_provider_key("gemini", db)
     
     try:
         field_prompts = {
@@ -162,13 +159,14 @@ Generate a DIFFERENT, fresh variation that:
 
 Return ONLY the new {request.field} text, nothing else."""
 
-        model = genai.GenerativeModel('gemini-flash-latest')
-        response = model.generate_content(prompt)
+        response_text = await generate_gemini_text(prompt, db)
         
-        new_value = response.text.strip().strip('"').strip("'")
+        new_value = response_text.strip().strip('"').strip("'")
         
         return {"newValue": new_value}
         
-    except Exception as e:
-        print(f"Field regeneration error: {e}")
-        raise HTTPException(status_code=500, detail=f"Field regeneration failed: {str(e)}")
+    except InstallationError:
+        raise
+    except Exception as exc:
+        capture_exception(exc, "copy_generation.regenerate_field", message="Field regeneration failed.")
+        raise HTTPException(status_code=502, detail="The provider returned unusable copy. Try adjusting the prompt.") from None

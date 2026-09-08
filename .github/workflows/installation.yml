@@ -1,0 +1,68 @@
+name: Installation journey
+on:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  installation:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test-password
+          POSTGRES_DB: test_installation_browser
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:test-password@localhost:5432/test_installation_browser
+      SECRET_KEY: test-browser-signing-key-only
+      ADMIN_EMAIL: test-owner@example.com
+      ADMIN_PASSWORD: test-owner-password-123
+      MEDIA_STORAGE_PATH: /tmp/test-installation-media
+      PUBLIC_API_URL: http://127.0.0.1:8552
+      TEST_INSTALLATION_PROVIDERS: '1'
+      TEST_INSTALLATION_E2E: '1'
+      TEST_EMAIL: test-owner@example.com
+      TEST_PASSWORD: test-owner-password-123
+      TEST_API_URL: http://127.0.0.1:8552/api/v1
+      BASE_URL: http://127.0.0.1:8552
+      PORT: '8551'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pip install -r backend/requirements.txt
+      - run: npm ci --ignore-scripts
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: npm ci --ignore-scripts && npm run check
+        working-directory: .railway
+      - name: Start the isolated app and run the owner journey
+        shell: bash
+        run: |
+          python backend/tests/installation_server.py > /tmp/test-installation-backend.log 2>&1 &
+          backend_pid=$!
+          VITE_API_URL=/api/v1 DEV_API_PROXY_TARGET=http://127.0.0.1:8551 npm --prefix frontend run dev -- --host 127.0.0.1 --port 8552 --strictPort > /tmp/test-installation-frontend.log 2>&1 &
+          frontend_pid=$!
+          trap 'kill "$backend_pid" "$frontend_pid" 2>/dev/null || true; wait || true' EXIT
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:8551/health/ready && curl --fail --silent http://127.0.0.1:8552/ > /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:8551/health/ready
+          cd frontend
+          npx playwright test tests/e2e/installation.spec.js tests/smoke/installation.spec.js --workers=1 --reporter=list
+          npx playwright test tests/e2e/telemetry.spec.js tests/smoke/telemetry.spec.js --workers=1 --reporter=list
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: installation-evidence
+          path: |
+            frontend/test-results/
+            /tmp/test-installation-backend.log
+            /tmp/test-installation-frontend.log

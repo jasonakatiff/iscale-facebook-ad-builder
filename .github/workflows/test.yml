@@ -7,6 +7,19 @@ on:
     branches: [main, dev]
 
 jobs:
+  deployment-images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend, worker and frontend images
+        run: |
+          docker build --file backend/Dockerfile --tag breadwinner-backend:${{ github.sha }} .
+          docker build --file backend/Dockerfile.sync-worker --tag breadwinner-worker:${{ github.sha }} .
+          docker build --file frontend/Dockerfile.railway --tag breadwinner-frontend:${{ github.sha }} --build-arg VITE_API_URL=https://test-api.example.com/api/v1 frontend
+      - name: Verify fresh startup and persistence with disposable containers
+        run: python3 backend/scripts/check_installation_containers.py ${{ github.sha }}
+
   backend-tests:
     runs-on: ubuntu-latest
 
@@ -46,11 +59,20 @@ jobs:
         working-directory: backend
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          TEST_WORKSPACE_MIGRATION_URL: postgresql://postgres:postgres@localhost:5432/test_workspace_migration
+          TEST_INSTALL_BOOTSTRAP_URL: postgresql://postgres:postgres@localhost:5432/test_install_bootstrap
           SECRET_KEY: test-secret-key-for-ci
           GEMINI_API_KEY: mock-key
           FAL_AI_API_KEY: mock-key
-          OAUTH_TOKEN_ENCRYPTION_KEY: YLYPoADkMGcJu-Eqq2n3Q-mql-fZ69SOiyrUm2tlJgs=
         run: |
+          python - <<'PY'
+          from sqlalchemy import create_engine, text
+          engine = create_engine("postgresql://postgres:postgres@localhost:5432/postgres", isolation_level="AUTOCOMMIT")
+          with engine.connect() as connection:
+              connection.execute(text("CREATE DATABASE test_workspace_migration"))
+              connection.execute(text("CREATE DATABASE test_install_bootstrap"))
+          engine.dispose()
+          PY
           pytest tests/ -v --tb=short --cov=app --cov-report=xml
 
       - name: Upload coverage
@@ -81,12 +103,17 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
+      - name: Run frontend unit tests and build
+        working-directory: frontend
+        run: |
+          npm run test:unit
+          npm run build
+
       - name: Run E2E tests
         working-directory: frontend
         run: npx playwright test --reporter=list
         env:
           CI: true
-        continue-on-error: true
 
       - name: Upload test results
         uses: actions/upload-artifact@v4

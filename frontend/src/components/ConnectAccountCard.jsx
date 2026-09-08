@@ -18,32 +18,36 @@ export default function ConnectAccountCard({
     onDisconnect,
     disconnecting = false,
     warning,
+    statusLabel,
+    connectLabel = 'Connect',
+    connectDisabled = false,
+    compact = false,
 }) {
     const Icon = icon;
     return (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <div className={`bg-panel rounded-xl border border-line ${compact ? "connect-card-compact" : "shadow-sm p-6"}`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-4 min-w-0">
-                    <div className={`p-3 rounded-lg flex-shrink-0 ${connected ? 'bg-green-50' : 'bg-amber-50'}`}>
-                        <Icon size={24} className={connected ? 'text-green-600' : 'text-amber-600'} />
+                    <div className={`p-3 rounded-lg flex-shrink-0 ${connected ? 'bg-success-soft' : 'bg-brand-soft'}`}>
+                        <Icon size={24} className={connected ? 'text-success' : 'text-brand-ink'} />
                     </div>
                     <div className="min-w-0">
-                        <h3 className="font-bold text-gray-900">{platformName}</h3>
+                        <h3 className="font-bold text-foreground">{platformName}</h3>
                         {connected ? (
-                            <p className="text-sm text-gray-600 flex items-center gap-1">
-                                <CheckCircle2 size={14} className="text-green-600" />
-                                Connected{accountLabel ? ` — ${accountLabel}` : ''}
+                            <p className="text-sm text-secondary flex items-center gap-1">
+                                <CheckCircle2 size={14} className="text-success" />
+                                {statusLabel || 'Connected'}{accountLabel ? ` — ${accountLabel}` : ''}
                             </p>
                         ) : (
-                            <p className="text-sm text-gray-500">Not connected</p>
+                            <p className="text-sm text-muted">{statusLabel || 'Not connected'}</p>
                         )}
                         {connected && connectedAt && (
-                            <p className="text-xs text-gray-400 mt-0.5">
+                            <p className="text-xs text-faint mt-0.5">
                                 Since {new Date(connectedAt).toLocaleDateString()}
                             </p>
                         )}
                         {warning && (
-                            <p role="status" className="mt-1.5 flex items-start gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                            <p role="status" className="mt-1.5 flex items-start gap-1.5 text-xs text-brand-ink bg-brand-soft border border-brand-line rounded-lg px-2.5 py-1.5">
                                 <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
                                 <span>{warning}</span>
                             </p>
@@ -51,11 +55,11 @@ export default function ConnectAccountCard({
                     </div>
                 </div>
 
-                {connected ? (
+                {connected ? onDisconnect && (
                     <button
                         onClick={onDisconnect}
                         disabled={disconnecting}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 flex-shrink-0 self-start sm:self-auto"
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-danger border border-danger-line rounded-lg hover:bg-danger-soft transition-colors disabled:opacity-50 flex-shrink-0 self-start sm:self-auto"
                     >
                         <Unplug size={16} />
                         {disconnecting ? 'Disconnecting…' : 'Disconnect'}
@@ -63,9 +67,10 @@ export default function ConnectAccountCard({
                 ) : (
                     <button
                         onClick={onConnect}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 transition-colors flex-shrink-0 self-start sm:self-auto"
+                        disabled={connectDisabled}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-brand rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50 flex-shrink-0 self-start sm:self-auto"
                     >
-                        Connect
+                        {connectLabel}
                         <ExternalLink size={16} />
                     </button>
                 )}

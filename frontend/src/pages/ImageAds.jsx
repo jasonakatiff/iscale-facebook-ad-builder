@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+import { useInstallation } from '../context/InstallationContext';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import React, { useState, useEffect } from 'react';
@@ -9,13 +11,15 @@ import ProductSelectionStep from '../components/steps/ProductSelectionStep';
 import ProfileSelectionStep from '../components/steps/ProfileSelectionStep';
 import StyleSelector from '../components/StyleSelector';
 import { resolveMediaUrl } from '../utils/mediaUrl';
+import { LeadRouterBrief } from '../components/LeadRouterDefault';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export default function ImageAds() {
     const { brands, customerProfiles } = useBrands();
+    const { state: installation } = useInstallation();
     const { showError } = useToast();
-    const { authFetch } = useAuth();
+    const { authFetch, user } = useAuth();
     const [currentStep, setCurrentStep] = useState(1);
     const [generating, setGenerating] = useState(false);
     const [generatedCopy, setGeneratedCopy] = useState(null);
@@ -26,7 +30,7 @@ export default function ImageAds() {
 
     // Load saved campaign details from localStorage on mount
     const [wizardData, setWizardData] = useState(() => {
-        const savedCampaignDetails = localStorage.getItem('imageAds_campaignDetails');
+        const savedCampaignDetails = localStorage.getItem(`imageAds_campaignDetails:${user?.id}`);
         const defaultCampaignDetails = {
             offer: '',
             urgency: '',
@@ -57,9 +61,9 @@ export default function ImageAds() {
     // Save campaign details to localStorage whenever they change
     useEffect(() => {
         if (wizardData.campaignDetails) {
-            localStorage.setItem('imageAds_campaignDetails', JSON.stringify(wizardData.campaignDetails));
+            localStorage.setItem(`imageAds_campaignDetails:${user?.id}`, JSON.stringify(wizardData.campaignDetails));
         }
-    }, [wizardData.campaignDetails]);
+    }, [wizardData.campaignDetails, user?.id]);
 
     const steps = [
         { id: 1, name: 'Brand', icon: Briefcase },
@@ -133,6 +137,10 @@ export default function ImageAds() {
     };
 
     const handleGenerate = async () => {
+        if (!installation?.capabilities.image_ad_workflow) {
+            showError('Connect Gemini and fal.ai in Settings → Integrations before generating.');
+            return;
+        }
         setGenerating(true);
         try {
             const response = await authFetch(`${API_URL}/copy-generation/generate`, {
@@ -142,7 +150,8 @@ export default function ImageAds() {
             });
 
             if (!response.ok) {
-                throw new Error('Copy generation failed');
+                const failure = await response.json();
+                throw new Error(failure.error?.message || 'Copy generation failed. Check your connections in Settings.');
             }
 
             const data = await response.json();
@@ -151,7 +160,7 @@ export default function ImageAds() {
             setCurrentStep(9);
         } catch (error) {
             console.error('Copy generation error:', error);
-            showError('Failed to generate copy. Please try again.');
+            showError(error.message);
         } finally {
             setGenerating(false);
         }
@@ -180,7 +189,8 @@ export default function ImageAds() {
             });
 
             if (!response.ok) {
-                throw new Error('Image generation failed');
+                const failure = await response.json();
+                throw new Error(failure.error?.message || 'Image generation failed. Check your connections in Settings.');
             }
 
             const data = await response.json();
@@ -233,13 +243,13 @@ export default function ImageAds() {
                 console.log('✅ Saved generated ads to database with bundle ID:', bundleId);
             } catch (saveError) {
                 console.error('Failed to save ads to database:', saveError);
-                // Don't fail the whole operation if saving fails
+                showError('Your images were generated but could not be saved. Download them before leaving this page.');
             }
 
             setCurrentStep(10); // Move to image result step
         } catch (error) {
             console.error('Image generation error:', error);
-            showError('Failed to generate images. Please try again.');
+            showError(error.message);
         } finally {
             setGenerating(false);
         }
@@ -247,19 +257,23 @@ export default function ImageAds() {
 
     return (
         <div className="max-w-5xl mx-auto">
+            {!installation?.capabilities.image_ad_workflow && <div className="studio-panel p-4 mb-5 text-sm" role="status">
+                Connect Gemini for copy and fal.ai for images before generating.{' '}
+                <Link to="/settings?tab=integrations" className="text-brand-ink underline">Open integration settings</Link>
+            </div>}
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                    <Image size={32} className="text-amber-600" />
+                <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
+                    <Image size={32} className="text-brand-ink" />
                     Create Image Ads
                 </h1>
-                <p className="text-gray-600 mt-1">Generate AI-powered ads using winning templates</p>
+                <p className="text-secondary mt-1">Generate AI-powered ads using winning templates</p>
             </div>
 
             {/* Progress Steps */}
-            <div className="mb-8 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center justify-between relative">
-                    <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-gray-200 -z-10"></div>
+            <div className="mb-8 bg-panel rounded-xl shadow-sm border border-line p-6">
+                <div className="grid grid-cols-4 gap-y-4 sm:flex items-center justify-between relative">
+                    <div className="hidden sm:block absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-px bg-line -z-10"></div>
                     {steps.map((step, index) => {
                         const Icon = step.icon;
                         const isActive = step.id === currentStep;
@@ -277,19 +291,19 @@ export default function ImageAds() {
                         return (
                             <div
                                 key={step.id}
-                                className={`flex flex-col items-center bg-white px-2 ${isClickable ? 'cursor-pointer group' : 'cursor-not-allowed opacity-60'}`}
+                                className={`flex flex-col items-center bg-panel px-2 ${isClickable ? 'cursor-pointer group' : 'cursor-not-allowed opacity-60'}`}
                                 onClick={() => isClickable && handleStepClick(step.id)}
                             >
                                 <div
-                                    className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-all ${isActive ? 'bg-amber-600 text-white scale-110 shadow-md' :
+                                    className={`w-10 h-10 rounded-lg flex items-center justify-center mb-2 transition-all ${isActive ? 'bg-brand text-white ' :
                                         isCompleted ? 'bg-green-500 text-white group-hover:bg-green-600' :
-                                            'bg-gray-200 text-gray-500 group-hover:bg-gray-300'
+                                            'bg-soft text-muted group-hover:bg-line-strong'
                                         }`}
                                 >
                                     {isCompleted ? <Check size={20} /> : <Icon size={20} />}
                                 </div>
-                                <span className={`text-xs font-medium transition-colors ${isActive ? 'text-amber-600' :
-                                    isClickable ? 'text-gray-500 group-hover:text-gray-700' : 'text-gray-400'
+                                <span className={`text-xs font-medium transition-colors ${isActive ? 'text-brand-ink' :
+                                    isClickable ? 'text-muted group-hover:text-secondary' : 'text-faint'
                                     }`}>
                                     {step.name}
                                 </span>
@@ -300,15 +314,15 @@ export default function ImageAds() {
             </div>
 
             {/* Step Content */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 min-h-[500px] relative">
+            <div className="bg-panel rounded-xl shadow-sm border border-line p-8 min-h-[500px] relative">
                 {/* Loading Overlay */}
                 {generating && (
-                    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center rounded-xl">
-                        <div className="w-16 h-16 border-4 border-amber-200 border-t-amber-600 rounded-full animate-spin mb-4"></div>
-                        <h3 className="text-xl font-bold text-gray-900">
+                    <div className="absolute inset-0 bg-panel/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center rounded-xl">
+                        <div className="w-16 h-16 border-4 border-brand-line border-t-amber-600 rounded-full animate-spin mb-4"></div>
+                        <h3 className="text-xl font-bold text-foreground">
                             {currentStep === 9 ? 'Generating High-Converting Images...' : 'Generating Ad Copy...'}
                         </h3>
-                        <p className="text-gray-500 mt-2">Using AI to create your perfect ads</p>
+                        <p className="text-muted mt-2">Using AI to create your perfect ads</p>
                     </div>
                 )}
 
@@ -356,17 +370,17 @@ export default function ImageAds() {
                 {currentStep === 4 && (
                     <div>
                         <h3 className="text-xl font-bold mb-4">Select a Template or Style</h3>
-                        <p className="text-gray-600 mb-6">
+                        <p className="text-secondary mb-6">
                             Choose a proven ad style archetype or browse existing templates
                         </p>
 
                         {/* Mode Toggle */}
-                        <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
+                        <div className="flex gap-2 mb-6 bg-inset p-1 rounded-lg w-fit">
                             <button
                                 onClick={() => setTemplateMode('style')}
                                 className={`px-6 py-2 rounded-md font-medium transition-all ${templateMode === 'style'
-                                    ? 'bg-white text-amber-600 shadow-sm'
-                                    : 'text-gray-600 hover:text-gray-900'
+                                    ? 'bg-panel text-brand-ink shadow-sm'
+                                    : 'text-secondary hover:text-foreground'
                                     }`}
                             >
                                 <div className="flex items-center gap-2">
@@ -377,8 +391,8 @@ export default function ImageAds() {
                             <button
                                 onClick={() => setTemplateMode('template')}
                                 className={`px-6 py-2 rounded-md font-medium transition-all ${templateMode === 'template'
-                                    ? 'bg-white text-amber-600 shadow-sm'
-                                    : 'text-gray-600 hover:text-gray-900'
+                                    ? 'bg-panel text-brand-ink shadow-sm'
+                                    : 'text-secondary hover:text-foreground'
                                     }`}
                             >
                                 <div className="flex items-center gap-2">
@@ -437,10 +451,13 @@ export default function ImageAds() {
 
                 {/* Step 7: Campaign Details */}
                 {currentStep === 7 && (
+                    <>
+                    <LeadRouterBrief key={`${wizardData.brand?.id}:${wizardData.product?.id}`} brandId={wizardData.brand?.id} productId={wizardData.product?.id} onUseOffer={offer => updateCampaignDetails('offer', offer)} />
                     <CampaignDetailsStep
                         details={wizardData.campaignDetails}
                         onChange={updateCampaignDetails}
                     />
+                    </>
                 )}
 
                 {/* Step 8: Review */}
@@ -475,14 +492,14 @@ export default function ImageAds() {
                         />
                     ) : (
                         <div className="text-center py-12">
-                            <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <div className="w-16 h-16 bg-danger-soft text-danger rounded-full flex items-center justify-center mx-auto mb-4">
                                 <FileText size={32} />
                             </div>
-                            <h3 className="text-xl font-bold text-gray-900 mb-2">Generation Error</h3>
-                            <p className="text-gray-600 mb-6">Something went wrong displaying the generated images.</p>
+                            <h3 className="text-xl font-bold text-foreground mb-2">Generation Error</h3>
+                            <p className="text-secondary mb-6">Something went wrong displaying the generated images.</p>
                             <button
                                 onClick={() => setCurrentStep(9)}
-                                className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors"
+                                className="px-6 py-3 bg-soft text-secondary rounded-lg hover:bg-line-strong font-medium transition-colors"
                             >
                                 Go Back
                             </button>
@@ -498,8 +515,8 @@ export default function ImageAds() {
                         onClick={prevStep}
                         disabled={currentStep === 1}
                         className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${currentStep === 1
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            ? 'bg-inset text-faint cursor-not-allowed'
+                            : 'bg-inset text-secondary hover:bg-soft'
                             }`}
                     >
                         <ChevronLeft size={20} />
@@ -510,7 +527,7 @@ export default function ImageAds() {
                         <button
                             onClick={handleGenerate}
                             disabled={!canProceed() || generating}
-                            className="flex items-center gap-2 px-8 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="flex items-center gap-2 px-8 py-3 bg-brand text-white rounded-lg hover:bg-brand-hover font-medium shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                             <Sparkles size={20} className={generating ? 'animate-spin' : ''} />
                             {generating ? 'Generating Magic...' : 'Generate Ad Copy'}
@@ -519,7 +536,7 @@ export default function ImageAds() {
                         <button
                             onClick={nextStep}
                             disabled={!canProceed()}
-                            className="flex items-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="flex items-center gap-2 px-6 py-3 bg-brand text-white rounded-lg hover:bg-brand-hover font-medium shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                             Continue
                             <ChevronRight size={20} />
@@ -538,7 +555,7 @@ function VariationCountStep({ count, onChange }) {
     return (
         <div>
             <h3 className="text-xl font-bold mb-4">How Many Variations?</h3>
-            <p className="text-gray-600 mb-6">Choose how many ad variations to generate (1-10)</p>
+            <p className="text-secondary mb-6">Choose how many ad variations to generate (1-10)</p>
 
             <div className="max-w-md mx-auto">
                 <div className="flex items-center gap-4 mb-6">
@@ -548,15 +565,15 @@ function VariationCountStep({ count, onChange }) {
                         max="10"
                         value={count}
                         onChange={(e) => onChange(parseInt(e.target.value))}
-                        className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-amber-600"
+                        className="flex-1 h-2 bg-soft rounded-lg appearance-none cursor-pointer accent-amber-600"
                     />
                     <div className="w-16 h-16 rounded-full bg-amber-600 text-white flex items-center justify-center text-2xl font-bold">
                         {count}
                     </div>
                 </div>
 
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                    <p className="text-sm text-amber-800">
+                <div className="bg-brand-soft border border-brand-line rounded-lg p-4">
+                    <p className="text-sm text-brand-ink">
                         <strong>Tip:</strong> More variations give you more options to choose from, but will take longer to generate.
                     </p>
                 </div>
@@ -617,8 +634,8 @@ function ImageSizeStep({ selectedSizes = [], onSelect, resolution, onResolutionC
     return (
         <div>
             <h3 className="text-xl font-bold mb-4">Select Image Sizes & Quality</h3>
-            <p className="text-gray-600 mb-2">Square is required. Select up to 2 additional sizes.</p>
-            <p className="text-sm text-amber-600 font-medium mb-6">{selectedSizes.length} of 3 selected</p>
+            <p className="text-secondary mb-2">Square is required. Select up to 2 additional sizes.</p>
+            <p className="text-sm text-brand-ink font-medium mb-6">{selectedSizes.length} of 3 selected</p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto mb-8">
                 {sizeOptions.map((size) => {
@@ -631,12 +648,12 @@ function ImageSizeStep({ selectedSizes = [], onSelect, resolution, onResolutionC
                             key={size.name}
                             onClick={() => !isDisabled && toggleSize(size)}
                             className={`p-6 rounded-xl border-2 transition-all relative ${isRequired
-                                ? 'border-amber-600 bg-amber-50 shadow-lg cursor-default'
+                                ? 'border-amber-600 bg-brand-soft shadow-lg cursor-default'
                                 : isSelected
-                                    ? 'border-amber-600 bg-amber-50 shadow-lg cursor-pointer'
+                                    ? 'border-amber-600 bg-brand-soft shadow-lg cursor-pointer'
                                     : isDisabled
-                                        ? 'border-gray-200 opacity-50 cursor-not-allowed'
-                                        : 'border-gray-200 hover:border-amber-300 hover:shadow-md cursor-pointer'
+                                        ? 'border-line opacity-50 cursor-not-allowed'
+                                        : 'border-line hover:border-brand-line hover:shadow-md cursor-pointer'
                                 }`}
                         >
                             {/* Required Badge or Checkbox */}
@@ -645,23 +662,23 @@ function ImageSizeStep({ selectedSizes = [], onSelect, resolution, onResolutionC
                                     REQUIRED
                                 </div>
                             ) : (
-                                <div className={`absolute top-3 right-3 w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-amber-600 border-amber-600' : 'bg-white border-gray-400'
+                                <div className={`absolute top-3 right-3 w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-amber-600 border-amber-600' : 'bg-panel border-line-strong'
                                     }`}>
                                     {isSelected && <Check size={14} className="text-white" />}
                                 </div>
                             )}
 
                             <div className="text-4xl mb-3 text-center">{size.icon}</div>
-                            <h4 className="font-bold text-gray-900 mb-2 text-center">{size.name}</h4>
-                            <p className="text-sm text-gray-600 mb-3 text-center">{size.description}</p>
-                            <div className="bg-white rounded-lg p-3 border border-gray-200">
-                                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                            <h4 className="font-bold text-foreground mb-2 text-center">{size.name}</h4>
+                            <p className="text-sm text-secondary mb-3 text-center">{size.description}</p>
+                            <div className="bg-panel rounded-lg p-3 border border-line">
+                                <div className="flex justify-between text-xs text-muted mb-1">
                                     <span>Dimensions:</span>
-                                    <span className="font-medium text-gray-900">{size.width}×{size.height}</span>
+                                    <span className="font-medium text-foreground">{size.width}×{size.height}</span>
                                 </div>
-                                <div className="flex justify-between text-xs text-gray-500">
+                                <div className="flex justify-between text-xs text-muted">
                                     <span>Aspect Ratio:</span>
-                                    <span className="font-medium text-gray-900">{size.aspectRatio}</span>
+                                    <span className="font-medium text-foreground">{size.aspectRatio}</span>
                                 </div>
                             </div>
                         </div>
@@ -673,7 +690,7 @@ function ImageSizeStep({ selectedSizes = [], onSelect, resolution, onResolutionC
             <div className="max-w-4xl mx-auto mb-8">
                 <button
                     onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="flex items-center gap-2 text-gray-600 font-medium hover:text-amber-600 transition-colors mb-4"
+                    className="flex items-center gap-2 text-secondary font-medium hover:text-brand-ink transition-colors mb-4"
                 >
                     <Settings size={18} />
                     <span>Advanced Settings (Quality & Model)</span>
@@ -683,12 +700,12 @@ function ImageSizeStep({ selectedSizes = [], onSelect, resolution, onResolutionC
                 {showAdvanced && (
                     <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-300">
                         {/* Resolution Selector */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div className="bg-panel rounded-xl shadow-sm border border-line p-6">
                             <div className="flex items-center gap-2 mb-4">
-                                <Sparkles className="text-amber-600" size={20} />
-                                <h4 className="font-bold text-gray-900">Image Quality</h4>
+                                <Sparkles className="text-brand-ink" size={20} />
+                                <h4 className="font-bold text-foreground">Image Quality</h4>
                             </div>
-                            <p className="text-sm text-gray-600 mb-4">Select the resolution for your generated images</p>
+                            <p className="text-sm text-secondary mb-4">Select the resolution for your generated images</p>
 
                             <div className="grid grid-cols-3 gap-3">
                                 {['1K', '2K', '4K'].map((res) => (
@@ -696,8 +713,8 @@ function ImageSizeStep({ selectedSizes = [], onSelect, resolution, onResolutionC
                                         key={res}
                                         onClick={() => onResolutionChange(res)}
                                         className={`p-4 rounded-lg border-2 transition-all ${resolution === res
-                                            ? 'border-amber-600 bg-amber-50 text-amber-900'
-                                            : 'border-gray-200 hover:border-amber-300 text-gray-700'
+                                            ? 'border-amber-600 bg-brand-soft text-brand-ink'
+                                            : 'border-line hover:border-brand-line text-secondary'
                                             }`}
                                     >
                                         <div className="font-bold text-lg">{res}</div>
@@ -710,45 +727,45 @@ function ImageSizeStep({ selectedSizes = [], onSelect, resolution, onResolutionC
                                 ))}
                             </div>
 
-                            <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                                <p className="text-sm text-amber-800">
+                            <div className="mt-4 bg-brand-soft border border-brand-line rounded-lg p-3">
+                                <p className="text-sm text-brand-ink">
                                     <strong>Tip:</strong> Higher resolutions produce better quality but take longer to generate. 1K is recommended for quick previews.
                                 </p>
                             </div>
                         </div>
 
                         {/* Model Selection */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div className="bg-panel rounded-xl shadow-sm border border-line p-6">
                             <h3 className="text-xl font-bold mb-4">Select AI Model (Primary Image)</h3>
-                            <p className="text-gray-600 mb-4">Choose the model used to generate the initial square image. Resizing always uses Nano Banana Pro Edit.</p>
+                            <p className="text-secondary mb-4">Choose the model used to generate the initial square image. Resizing always uses Nano Banana Pro Edit.</p>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div
                                     onClick={() => onModelChange('nano-banana-pro')}
                                     className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${model === 'nano-banana-pro'
-                                        ? 'border-amber-600 bg-amber-50'
-                                        : 'border-gray-200 hover:border-amber-300'
+                                        ? 'border-amber-600 bg-brand-soft'
+                                        : 'border-line hover:border-brand-line'
                                         }`}
                                 >
                                     <div className="flex items-center justify-between mb-2">
                                         <span className="font-bold text-lg">Nano Banana Pro</span>
-                                        {model === 'nano-banana-pro' && <Check className="text-amber-600" size={20} />}
+                                        {model === 'nano-banana-pro' && <Check className="text-brand-ink" size={20} />}
                                     </div>
-                                    <p className="text-sm text-gray-600">Fast, efficient, and great for most styles. (Default)</p>
+                                    <p className="text-sm text-secondary">Fast, efficient, and great for most styles. (Default)</p>
                                 </div>
 
                                 <div
                                     onClick={() => onModelChange('imagen4')}
                                     className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${model === 'imagen4'
-                                        ? 'border-amber-600 bg-amber-50'
-                                        : 'border-gray-200 hover:border-amber-300'
+                                        ? 'border-amber-600 bg-brand-soft'
+                                        : 'border-line hover:border-brand-line'
                                         }`}
                                 >
                                     <div className="flex items-center justify-between mb-2">
                                         <span className="font-bold text-lg">Google Imagen 3</span>
-                                        {model === 'imagen4' && <Check className="text-amber-600" size={20} />}
+                                        {model === 'imagen4' && <Check className="text-brand-ink" size={20} />}
                                     </div>
-                                    <p className="text-sm text-gray-600">High fidelity, photorealistic quality. Slower generation time.</p>
+                                    <p className="text-sm text-secondary">High fidelity, photorealistic quality. Slower generation time.</p>
                                 </div>
                             </div>
                         </div>
@@ -771,11 +788,11 @@ function CampaignDetailsStep({ details, onChange }) {
     return (
         <div>
             <h3 className="text-xl font-bold mb-4">Campaign Details</h3>
-            <p className="text-gray-600 mb-6">Provide details to customize your ad copy</p>
+            <p className="text-secondary mb-6">Provide details to customize your ad copy</p>
 
             <div className="max-w-2xl space-y-4">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-secondary mb-2">
                         Offer / Promotion *
                     </label>
                     <input
@@ -784,12 +801,12 @@ function CampaignDetailsStep({ details, onChange }) {
                         value={details.offer}
                         onChange={(e) => onChange('offer', e.target.value)}
                         placeholder="e.g., 50% off Black Friday, Buy 2 Get 1 Free"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                        className="w-full px-4 py-3 border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-secondary mb-2">
                         Urgency / Timing
                     </label>
                     <input
@@ -797,12 +814,12 @@ function CampaignDetailsStep({ details, onChange }) {
                         value={details.urgency}
                         onChange={(e) => onChange('urgency', e.target.value)}
                         placeholder="e.g., Limited time, Ends tonight, While supplies last"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                        className="w-full px-4 py-3 border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-secondary mb-2">
                         Key Messaging *
                     </label>
                     <textarea
@@ -810,12 +827,12 @@ function CampaignDetailsStep({ details, onChange }) {
                         onChange={(e) => onChange('messaging', e.target.value)}
                         placeholder="e.g., Science-backed results, Trusted by 10,000+ customers, Clinically proven"
                         rows={3}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                        className="w-full px-4 py-3 border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-secondary mb-2">
                         Visual Angle (Optional)
                     </label>
                     <input
@@ -823,9 +840,9 @@ function CampaignDetailsStep({ details, onChange }) {
                         value={details.angle || ''}
                         onChange={(e) => onChange('angle', e.target.value)}
                         placeholder="e.g., Low angle hero shot, Top down flat lay, Close up macro"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                        className="w-full px-4 py-3 border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-muted mt-1">
                         Overrides the template's default subject matter/angle.
                     </p>
                 </div>
@@ -905,7 +922,7 @@ Return ONLY valid JSON in this exact format:
     return (
         <div>
             <h3 className="text-xl font-bold mb-4">Review Your Selections</h3>
-            <p className="text-gray-600 mb-6">Verify everything looks correct before generating</p>
+            <p className="text-secondary mb-6">Verify everything looks correct before generating</p>
 
             <div className="grid grid-cols-2 gap-3 max-w-3xl">
                 <ReviewItem
@@ -951,46 +968,46 @@ Return ONLY valid JSON in this exact format:
             </div>
 
             {/* AI Prompt Accordion */}
-            <div className="mt-6 max-w-3xl bg-white rounded-xl shadow-sm border border-gray-200">
+            <div className="mt-6 max-w-3xl bg-panel rounded-xl shadow-sm border border-line">
                 <button
                     onClick={() => setShowPrompt(!showPrompt)}
-                    className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors rounded-xl"
+                    className="w-full p-4 flex items-center justify-between hover:bg-subtle transition-colors rounded-xl"
                 >
                     <div className="flex items-center gap-2">
-                        <Sparkles className="text-amber-600" size={18} />
-                        <h4 className="font-bold text-gray-900 text-sm">AI Copy Generation Prompt</h4>
-                        <span className="text-xs text-gray-500">(Advanced)</span>
+                        <Sparkles className="text-brand-ink" size={18} />
+                        <h4 className="font-bold text-foreground text-sm">AI Copy Generation Prompt</h4>
+                        <span className="text-xs text-muted">(Advanced)</span>
                     </div>
                     <ChevronRight
-                        className={`text-gray-400 transition-transform ${showPrompt ? 'rotate-90' : ''}`}
+                        className={`text-faint transition-transform ${showPrompt ? 'rotate-90' : ''}`}
                         size={18}
                     />
                 </button>
 
                 {showPrompt && (
-                    <div className="px-4 pb-4 border-t border-gray-100">
-                        <p className="text-xs text-gray-600 mb-3 mt-3">Customize the AI prompt used to generate your ad copy:</p>
+                    <div className="px-4 pb-4 border-t border-line-soft">
+                        <p className="text-xs text-secondary mb-3 mt-3">Customize the AI prompt used to generate your ad copy:</p>
                         <textarea
                             value={customPrompt}
                             onChange={(e) => setCustomPrompt(e.target.value)}
-                            className="w-full h-64 p-3 text-xs font-mono border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
+                            className="w-full h-64 p-3 text-xs font-mono border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
                             placeholder="Enter your custom prompt..."
                         />
                         <div className="flex items-center justify-between mt-2">
                             <button
                                 onClick={() => setCustomPrompt(buildPrompt())}
-                                className="text-xs text-amber-600 hover:text-amber-700 font-medium"
+                                className="text-xs text-brand-ink hover:text-brand-ink font-medium"
                             >
                                 Reset to Default
                             </button>
-                            <span className="text-xs text-gray-500">{customPrompt.length} characters</span>
+                            <span className="text-xs text-muted">{customPrompt.length} characters</span>
                         </div>
                     </div>
                 )}
             </div>
 
-            <div className="mt-6 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-4 max-w-3xl">
-                <p className="text-sm text-amber-900">
+            <div className="mt-6 bg-brand-soft border border-brand-line rounded-lg p-4 max-w-3xl">
+                <p className="text-sm text-brand-ink">
                     <strong>Ready to generate!</strong> Click "Generate Ad Copy" to create {wizardData.variationCount} AI-powered ad{wizardData.variationCount > 1 ? 's' : ''} based on your selections.
                 </p>
             </div>
@@ -1000,11 +1017,11 @@ Return ONLY valid JSON in this exact format:
 
 function ReviewItem({ label, value, icon: Icon }) {
     return (
-        <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-            <Icon className="text-amber-600 flex-shrink-0" size={18} />
+        <div className="flex items-center gap-2 p-3 bg-subtle rounded-lg">
+            <Icon className="text-brand-ink flex-shrink-0" size={18} />
             <div className="min-w-0">
-                <div className="text-xs font-medium text-gray-500">{label}</div>
-                <div className="text-sm text-gray-900 truncate">{value}</div>
+                <div className="text-xs font-medium text-muted">{label}</div>
+                <div className="text-sm text-foreground truncate">{value}</div>
             </div>
         </div>
     );
@@ -1183,17 +1200,17 @@ Style: ${designStyle}`);
         <button
             onClick={() => handleRegenerateField(field)}
             disabled={regeneratingField === field}
-            className="ml-2 p-1 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-full transition-colors"
+            className="ml-2 p-1 text-faint hover:text-brand-ink hover:bg-brand-soft rounded-full transition-colors"
             title="Regenerate this field"
         >
-            <Sparkles size={14} className={regeneratingField === field ? 'animate-spin text-amber-600' : ''} />
+            <Sparkles size={14} className={regeneratingField === field ? 'animate-spin text-brand-ink' : ''} />
         </button>
     );
 
     return (
         <div>
             <h3 className="text-xl font-bold mb-2">Generated Ad Copy</h3>
-            <p className="text-gray-600 mb-6">
+            <p className="text-secondary mb-6">
                 Select a variation and edit if needed. Generated {generatedCopy.variations.length} variations based on your template and brand.
             </p>
 
@@ -1207,8 +1224,8 @@ Style: ${designStyle}`);
                             setEditedCopy(null);
                         }}
                         className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all ${selectedIndex === index
-                            ? 'bg-amber-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            ? 'bg-brand text-white'
+                            : 'bg-inset text-secondary hover:bg-soft'
                             }`}
                     >
                         Variation {index + 1}
@@ -1221,7 +1238,7 @@ Style: ${designStyle}`);
                 {/* Edit Form */}
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        <label className="block text-sm font-medium text-secondary mb-2 flex items-center">
                             Headline
                             <RegenerateButton field="headline" />
                         </label>
@@ -1229,16 +1246,16 @@ Style: ${designStyle}`);
                             type="text"
                             value={currentCopy.headline}
                             onChange={(e) => handleEdit('headline', e.target.value)}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                            className="w-full px-4 py-3 border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                             placeholder="Enter headline"
                         />
-                        <div className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-muted mt-1">
                             {currentCopy.headline.length} / 40 characters
                         </div>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        <label className="block text-sm font-medium text-secondary mb-2 flex items-center">
                             Body Copy
                             <RegenerateButton field="body" />
                         </label>
@@ -1246,16 +1263,16 @@ Style: ${designStyle}`);
                             value={currentCopy.body}
                             onChange={(e) => handleEdit('body', e.target.value)}
                             rows={3}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                            className="w-full px-4 py-3 border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                             placeholder="Enter body copy"
                         />
-                        <div className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-muted mt-1">
                             {currentCopy.body.length} / 125 characters (recommended)
                         </div>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                        <label className="block text-sm font-medium text-secondary mb-2 flex items-center">
                             Call to Action
                             <RegenerateButton field="cta" />
                         </label>
@@ -1263,10 +1280,10 @@ Style: ${designStyle}`);
                             type="text"
                             value={currentCopy.cta}
                             onChange={(e) => handleEdit('cta', e.target.value)}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                            className="w-full px-4 py-3 border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                             placeholder="Enter CTA"
                         />
-                        <div className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-muted mt-1">
                             {currentCopy.cta.length} / 20 characters
                         </div>
                     </div>
@@ -1274,20 +1291,20 @@ Style: ${designStyle}`);
 
                 {/* Preview */}
                 <div>
-                    <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl p-6">
-                        <div className="text-xs font-medium text-amber-600 mb-3">PREVIEW</div>
-                        <div className="bg-white rounded-lg p-4 shadow-sm">
-                            <div className="font-bold text-lg text-gray-900 mb-2">
+                    <div className="bg-brand-soft border-2 border-brand-line rounded-xl p-6">
+                        <div className="text-xs font-medium text-brand-ink mb-3">PREVIEW</div>
+                        <div className="bg-panel rounded-lg p-4 shadow-sm">
+                            <div className="font-bold text-lg text-foreground mb-2">
                                 {currentCopy.headline}
                             </div>
-                            <div className="text-gray-700 text-sm mb-4">
+                            <div className="text-secondary text-sm mb-4">
                                 {currentCopy.body}
                             </div>
-                            <button className="w-full bg-amber-600 text-white font-medium py-2 px-4 rounded-lg">
+                            <button className="w-full bg-brand text-white font-medium py-2 px-4 rounded-lg">
                                 {currentCopy.cta}
                             </button>
                         </div>
-                        <div className="mt-4 text-xs text-gray-600 space-y-1">
+                        <div className="mt-4 text-xs text-secondary space-y-1">
                             <div><strong>Brand:</strong> {wizardData.brand.name}</div>
                             <div><strong>Product:</strong> {wizardData.product.name}</div>
                             <div><strong>Template:</strong> {wizardData.template?.name || 'Custom'}</div>
@@ -1297,38 +1314,38 @@ Style: ${designStyle}`);
             </div>
 
             {/* Custom Image Prompt */}
-            <div className="mt-8 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="mt-8 bg-panel rounded-xl shadow-sm border border-line overflow-hidden">
                 <button
                     onClick={() => setShowPrompt(!showPrompt)}
-                    className="w-full p-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between hover:bg-gray-100 transition-colors"
+                    className="w-full p-4 bg-subtle border-b border-line flex items-center justify-between hover:bg-inset transition-colors"
                 >
                     <div className="flex items-center gap-2">
-                        <Sparkles className="text-amber-600" size={18} />
-                        <h4 className="font-bold text-gray-900 text-sm">Custom Image Generation Prompt (Advanced)</h4>
+                        <Sparkles className="text-brand-ink" size={18} />
+                        <h4 className="font-bold text-foreground text-sm">Custom Image Generation Prompt (Advanced)</h4>
                     </div>
-                    {showPrompt ? <ChevronUp size={18} className="text-gray-500" /> : <ChevronDown size={18} className="text-gray-500" />}
+                    {showPrompt ? <ChevronUp size={18} className="text-muted" /> : <ChevronDown size={18} className="text-muted" />}
                 </button>
 
                 {showPrompt && (
                     <div className="p-4 animate-in slide-in-from-top-2 duration-200">
-                        <p className="text-xs text-gray-600 mb-3">
+                        <p className="text-xs text-secondary mb-3">
                             <strong>Optional:</strong> Override the AI-generated prompt. Leave empty to automatically build a comprehensive prompt using your brand, product, copy, and template details.
                         </p>
                         <textarea
                             value={customImagePrompt}
                             onChange={(e) => setCustomImagePrompt(e.target.value)}
                             placeholder="Leave empty to auto-generate comprehensive prompt from your brand, product, and copy..."
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm font-mono"
+                            className="w-full px-3 py-2 border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm font-mono"
                             rows={4}
                         />
                         <div className="flex items-center justify-between mt-2">
                             <button
                                 onClick={handleResetPrompt}
-                                className="text-xs text-amber-600 hover:text-amber-700 font-medium"
+                                className="text-xs text-brand-ink hover:text-brand-ink font-medium"
                             >
                                 ↺ Reset to Generated Prompt
                             </button>
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-muted">
                                 {customImagePrompt.length > 0
                                     ? `${customImagePrompt.length} characters`
                                     : '✨ Auto-generating comprehensive prompt'}
@@ -1342,14 +1359,14 @@ Style: ${designStyle}`);
             <div className="mt-6 flex items-center justify-between">
                 <button
                     onClick={onBack}
-                    className="flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium transition-colors"
+                    className="flex items-center gap-2 px-6 py-3 bg-inset text-secondary rounded-lg hover:bg-soft font-medium transition-colors"
                 >
                     <ChevronLeft size={20} />
                     Back to Review
                 </button>
                 <button
                     onClick={handleProceed}
-                    className="flex items-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium shadow-lg transition-colors"
+                    className="flex items-center gap-2 px-6 py-3 bg-brand text-white rounded-lg hover:bg-brand-hover font-medium shadow-lg transition-colors"
                 >
                     Generate Image
                     <ChevronRight size={20} />
@@ -1364,7 +1381,7 @@ function ImageGenerationStep({ generatedImages, wizardData, selectedCopy, onBack
     const [imgError, setImgError] = useState(false);
 
     if (!generatedImages || generatedImages.length === 0) {
-        return <div className="text-center p-8 text-red-600">Error: No image data available.</div>;
+        return <div className="text-center p-8 text-danger">Error: No image data available.</div>;
     }
 
     // Filter to show only square images in the main grid
@@ -1396,11 +1413,11 @@ function ImageGenerationStep({ generatedImages, wizardData, selectedCopy, onBack
         <div>
             {/* Header */}
             <div className="text-center mb-8">
-                <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-20 h-20 bg-success-soft text-success rounded-full flex items-center justify-center mx-auto mb-4">
                     <Check size={40} />
                 </div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-2">Ads Generated Successfully!</h2>
-                <p className="text-gray-600">Click on any image to view details and download</p>
+                <h2 className="text-3xl font-bold text-foreground mb-2">Ads Generated Successfully!</h2>
+                <p className="text-secondary">Click on any image to view details and download</p>
             </div>
 
             {/* Image Tile Gallery (Square Images Only) */}
@@ -1409,7 +1426,7 @@ function ImageGenerationStep({ generatedImages, wizardData, selectedCopy, onBack
                     <button
                         key={index}
                         onClick={() => setSelectedImageIndex(index)}
-                        className="group relative aspect-square rounded-xl overflow-hidden border-2 border-gray-200 hover:border-amber-600 transition-all hover:shadow-xl hover:scale-105"
+                        className="group relative aspect-square rounded-xl overflow-hidden border-2 border-line hover:border-amber-600 transition-all hover:shadow-xl hover:scale-105"
                     >
                         <img
                             src={img.url}
@@ -1425,7 +1442,7 @@ function ImageGenerationStep({ generatedImages, wizardData, selectedCopy, onBack
                             </div>
                         </div>
                         {/* Size badge */}
-                        <div className="absolute bottom-2 left-2 right-2 bg-white/90 backdrop-blur-sm rounded-lg px-2 py-1 text-xs font-medium text-gray-900 text-center">
+                        <div className="absolute bottom-2 left-2 right-2 bg-panel/90 backdrop-blur-sm rounded-lg px-2 py-1 text-xs font-medium text-foreground text-center">
                             {img.size}
                         </div>
                     </button>
@@ -1436,14 +1453,14 @@ function ImageGenerationStep({ generatedImages, wizardData, selectedCopy, onBack
             <div className="flex justify-between items-center">
                 <button
                     onClick={onBack}
-                    className="flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium transition-colors"
+                    className="flex items-center gap-2 px-6 py-3 bg-inset text-secondary rounded-lg hover:bg-soft font-medium transition-colors"
                 >
                     <ChevronLeft size={20} />
                     Back to Copy
                 </button>
                 <button
                     onClick={onRestart}
-                    className="px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium shadow-lg transition-colors"
+                    className="px-6 py-3 bg-brand text-white rounded-lg hover:bg-brand-hover font-medium shadow-lg transition-colors"
                 >
                     Create New Ad
                 </button>
@@ -1456,17 +1473,17 @@ function ImageGenerationStep({ generatedImages, wizardData, selectedCopy, onBack
                     onClick={() => setSelectedImageIndex(null)}
                 >
                     <div
-                        className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto"
+                        className="bg-panel rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Modal Header */}
-                        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
-                            <h3 className="text-xl font-bold text-gray-900">Ad Details</h3>
+                        <div className="sticky top-0 bg-panel border-b border-line px-6 py-4 flex items-center justify-between rounded-t-2xl">
+                            <h3 className="text-xl font-bold text-foreground">Ad Details</h3>
                             <button
                                 onClick={() => setSelectedImageIndex(null)}
-                                className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+                                className="w-8 h-8 rounded-full hover:bg-inset flex items-center justify-center transition-colors"
                             >
-                                <span className="text-2xl text-gray-500">×</span>
+                                <span className="text-2xl text-muted">×</span>
                             </button>
                         </div>
 
@@ -1476,9 +1493,9 @@ function ImageGenerationStep({ generatedImages, wizardData, selectedCopy, onBack
                                 {/* Image Preview Section */}
                                 <div className="space-y-4">
                                     {/* Main Image */}
-                                    <div className="bg-gray-100 rounded-xl overflow-hidden aspect-square flex items-center justify-center">
+                                    <div className="bg-inset rounded-xl overflow-hidden aspect-square flex items-center justify-center">
                                         {imgError ? (
-                                            <div className="p-8 text-center text-red-500 bg-red-50">
+                                            <div className="p-8 text-center text-danger bg-danger-soft">
                                                 <p className="font-bold mb-2">Failed to load image</p>
                                             </div>
                                         ) : (
@@ -1494,7 +1511,7 @@ function ImageGenerationStep({ generatedImages, wizardData, selectedCopy, onBack
                                     {/* Bundle Thumbnails */}
                                     {bundleImages.length > 1 && (
                                         <div>
-                                            <p className="text-sm font-medium text-gray-700 mb-2">Available Sizes:</p>
+                                            <p className="text-sm font-medium text-secondary mb-2">Available Sizes:</p>
                                             <div className="flex gap-2 overflow-x-auto pb-2">
                                                 {bundleImages.map((img, idx) => (
                                                     <button
@@ -1505,7 +1522,7 @@ function ImageGenerationStep({ generatedImages, wizardData, selectedCopy, onBack
                                                         }}
                                                         className={`relative w-20 h-20 rounded-lg overflow-hidden border-2 transition-all flex-shrink-0 ${viewedImage.url === img.url
                                                             ? 'border-amber-600 ring-2 ring-amber-200'
-                                                            : 'border-gray-200 hover:border-amber-300'
+                                                            : 'border-line hover:border-brand-line'
                                                             }`}
                                                     >
                                                         <img
@@ -1526,22 +1543,22 @@ function ImageGenerationStep({ generatedImages, wizardData, selectedCopy, onBack
                                 {/* Details Panel */}
                                 <div className="space-y-6">
                                     {/* Ad Copy */}
-                                    <div className="bg-amber-50 p-5 rounded-xl border border-amber-200">
-                                        <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                            <FileText size={20} className="text-amber-600" />
+                                    <div className="bg-brand-soft p-5 rounded-xl border border-brand-line">
+                                        <h4 className="font-bold text-foreground mb-4 flex items-center gap-2">
+                                            <FileText size={20} className="text-brand-ink" />
                                             Ad Copy
                                         </h4>
                                         <div className="space-y-3">
                                             <div>
-                                                <label className="text-xs font-medium text-amber-700 uppercase">Headline</label>
-                                                <p className="font-bold text-gray-900 mt-1">{displayCopy.headline}</p>
+                                                <label className="text-xs font-medium text-brand-ink uppercase">Headline</label>
+                                                <p className="font-bold text-foreground mt-1">{displayCopy.headline}</p>
                                             </div>
                                             <div>
-                                                <label className="text-xs font-medium text-amber-700 uppercase">Body Text</label>
-                                                <p className="text-gray-700 text-sm whitespace-pre-line mt-1">{displayCopy.body}</p>
+                                                <label className="text-xs font-medium text-brand-ink uppercase">Body Text</label>
+                                                <p className="text-secondary text-sm whitespace-pre-line mt-1">{displayCopy.body}</p>
                                             </div>
                                             <div>
-                                                <label className="text-xs font-medium text-amber-700 uppercase">Call to Action</label>
+                                                <label className="text-xs font-medium text-brand-ink uppercase">Call to Action</label>
                                                 <div className="mt-1">
                                                     <span className="inline-block px-3 py-1 bg-amber-600 text-white rounded-full text-sm font-medium">
                                                         {displayCopy.cta}
@@ -1552,23 +1569,23 @@ function ImageGenerationStep({ generatedImages, wizardData, selectedCopy, onBack
                                     </div>
 
                                     {/* Image Details */}
-                                    <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
-                                        <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                            <Image size={20} className="text-gray-600" />
+                                    <div className="bg-subtle p-5 rounded-xl border border-line">
+                                        <h4 className="font-bold text-foreground mb-4 flex items-center gap-2">
+                                            <Image size={20} className="text-secondary" />
                                             Image Details
                                         </h4>
                                         <div className="space-y-2 text-sm">
                                             <div className="flex justify-between">
-                                                <span className="text-gray-500">Size:</span>
-                                                <span className="font-medium text-gray-900">{viewedImage.size}</span>
+                                                <span className="text-muted">Size:</span>
+                                                <span className="font-medium text-foreground">{viewedImage.size}</span>
                                             </div>
                                             <div className="flex justify-between">
-                                                <span className="text-gray-500">Dimensions:</span>
-                                                <span className="font-medium text-gray-900">{viewedImage.dimensions}</span>
+                                                <span className="text-muted">Dimensions:</span>
+                                                <span className="font-medium text-foreground">{viewedImage.dimensions}</span>
                                             </div>
                                             <div className="flex justify-between">
-                                                <span className="text-gray-500">Format:</span>
-                                                <span className="font-medium text-gray-900">PNG</span>
+                                                <span className="text-muted">Format:</span>
+                                                <span className="font-medium text-foreground">PNG</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1579,7 +1596,7 @@ function ImageGenerationStep({ generatedImages, wizardData, selectedCopy, onBack
                                         download={`ad-${viewedImage.size}-${Date.now()}.png`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="w-full py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-bold flex items-center justify-center gap-2 transition-colors"
+                                        className="w-full py-3 bg-brand text-white rounded-lg hover:bg-brand-hover font-bold flex items-center justify-center gap-2 transition-colors"
                                     >
                                         <Download size={20} />
                                         Download Image

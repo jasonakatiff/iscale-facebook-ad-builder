@@ -7,6 +7,7 @@ const TEST_PASSWORD = process.env.TEST_PASSWORD || 'testpassword';
 
 test.describe('Brand Scrapes Smoke Tests', () => {
   test.beforeEach(async ({ page }) => {
+    test.skip(!process.env.TEST_EMAIL || !process.env.TEST_PASSWORD, 'Requires a running API and configured test login');
     // Login first
     await page.goto(`${BASE_URL}/login`);
     await page.waitForLoadState('networkidle');

@@ -9,6 +9,7 @@ Note: The API has limitations:
 - Non-political ads may have limited data
 - Access token required (from Facebook App)
 """
+from app.telemetry.runtime import capture_exception
 
 import httpx
 import os
@@ -69,6 +70,7 @@ class FacebookAdsLibraryAPI:
 
                 return ads
             except Exception as e:
+                capture_exception(e, "scraper.search_ads")
                 print(f"API search failed: {e}, falling back to scraper")
 
         # Fallback to scraper
@@ -529,12 +531,14 @@ class FacebookAdsLibraryAPI:
                         ads.append(ad)
 
                     except Exception as e:
+                        capture_exception(e, "scraper._fallback_search")
                         print(f"Error parsing ad: {e}")
                         continue
 
                 await browser.close()
 
         except Exception as e:
+            capture_exception(e, "scraper._fallback_search")
             print(f"Scraper error: {e}")
             import traceback
             traceback.print_exc()

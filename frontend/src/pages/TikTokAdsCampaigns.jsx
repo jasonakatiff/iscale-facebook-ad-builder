@@ -185,21 +185,21 @@ export default function TikTokAdsCampaigns() {
         <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2 flex items-center gap-3">
-                        <Music2 size={28} className="text-amber-600 sm:hidden" />
-                        <Music2 size={32} className="text-amber-600 hidden sm:block" />
+                    <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1 sm:mb-2 flex items-center gap-3">
+                        <Music2 size={28} className="text-brand-ink sm:hidden" />
+                        <Music2 size={32} className="text-brand-ink hidden sm:block" />
                         TikTok Ads
                     </h1>
-                    <p className="text-sm sm:text-base text-gray-600">Connect a TikTok advertiser to manage and measure campaigns</p>
+                    <p className="text-sm sm:text-base text-secondary">Connect a TikTok advertiser to manage and measure campaigns</p>
                 </div>
-                {connection?.connected && <button onClick={() => setShowCreateForm((visible) => !visible)} className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700"><Plus size={18} />Create campaign</button>}
+                {connection?.connected && <button onClick={() => setShowCreateForm((visible) => !visible)} className="inline-flex items-center gap-2 px-4 py-2 bg-brand text-white rounded-lg font-medium hover:bg-brand-hover"><Plus size={18} />Create campaign</button>}
             </div>
 
             {!loadingConnection && (
                 <div className="space-y-3">
                     <ConnectAccountCard platformName="TikTok Ads" icon={Music2} connected={!!connection?.connected} accountLabel={connection?.account_name || connection?.advertiser_id} connectedAt={connection?.connected_at} onConnect={connect} onDisconnect={disconnect} />
                     {connection?.connected && connections.length > 1 && !selectingAccount && (
-                        <button type="button" onClick={() => setSelectingAccount(true)} className="text-sm font-medium text-amber-700 hover:text-amber-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600">
+                        <button type="button" onClick={() => setSelectingAccount(true)} className="text-sm font-medium text-brand-ink hover:text-brand-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600">
                             Change TikTok advertiser
                         </button>
                     )}
@@ -207,11 +207,11 @@ export default function TikTokAdsCampaigns() {
             )}
 
             {selectingAccount && connections.length > 0 && (
-                <section aria-labelledby="tiktok-account-heading" className="border-y border-gray-200 py-5">
+                <section aria-labelledby="tiktok-account-heading" className="border-y border-line py-5">
                     <div className="flex items-center justify-between gap-4 mb-3">
-                        <h2 id="tiktok-account-heading" className="text-lg font-bold text-gray-900">Choose a TikTok advertiser</h2>
+                        <h2 id="tiktok-account-heading" className="text-lg font-bold text-foreground">Choose a TikTok advertiser</h2>
                         {connection?.connected && (
-                            <button type="button" onClick={() => setSelectingAccount(false)} className="text-sm text-gray-600 hover:text-gray-900">Cancel</button>
+                            <button type="button" onClick={() => setSelectingAccount(false)} className="text-sm text-secondary hover:text-foreground">Cancel</button>
                         )}
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -222,25 +222,25 @@ export default function TikTokAdsCampaigns() {
                                 onClick={() => selectAdvertiser(candidate.advertiser_id)}
                                 disabled={selectingId !== null}
                                 aria-pressed={candidate.selected}
-                                className={`min-h-16 border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 disabled:opacity-60 ${candidate.selected ? 'border-amber-600 bg-amber-50' : 'border-gray-300 bg-white hover:border-amber-500'}`}
+                                className={`min-h-16 border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 disabled:opacity-60 ${candidate.selected ? 'border-amber-600 bg-brand-soft' : 'border-line-strong bg-panel hover:border-amber-500'}`}
                             >
-                                <span className="block font-semibold text-gray-900">{candidate.account_name || 'TikTok advertiser'}</span>
-                                <span className="block text-sm text-gray-500">{candidate.advertiser_id}</span>
-                                {selectingId === candidate.advertiser_id && <span className="block text-xs text-amber-700 mt-1">Selecting…</span>}
+                                <span className="block font-semibold text-foreground">{candidate.account_name || 'TikTok advertiser'}</span>
+                                <span className="block text-sm text-muted">{candidate.advertiser_id}</span>
+                                {selectingId === candidate.advertiser_id && <span className="block text-xs text-brand-ink mt-1">Selecting…</span>}
                             </button>
                         ))}
                     </div>
                 </section>
             )}
 
-            {showCreateForm && <form onSubmit={reviewCreate} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6 space-y-4">
-                <h2 className="text-lg font-bold text-gray-900">New TikTok campaign</h2>
+            {showCreateForm && <form onSubmit={reviewCreate} className="bg-panel rounded-xl border border-line shadow-sm p-4 sm:p-6 space-y-4">
+                <h2 className="text-lg font-bold text-foreground">New TikTok campaign</h2>
                 <div className="grid sm:grid-cols-2 gap-4">
-                    <label className="text-sm font-medium text-gray-700">Campaign name<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2" /></label>
-                    <label className="text-sm font-medium text-gray-700">Daily budget (USD)<input type="number" min="1" step="0.01" value={dailyBudget} onChange={(event) => setDailyBudget(event.target.value)} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2" /></label>
+                    <label className="text-sm font-medium text-secondary">Campaign name<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full border border-line-strong rounded-lg px-3 py-2" /></label>
+                    <label className="text-sm font-medium text-secondary">Daily budget (USD)<input type="number" min="1" step="0.01" value={dailyBudget} onChange={(event) => setDailyBudget(event.target.value)} className="mt-1 w-full border border-line-strong rounded-lg px-3 py-2" /></label>
                 </div>
-                <p className="text-xs text-gray-500">The campaign will be created PAUSED. It cannot spend until enabled in TikTok Ads Manager.</p>
-                <div className="flex justify-end gap-3"><button type="button" onClick={() => setShowCreateForm(false)} className="px-4 py-2 text-gray-700">Cancel</button><button type="submit" className="px-4 py-2 bg-amber-600 text-white rounded-lg">Review &amp; create</button></div>
+                <p className="text-xs text-muted">The campaign will be created PAUSED. It cannot spend until enabled in TikTok Ads Manager.</p>
+                <div className="flex justify-end gap-3"><button type="button" onClick={() => setShowCreateForm(false)} className="px-4 py-2 text-secondary">Cancel</button><button type="submit" className="px-4 py-2 bg-brand text-white rounded-lg">Review &amp; create</button></div>
             </form>}
 
             {connection?.connected && <PerformanceTable rows={campaigns.map((row) => ({ ...row, id: row.campaign_id }))} columns={CAMPAIGN_COLUMNS} loading={loadingCampaigns} datePreset={datePreset} onDatePresetChange={setDatePreset} emptyMessage="No TikTok campaigns found for this date range." />}

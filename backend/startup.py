@@ -15,10 +15,12 @@ from pathlib import Path
 import uvicorn
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 
-from app.database import engine
-from init_db import create_superuser, init_db, seed_roles_and_permissions
+from app.database import Base, engine, SessionLocal
+from app.core.installation import BOOTSTRAP_LOCK_ID
+from app.services.installation import initialize_owner
+from init_db import seed_roles_and_permissions
 
 
 ALEMBIC_CONFIG_PATH = Path(__file__).with_name("alembic.ini")
@@ -29,46 +31,34 @@ def _alembic_config() -> Config:
     return Config(str(ALEMBIC_CONFIG_PATH))
 
 
-def _create_configured_admin() -> None:
-    """Create the configured first admin account, if credentials are present."""
-    admin_email = os.getenv("ADMIN_EMAIL")
-    admin_password = os.getenv("ADMIN_PASSWORD")
-
-    if admin_email and admin_password:
-        create_superuser(admin_email, admin_password)
-    else:
-        print("ADMIN_EMAIL and ADMIN_PASSWORD are not set; skipping admin creation")
-
-
 def bootstrap_database() -> None:
-    """Initialize a fresh database or migrate an existing one safely."""
-    tables = set(inspect(engine).get_table_names())
-    application_tables = tables - {ALEMBIC_VERSION_TABLE}
-
-    if not application_tables:
-        print("Empty database detected; creating the current application schema")
-        init_db()
-        # Stamp immediately after the tables exist, before any seeding. If a
-        # seed step fails after this point the database is still a valid
-        # stamped schema and the next boot takes the normal upgrade path
-        # instead of the "tables but no alembic_version" refusal below.
-        command.stamp(_alembic_config(), "head")
-        print("Fresh database schema created and stamped at Alembic head")
-        seed_roles_and_permissions()
-        _create_configured_admin()
-        return
-
-    if ALEMBIC_VERSION_TABLE not in tables:
-        raise RuntimeError(
-            "The database contains application tables but no alembic_version "
-            "table. Refusing to guess its migration history; restore a valid "
-            "backup or establish a migration baseline before deploying."
-        )
-
-    print("Existing database detected; applying Alembic migrations")
-    command.upgrade(_alembic_config(), "head")
-    seed_roles_and_permissions()
-    _create_configured_admin()
+    """Serialize all starts; create/stamp fresh schemas atomically."""
+    with engine.connect() as connection:
+        connection.execute(text("SELECT pg_advisory_lock(:key)"), {"key": BOOTSTRAP_LOCK_ID})
+        connection.commit()
+        try:
+            with connection.begin():
+                tables = set(inspect(connection).get_table_names())
+                config = _alembic_config()
+                config.attributes["connection"] = connection
+                if not tables - {ALEMBIC_VERSION_TABLE}:
+                    Base.metadata.create_all(bind=connection)
+                    command.stamp(config, "head")
+                elif ALEMBIC_VERSION_TABLE not in tables:
+                    raise RuntimeError(
+                        "The database contains application tables but no alembic_version. "
+                        "Refusing to guess its migration history; restore a valid backup or establish a baseline."
+                    )
+                else:
+                    command.upgrade(config, "head")
+            seed_roles_and_permissions()
+            with SessionLocal.begin() as db:
+                initialize_owner(db, os.getenv("ADMIN_EMAIL"), os.getenv("ADMIN_PASSWORD"))
+            print("Database and installation are ready", flush=True)
+        finally:
+            connection.rollback()
+            connection.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": BOOTSTRAP_LOCK_ID})
+            connection.commit()
 
 
 if __name__ == "__main__":

@@ -20,10 +20,10 @@ const CopyButton = ({ text, label }) => {
     return (
         <button
             onClick={handleCopy}
-            className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors"
+            className="p-1.5 text-faint hover:text-highlight hover:bg-highlight-soft rounded-md transition-colors"
             title={`Copy ${label}`}
         >
-            {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} />}
+            {copied ? <Check size={16} className="text-success" /> : <Copy size={16} />}
         </button>
     );
 };
@@ -34,13 +34,13 @@ const AnalysisField = ({ label, value, fullWidth = false }) => {
         : value;
 
     return (
-        <div className={`bg-gray-50 rounded-lg p-4 border border-gray-200 ${fullWidth ? 'col-span-full' : ''}`}>
+        <div className={`bg-subtle rounded-lg p-4 border border-line ${fullWidth ? 'col-span-full' : ''}`}>
             <div className="flex justify-between items-start mb-2">
-                <h3 className="font-semibold text-gray-900 text-sm uppercase tracking-wide">{label}</h3>
+                <h3 className="font-semibold text-foreground text-sm uppercase tracking-wide">{label}</h3>
                 {displayValue && <CopyButton text={displayValue} label={label} />}
             </div>
-            <p className={`text-gray-700 text-sm leading-relaxed whitespace-pre-wrap ${typeof value === 'object' ? 'font-mono text-xs' : ''}`}>
-                {displayValue || <span className="text-gray-400 italic">Not available</span>}
+            <p className={`text-secondary text-sm leading-relaxed whitespace-pre-wrap ${typeof value === 'object' ? 'font-mono text-xs' : ''}`}>
+                {displayValue || <span className="text-faint italic">Not available</span>}
             </p>
         </div>
     );
@@ -110,16 +110,16 @@ const WinningAds = () => {
             {/* Header */}
             <div className="mb-8 flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                        <Star size={32} className="text-amber-600" />
+                    <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
+                        <Star size={32} className="text-brand-ink" />
                         Image Templates
                     </h1>
-                    <p className="text-gray-600 mt-1">Browse and manage your winning ad templates</p>
+                    <p className="text-secondary mt-1">Browse and manage your winning ad templates</p>
                 </div>
                 <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
-                    className="flex items-center gap-2 bg-gradient-to-r from-amber-600 to-orange-600 text-white px-4 py-2 rounded-lg hover:from-amber-700 hover:to-orange-700 transition-colors font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 bg-brand text-white px-4 py-2 rounded-lg hover:bg-brand-hover transition-colors font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {uploading ? <Loader size={20} className="animate-spin" /> : <Plus size={20} />}
                     {uploading ? 'Uploading...' : 'Upload Templates'}
@@ -137,7 +137,7 @@ const WinningAds = () => {
             />
 
             {/* Embedded Template Selector */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-panel rounded-xl shadow-sm border border-line p-6">
                 <ImageTemplateSelector
                     key={refreshKey}
                     onSelect={(template) => {
@@ -156,14 +156,14 @@ const WinningAds = () => {
                     onClick={() => setSelectedTemplate(null)}
                 >
                     <div
-                        className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto"
+                        className="bg-panel rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
-                            <h2 className="text-2xl font-bold text-gray-900">Template Details</h2>
+                        <div className="p-6 border-b border-line flex justify-between items-center sticky top-0 bg-panel z-10">
+                            <h2 className="text-2xl font-bold text-foreground">Template Details</h2>
                             <button
                                 onClick={() => setSelectedTemplate(null)}
-                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                                className="text-faint hover:text-secondary transition-colors"
                             >
                                 <X size={24} />
                             </button>
@@ -179,25 +179,25 @@ const WinningAds = () => {
                                     />
 
                                     {/* Quick Info */}
-                                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                                        <h3 className="font-semibold text-gray-900 mb-3">Quick Info</h3>
+                                    <div className="bg-subtle rounded-lg p-4 border border-line">
+                                        <h3 className="font-semibold text-foreground mb-3">Quick Info</h3>
                                         <div className="space-y-2 text-sm">
                                             {selectedTemplate.template_category && (
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-500">Category</span>
-                                                    <span className="text-gray-900 font-medium capitalize">{selectedTemplate.template_category}</span>
+                                                    <span className="text-muted">Category</span>
+                                                    <span className="text-foreground font-medium capitalize">{selectedTemplate.template_category}</span>
                                                 </div>
                                             )}
                                             {selectedTemplate.design_style && (
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-500">Style</span>
-                                                    <span className="text-gray-900 font-medium">{selectedTemplate.design_style}</span>
+                                                    <span className="text-muted">Style</span>
+                                                    <span className="text-foreground font-medium">{selectedTemplate.design_style}</span>
                                                 </div>
                                             )}
                                             {selectedTemplate.created_at && (
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-500">Created</span>
-                                                    <span className="text-gray-900">{new Date(selectedTemplate.created_at).toLocaleDateString()}</span>
+                                                    <span className="text-muted">Created</span>
+                                                    <span className="text-foreground">{new Date(selectedTemplate.created_at).toLocaleDateString()}</span>
                                                 </div>
                                             )}
                                         </div>
@@ -207,15 +207,15 @@ const WinningAds = () => {
                                 {/* Right Column - Analysis Data */}
                                 <div className="space-y-6">
                                     <div>
-                                        <h3 className="text-2xl font-bold text-gray-900 mb-2">{selectedTemplate.name}</h3>
+                                        <h3 className="text-2xl font-bold text-foreground mb-2">{selectedTemplate.name}</h3>
                                         <div className="flex gap-2 flex-wrap">
                                             {selectedTemplate.topic && (
-                                                <span className="inline-block bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-sm font-medium">
+                                                <span className="inline-block bg-brand-soft text-brand-ink px-3 py-1 rounded-full text-sm font-medium">
                                                     {selectedTemplate.topic}
                                                 </span>
                                             )}
                                             {selectedTemplate.mood && (
-                                                <span className="inline-block bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-sm font-medium">
+                                                <span className="inline-block bg-brand-soft text-brand-ink px-3 py-1 rounded-full text-sm font-medium">
                                                     {selectedTemplate.mood}
                                                 </span>
                                             )}
@@ -254,17 +254,17 @@ const WinningAds = () => {
                                         const structure = safeParse(selectedTemplate.template_structure);
                                         if (!structure) return null;
                                         return (
-                                            <div className="bg-amber-50 rounded-lg p-4 border border-amber-200">
-                                                <h3 className="font-semibold text-amber-900 mb-3">Template Structure</h3>
+                                            <div className="bg-brand-soft rounded-lg p-4 border border-brand-line">
+                                                <h3 className="font-semibold text-brand-ink mb-3">Template Structure</h3>
                                                 <div className="space-y-2 text-sm">
                                                     {structure.template_name && (
-                                                        <div><span className="text-amber-700 font-medium">Name:</span> {structure.template_name}</div>
+                                                        <div><span className="text-brand-ink font-medium">Name:</span> {structure.template_name}</div>
                                                     )}
                                                     {structure.layout_type && (
-                                                        <div><span className="text-amber-700 font-medium">Layout:</span> {structure.layout_type}</div>
+                                                        <div><span className="text-brand-ink font-medium">Layout:</span> {structure.layout_type}</div>
                                                     )}
                                                     {structure.aspect_ratio && (
-                                                        <div><span className="text-amber-700 font-medium">Aspect Ratio:</span> {structure.aspect_ratio}</div>
+                                                        <div><span className="text-brand-ink font-medium">Aspect Ratio:</span> {structure.aspect_ratio}</div>
                                                     )}
                                                 </div>
                                             </div>
@@ -276,25 +276,25 @@ const WinningAds = () => {
                                         const palette = safeParse(selectedTemplate.color_palette);
                                         if (!palette) return null;
                                         return (
-                                            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                                                <h3 className="font-semibold text-gray-900 mb-3">Color Palette</h3>
+                                            <div className="bg-subtle rounded-lg p-4 border border-line">
+                                                <h3 className="font-semibold text-foreground mb-3">Color Palette</h3>
                                                 <div className="flex gap-3 flex-wrap">
                                                     {Object.entries(palette).map(([key, color]) => {
                                                         if (key === 'theme' || key === 'color_count') return null;
                                                         return (
                                                             <div key={key} className="flex flex-col items-center">
                                                                 <div
-                                                                    className="w-12 h-12 rounded border border-gray-300 shadow-sm"
+                                                                    className="w-12 h-12 rounded border border-line-strong shadow-sm"
                                                                     style={{ backgroundColor: color }}
                                                                 />
-                                                                <span className="text-xs text-gray-600 mt-1 capitalize">{key.replace('_', ' ')}</span>
-                                                                <span className="text-xs text-gray-400">{color}</span>
+                                                                <span className="text-xs text-secondary mt-1 capitalize">{key.replace('_', ' ')}</span>
+                                                                <span className="text-xs text-faint">{color}</span>
                                                             </div>
                                                         );
                                                     })}
                                                 </div>
                                                 {palette.theme && (
-                                                    <div className="mt-3 text-sm text-gray-600">
+                                                    <div className="mt-3 text-sm text-secondary">
                                                         <span className="font-medium">Theme:</span> {palette.theme}
                                                     </div>
                                                 )}

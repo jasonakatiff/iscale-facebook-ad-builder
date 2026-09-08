@@ -1,0 +1,60 @@
+{
+  "name": "BreadWinner \u2014 your own AI ad studio",
+  "description": "Deploy your application, sign in, and connect Gemini and fal.ai in the setup wizard. Create, save, and download your first image ad. Railway and AI services bill your own accounts.",
+  "publicationStatus": "blocked_until_fresh_railway_install_verified",
+  "templateUrl": null,
+  "sourceRepository": "jasonakatiff/iscale-facebook-ad-builder",
+  "sourceRevision": null,
+  "sourceGate": "Export reviewed release files onto public history, merge, and record the public commit before creating the template.",
+  "installFields": [
+    {
+      "service": "Backend",
+      "variable": "ADMIN_EMAIL",
+      "label": "Owner email",
+      "description": "Use this email to sign in to your new application.",
+      "required": true
+    },
+    {
+      "service": "Backend",
+      "variable": "ADMIN_PASSWORD",
+      "label": "Owner password",
+      "description": "Choose 12 or more characters, at most 72 UTF-8 bytes. Save it in your password manager.",
+      "required": true
+    }
+  ],
+  "generatedVariables": [
+    {
+      "service": "Postgres",
+      "variable": "POSTGRES_PASSWORD",
+      "value": "${{secret(48)}}"
+    },
+    {
+      "service": "Backend",
+      "variable": "SECRET_KEY",
+      "value": "${{secret(64)}}"
+    },
+    {
+      "service": "Backend",
+      "variable": "OAUTH_TOKEN_ENCRYPTION_KEY",
+      "value": "${{secret(43, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_\")}}="
+    }
+  ],
+  "publicServices": [
+    "Frontend",
+    "Backend"
+  ],
+  "privateServices": [
+    "Postgres",
+    "Worker"
+  ],
+  "volumes": {
+    "Postgres": "/var/lib/postgresql/data",
+    "Backend": "/app/uploads"
+  },
+  "support": "https://github.com/jasonakatiff/iscale-facebook-ad-builder/issues",
+  "customerGuide": "docs/deployment/install-on-railway.md",
+  "generatedPublicDomains": {
+    "Frontend": 8080,
+    "Backend": 8080
+  }
+}

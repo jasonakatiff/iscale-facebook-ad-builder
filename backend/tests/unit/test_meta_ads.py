@@ -4,6 +4,7 @@ from urllib.parse import parse_qs, urlparse
 from fastapi import status
 
 from app.models import MetaAdsConnection
+from app.core.token_encryption import encrypt_token
 from app.services.meta_ads_oauth import META_SCOPES, build_oauth_url
 from app.services.facebook_service import FacebookService
 
@@ -28,7 +29,8 @@ class TestMetaOAuthHelpers:
             def __init__(self, fbid, api):
                 pass
 
-            def get_ad_accounts(self, fields):
+            def get_ad_accounts(self, fields, params):
+                assert params == {"limit": 200}
                 return accounts
 
         monkeypatch.setattr("app.services.facebook_service.User", FakeUser)
@@ -54,17 +56,22 @@ class TestMetaAuthGate:
 
 
 class TestMetaConnectionStatus:
-    def test_no_connection_reports_disconnected(self, client, auth_headers):
+    def test_no_connection_reports_disconnected(self, client, auth_headers, monkeypatch):
+        monkeypatch.delenv('FACEBOOK_ACCESS_TOKEN', raising=False)
+        monkeypatch.delenv('VITE_FACEBOOK_ACCESS_TOKEN', raising=False)
         response = client.get("/api/v1/facebook/connection", headers=auth_headers)
         assert response.status_code == status.HTTP_200_OK
-        assert response.json() == {"connected": False}
+        assert response.json()["connected"] is False
+        assert response.json()["state"] == "disconnected"
 
     def test_connection_reports_token_expiry(self, client, auth_headers, db_session, test_user):
         """Sprint 8: /facebook/connection must expose token_expires_at (naive
         datetimes normalized to UTC) so the UI can flag a lapsed token."""
         from datetime import datetime
         from app.models import MetaAdsConnection
+        from sqlalchemy import text
 
+        db_session.execute(text("SET LOCAL TIME ZONE 'UTC'"))
         naive = datetime(2026, 8, 22, 6, 53, 57)  # naive on purpose — Postgres may return naive
         db_session.add(MetaAdsConnection(
             user_id=test_user.id,
@@ -80,7 +87,8 @@ class TestMetaConnectionStatus:
 
         assert response.status_code == status.HTTP_200_OK
         body = response.json()
-        assert body["connected"] is True
+        assert body["connected"] is False
+        assert body["state"] == "expired"
         assert body["token_expires_at"].startswith("2026-08-22T06:53:57")
 
     def test_select_activates_only_owned_candidate(self, client, auth_headers, db_session, test_user):
@@ -88,14 +96,14 @@ class TestMetaConnectionStatus:
             user_id=test_user.id,
             ad_account_id="act_111",
             account_name="First",
-            encrypted_access_token="token-one",
+            encrypted_access_token=encrypt_token("test-token-one"),
             is_active=True,
         )
         second = MetaAdsConnection(
             user_id=test_user.id,
             ad_account_id="act_222",
             account_name="Second",
-            encrypted_access_token="token-two",
+            encrypted_access_token=encrypt_token("test-token-two"),
             is_active=False,
         )
         db_session.add_all([first, second])

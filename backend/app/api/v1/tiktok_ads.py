@@ -1,4 +1,5 @@
 """TikTok Marketing API OAuth, reporting, and guarded campaign creation."""
+from app.telemetry.runtime import capture_exception
 from datetime import date, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -99,6 +100,7 @@ async def oauth_callback(request: Request, auth_code: Optional[str] = None, code
         user_id = verify_oauth_state(state, PROVIDER)
         tokens = await exchange_code_for_tokens(authorization_code)
     except (ValueError, TikTokAdsApiError) as exc:
+        capture_exception(exc, "tiktok_ads.oauth_callback")
         raise HTTPException(status_code=400, detail=str(exc))
 
     advertiser_ids = tokens.get("advertiser_ids") or tokens.get("advertiser_id") or []
@@ -215,6 +217,7 @@ async def campaigns(date_preset: str = "last_30d", db: Session = Depends(get_db)
         start, end = _date_range(date_preset)
         rows = await get_campaign_performance(token, connection.advertiser_id, start, end)
     except (TikTokAdsApiError, TikTokAdsNotConfigured) as exc:
+        capture_exception(exc, "tiktok_ads.campaigns")
         raise HTTPException(status_code=502, detail=str(exc))
     return {"advertiser_id": connection.advertiser_id, "campaigns": rows}
 
@@ -228,4 +231,5 @@ async def create_campaign(body: CreateCampaignRequest, db: Session = Depends(get
         token = await get_valid_access_token(db, connection)
         return await create_tiktok_campaign(token, connection.advertiser_id, body.name, body.daily_budget)
     except (TikTokAdsApiError, TikTokAdsNotConfigured) as exc:
+        capture_exception(exc, "tiktok_ads.create_campaign")
         raise HTTPException(status_code=502, detail=str(exc))

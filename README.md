@@ -1,4 +1,8 @@
 <p align="center">
+
+## Guided Railway installation (release preview)
+
+The installer adds a first-run wizard and Settings → Integrations for encrypted AI keys, brand/product setup, and a first image ad. The Railway template is still being verified; a public deploy button is not available yet. See the [customer installation guide](docs/deployment/install-on-railway.md) for the intended setup and [release procedure](docs/deployment/railway-template-maintainer.md) for verification requirements.
   <img src="frontend/public/breadwinner_logo.png" alt="Facebook Ad Builder" width="120" />
 </p>
 

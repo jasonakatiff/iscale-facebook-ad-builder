@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — guided installation
+
+Add a resumable setup wizard, encrypted AI credentials in Settings, one-time owner bootstrap, persistent media and a four-service Railway scaffold. Preserve the current workspace, diagnostics and plugin features. Local validation passed 410 backend tests plus one existing XPASS, 78 frontend unit tests and a production build. The five installer/telemetry browser checks passed in CI with simulated AI. Live Railway provisioning, real generation and template publication remain pending. See the [installer release procedure](docs/deployment/railway-template-maintainer.md).
+
 ## [2026-09-05] Consolidate remaining local (breadWinner) assets
 
 ### Added

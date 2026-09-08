@@ -3,6 +3,7 @@ Brand Scraper Service
 
 Scrapes all ads from a specific Facebook page and downloads media to R2.
 """
+from app.telemetry.runtime import capture_exception
 
 import httpx
 import os
@@ -14,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.models import BrandScrape, BrandScrapedAd
 from app.core.config import settings
 import uuid
+from app.telemetry.runtime import observe, emit, error_attributes
 
 
 def parse_page_id_from_url(url: str) -> Optional[str]:
@@ -78,6 +80,7 @@ class BrandScraperService:
         self.access_token = os.getenv("FACEBOOK_ADS_LIBRARY_TOKEN") or os.getenv("VITE_FACEBOOK_ACCESS_TOKEN")
         self.base_url = "https://graph.facebook.com/v21.0/ads_archive"
 
+    @observe("research.brand_scrape", kind="job")
     async def scrape_brand(self, brand_scrape: BrandScrape) -> BrandScrape:
         """
         Scrape all ads from a brand's Facebook page and download media.
@@ -122,7 +125,9 @@ class BrandScraperService:
                     if ad_record and ad_record.media_urls:
                         media_count += len(ad_record.media_urls)
                 except Exception as e:
-                    print(f"Error processing ad {ad_data.get('id')}: {e}")
+                    capture_exception(e, "brand_scraper.scrape_brand")
+                    emit("operation", "research.process_ad", level="error", message=str(e),
+                         attributes={**error_attributes(e), "brand_scrape_id": brand_scrape.id})
                     continue
 
             brand_scrape.media_downloaded = media_count
@@ -132,6 +137,7 @@ class BrandScraperService:
             return brand_scrape
 
         except Exception as e:
+            capture_exception(e, "brand_scraper.scrape_brand")
             brand_scrape.status = "failed"
             brand_scrape.error_message = str(e)[:500]
             self.db.commit()
@@ -194,6 +200,7 @@ class BrandScraperService:
                         break
 
                 except Exception as e:
+                    capture_exception(e, "brand_scraper._fetch_page_ads")
                     print(f"API error: {e}, falling back to Playwright")
                     return await self._playwright_scrape_ads(
                         page_id, limit, is_search=False, country=country, active_status=active_status,
@@ -416,6 +423,7 @@ class BrandScraperService:
                 await browser.close()
 
         except Exception as e:
+            capture_exception(e, "brand_scraper._playwright_scrape_ads")
             error_msg = f"Playwright scrape failed: {str(e)}"
             print(error_msg)
             import traceback
@@ -619,6 +627,7 @@ class BrandScraperService:
                 print(f"Extracted {len(ads)} ads with media data")
 
         except Exception as e:
+            capture_exception(e, "brand_scraper._fallback_fetch_page_ads")
             print(f"Playwright scrape error: {e}")
             import traceback
             traceback.print_exc()
@@ -692,6 +701,7 @@ class BrandScraperService:
                         print(f"Uploaded {detected_type} for ad {ad_id}: {len(media_item['data'])} bytes")
 
                 except Exception as e:
+                    capture_exception(e, "brand_scraper._process_ad")
                     print(f"Failed to upload media for ad {ad_id}: {e}")
 
         else:
@@ -713,6 +723,7 @@ class BrandScraperService:
                         if detected_type == "video":
                             media_type = "video"
                 except Exception as e:
+                    capture_exception(e, "brand_scraper._process_ad")
                     print(f"Failed to download media {media_url}: {e}")
 
         # Detect carousel
@@ -768,6 +779,7 @@ class BrandScraperService:
                 media_urls.extend(videos[:3])
 
         except Exception as e:
+            capture_exception(e, "brand_scraper._extract_media_from_snapshot")
             print(f"Error extracting media from snapshot: {e}")
 
         return media_urls
@@ -808,6 +820,7 @@ class BrandScraperService:
             return r2_url, media_type
 
         except Exception as e:
+            capture_exception(e, "brand_scraper._download_and_upload_media")
             print(f"Download/upload error: {e}")
             return None, "image"
 
@@ -840,6 +853,7 @@ class BrandScraperService:
             return f"{settings.R2_PUBLIC_URL}/{filename}"
 
         except Exception as e:
+            capture_exception(e, "brand_scraper._upload_to_r2")
             print(f"R2 upload error: {e}")
             return None
 
@@ -866,6 +880,7 @@ class BrandScraperService:
                                 key = url.replace(f"{settings.R2_PUBLIC_URL}/", "")
                                 s3_client.delete_object(Bucket=settings.R2_BUCKET_NAME, Key=key)
                             except Exception as e:
+                                capture_exception(e, "brand_scraper.delete_brand_scrape")
                                 print(f"Error deleting {url}: {e}")
 
             # Delete from DB (cascade will delete ads)
@@ -875,5 +890,6 @@ class BrandScraperService:
             return True
 
         except Exception as e:
+            capture_exception(e, "brand_scraper.delete_brand_scrape")
             print(f"Error deleting brand scrape: {e}")
             return False
