@@ -28,7 +28,7 @@ export default function Connections() {
     return <div className="space-y-6">
         <header className="studio-page-header"><div><h1 className="studio-heading">Connections</h1><p className="studio-description">Choose the accounts your team uses and control who can refresh them.</p></div></header>
         <section className="studio-panel p-5 flex flex-wrap justify-between items-center gap-3" aria-label="Native LeadRouter integration">
-            <div><h2 className="font-semibold">LeadRouter · Built in</h2><p className="text-sm text-muted mt-1">Connect your account and select campaigns across BreadWinner.</p></div>
+            <div><h2 className="font-semibold">LeadRouter · Built in</h2><p className="text-sm text-muted mt-1">Connect your account and select campaigns across your ad workspace.</p></div>
             <Link className="studio-button primary" to="/settings/leadrouter">Configure LeadRouter</Link>
         </section>
         <div className="studio-panel p-5 bg-subtle text-sm space-y-2">

@@ -1,6 +1,6 @@
 # Connections, workspaces, and refresh
 
-BreadWinner · Powered by theLeadRouter.com
+theLeadRouter — Ad Builder & Manager
 
 Open Connections. Select an existing workspace or, as an administrator, create one and add members. Choose the accounts the team is allowed to use. Membership, role, and account grants control visibility and refresh access.
 

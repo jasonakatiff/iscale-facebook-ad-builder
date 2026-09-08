@@ -1,6 +1,6 @@
 # Plugin package and service API
 
-BreadWinner · Powered by theLeadRouter.com
+theLeadRouter — Ad Builder & Manager
 
 All URLs below are relative to the backend origin. Package uploads are JSON requests, not executable archives. The UI and API use the same private installation and run records. Reference the running OpenAPI document at `/api/v1/openapi.json` for field types and status codes.
 

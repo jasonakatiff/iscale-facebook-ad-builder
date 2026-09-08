@@ -1,6 +1,6 @@
 # Settings and User Management
 
-BreadWinner · Powered by theLeadRouter.com
+theLeadRouter — Ad Builder & Manager
 
 Settings includes Ad Styles and Prompts used by the creative workflows. Inspect and edit the controls available for the selected item. Some style edits and the AI-style-generation demo currently affect frontend state only; General Settings is unfinished. Do not assume those demo controls persist or contact an AI service. Use the documented /api/v1/ad-styles and /api/v1/prompts operations for server-backed automation and verify the resulting record.
 

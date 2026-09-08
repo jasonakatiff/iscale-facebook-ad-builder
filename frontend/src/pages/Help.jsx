@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { BookOpen, Download, ExternalLink, Search } from 'lucide-react';
 import { API_BASE, downloadBlob } from '../lib/platformApi';
 import { useToast } from '../context/ToastContext';
+import { APP_TITLE } from '../lib/branding';
 
 export default function Help() {
     const { showError } = useToast();
@@ -88,7 +89,7 @@ export default function Help() {
             <header className="studio-page-header">
                 <div>
                     <p className="studio-eyebrow">
-                        BreadWinner by theLeadRouter.com
+                        {APP_TITLE}
                     </p>
                     <h1 className="studio-heading">Help & API Docs</h1>
                     <p className="studio-description">
@@ -108,14 +109,14 @@ export default function Help() {
                     <p className="text-sm text-muted">
                         All user guides as Markdown, OpenAPI JSON, and a Claude
                         Code guide in one ZIP. Add the files to your project to
-                        automate BreadWinner.
+                        automate your ad workspace.
                     </p>
                 </div>
                 <button
                     className="studio-button primary"
                     disabled={busy}
                     onClick={() =>
-                        download('/help/download', 'breadwinner-docs.zip')
+                        download('/help/download', 'leadrouter-ad-builder-manager-docs.zip')
                     }
                 >
                     <Download size={16} />

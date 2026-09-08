@@ -1,5 +1,5 @@
 """
-Facebook Ad Builder - Backend API
+theLeadRouter — Ad Builder & Manager API
 
 Created by Jason Akatiff
 iSCALE.com | A4D.com
@@ -29,10 +29,10 @@ from app.core.oauth_state import clear_oauth_state_cookie
 from app.core import token_encryption  # noqa: F401
 
 app = FastAPI(
-    title="BreadWinner API by theLeadRouter.com",
+    title=f"{settings.BRAND_NAME} API",
     description="Automate research, creative generation, campaigns, reporting, and workspaces. Use a user API key in the Bearer Authorization header; keys inherit current user permissions. Download Markdown guides and the OpenAPI bundle from /api/v1/help/download.",
     contact={"name": "theLeadRouter.com", "url": "https://theleadrouter.com"},
-    version="1.0.0",
+    version="2.0.0-rc.1",
     openapi_url="/api/v1/openapi.json",
     docs_url="/api/v1/docs",
     redoc_url="/api/v1/redoc",
@@ -113,7 +113,7 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to the Facebook Ad Automation API"}
+    return {"message": f"Welcome to the {settings.BRAND_NAME} API"}
 
 @app.get("/health")
 async def health_check():

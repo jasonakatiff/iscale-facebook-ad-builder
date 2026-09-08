@@ -1,6 +1,6 @@
 # Creative Building: image, video, and remix
 
-BreadWinner · Powered by theLeadRouter.com
+theLeadRouter — Ad Builder & Manager
 
 Open Creative Building and choose a format. Image Ads uses a brand, product, audience profile, style or template, and generation settings. Review those choices, generate, and inspect the result before saving or using it in a campaign.
 

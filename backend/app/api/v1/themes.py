@@ -184,7 +184,7 @@ async def fetch_theme(url):
         raise HTTPException(502, "Could not reach GitHub. Try again later.") from None
     except ValueError:
         raise HTTPException(
-            422, "The GitHub file is not a valid, readable BreadWinner color theme"
+            422, "The GitHub file is not a valid, readable workspace color theme"
         ) from None
 
 

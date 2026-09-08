@@ -1,6 +1,6 @@
 # Research and saved searches
 
-BreadWinner · Powered by theLeadRouter.com
+theLeadRouter — Ad Builder & Manager
 
 Open Research. Create a search with a keyword, country, result limit, and optional negative keywords or vertical. Start the search and monitor its status. Filter results to find reusable references; inspect media, copy, platform, and dates before using an ad as inspiration.
 

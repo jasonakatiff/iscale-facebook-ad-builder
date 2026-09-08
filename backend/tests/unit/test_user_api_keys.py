@@ -179,7 +179,7 @@ def test_openapi_and_docs_bundle_are_machine_readable(client):
     response = client.get("/api/v1/openapi.json")
     assert response.status_code == 200
     schema = response.json()
-    assert "theLeadRouter.com" in schema["info"]["title"]
+    assert schema["info"]["title"] == "theLeadRouter — Ad Builder & Manager API"
     assert (
         schema["components"]["securitySchemes"]["BreadWinnerBearer"]["scheme"]
         == "bearer"

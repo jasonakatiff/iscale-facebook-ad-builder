@@ -12,7 +12,7 @@ export function BrandMark({ compact = false }) {
                     />
                 ) : (
                     <span className="brand-monogram" aria-hidden="true">
-                        b.
+                        lr.
                     </span>
                 )}
             </span>

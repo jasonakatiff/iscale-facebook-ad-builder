@@ -3,7 +3,7 @@
   "slug": "creative-brief",
   "name": "Creative Brief",
   "version": "1.0.0",
-  "description": "Build a repeatable creative brief from your product, audience and brand voice. Runs inside BreadWinner without an external service.",
+  "description": "Build a repeatable creative brief from your product, audience and brand voice. Runs inside your ad workspace without an external service.",
   "category": "prompts",
   "execution": "template",
   "inputs": [

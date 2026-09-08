@@ -1,6 +1,6 @@
 # Help and downloadable documentation
 
-BreadWinner · Powered by theLeadRouter.com
+theLeadRouter — Ad Builder & Manager
 
 Open Help & API Docs from the sidebar. Browse the user-guide list, download an individual Markdown file, search the endpoint list, open Swagger, or download the complete ZIP. The ZIP includes all Markdown guides plus OpenAPI JSON and an endpoint index generated from the running application.
 

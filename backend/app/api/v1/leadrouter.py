@@ -120,7 +120,7 @@ def credential(row):
     except ValueError:
         raise HTTPException(
             503,
-            "The saved LeadRouter connection cannot be opened. Contact your BreadWinner administrator.",
+            "The saved LeadRouter connection cannot be opened. Contact your ad workspace administrator.",
         ) from None
 
 

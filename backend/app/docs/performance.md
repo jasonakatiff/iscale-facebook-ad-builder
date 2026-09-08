@@ -1,6 +1,6 @@
 # Performance Reports and Dashboard
 
-BreadWinner · Powered by theLeadRouter.com
+theLeadRouter — Ad Builder & Manager
 
 Open Performance Reports → Overview to inspect available connected-provider performance. The overview combines provider rows and reports provider errors separately; one unavailable integration does not imply that every other provider failed. Check the selected date range and account context.
 

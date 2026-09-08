@@ -85,7 +85,7 @@
         "ADMIN_EMAIL": {
           "defaultValue": "",
           "isOptional": false,
-          "description": "Owner email: sign in to your new BreadWinner application."
+          "description": "Owner email: sign in to your new Ad Builder & Manager workspace."
         },
         "ADMIN_PASSWORD": {
           "defaultValue": "",

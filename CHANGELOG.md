@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased — guided installation
+## 2.0.0-rc.1 — theLeadRouter Ad Builder & Manager (unreleased)
+
+Rename the public product from BreadWinner / Facebook Ad Builder to **theLeadRouter — Ad Builder & Manager**. Update the app wordmark, tab title, favicon, API identity, help text, downloadable guides, installer display text, and public README. Keep configured workspace branding and existing integration identifiers compatible. See [product naming](docs/brand-guidelines.md). Branding verification: 85 frontend tests, 12 backend API-key/documentation tests, production frontend build, scoped ESLint, and desktop/mobile browser checks passed. Browser account and help data were simulated; the API docs bundle test used isolated PostgreSQL. This entry does not mark the v2 release published.
 
 Add a resumable setup wizard, encrypted AI credentials in Settings, one-time owner bootstrap, persistent media and a four-service Railway scaffold. Preserve the current workspace, diagnostics and plugin features. Local validation passed 410 backend tests plus one existing XPASS, 78 frontend unit tests and a production build. The five installer/telemetry browser checks passed in CI with simulated AI. Live Railway provisioning, real generation and template publication remain pending. See the [installer release procedure](docs/deployment/railway-template-maintainer.md).
 

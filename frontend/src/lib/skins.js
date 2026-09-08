@@ -39,7 +39,7 @@ export const BUILTIN_SKINS = [
     {
         id: 'breadwinner',
         version: 1,
-        name: 'BreadWinner Classic',
+        name: 'Classic',
         light: {
             canvas: '#F6F7F3',
             panel: '#FDFDFA',

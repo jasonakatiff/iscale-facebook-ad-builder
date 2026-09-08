@@ -361,7 +361,7 @@ function PluginLibrary() {
                         </p>
                         <p className="text-sm text-muted">
                             Every installed plugin is available through your
-                            BreadWinner API key. Your LeadRouter connection
+                            workspace API key. Your LeadRouter connection
                             remains native to the platform.
                         </p>
                     </section>
@@ -735,7 +735,7 @@ function PluginDetail({ plugin, api, changed, onUninstalled, download }) {
                     {path}/runs
                 </p>
                 <p className="mt-1">
-                    Use your BreadWinner read/write key to start runs. A service
+                    Use your workspace read/write key to start runs. A service
                     key can only claim and complete this installation’s jobs.
                 </p>
                 <p className="mt-2 break-all">

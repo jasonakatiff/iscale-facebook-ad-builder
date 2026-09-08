@@ -1,6 +1,6 @@
 # Brands, Products, and Customer Profiles
 
-BreadWinner · Powered by theLeadRouter.com
+theLeadRouter — Ad Builder & Manager
 
 Start with Brands. Add a brand name, voice, colors, and logo. Use Products to attach product descriptions, product shots, and default landing-page URLs to that brand. Use Customer Profiles to describe demographics, pain points, and goals, then associate profiles with brands.
 

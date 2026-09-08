@@ -104,7 +104,7 @@ export default function Themes() {
             new Blob([JSON.stringify(themeDocument(theme), null, 2) + '\n'], {
                 type: 'application/json',
             }),
-            'breadwinner-theme.json',
+            'leadrouter-ad-builder-manager-theme.json',
         );
     const refresh = async (theme) => {
         if (pending) return;
@@ -262,7 +262,7 @@ export default function Themes() {
                     Connect a GitHub theme
                 </h2>
                 <p className="text-sm text-muted mt-2 mb-4">
-                    Paste a public GitHub link to a BreadWinner theme JSON file.
+                    Paste a public GitHub link to a theme JSON file for this ad workspace.
                     Refresh it manually when its author publishes changes.
                 </p>
                 <form

@@ -67,7 +67,7 @@ export default function LeadRouter() {
                 <div>
                     <h2 className="font-semibold">Your native connection</h2>
                     <p className="text-sm text-muted mt-1">
-                        Private to your BreadWinner user. Keys are encrypted on the server.
+                        Private to your ad workspace user. Keys are encrypted on the server.
                     </p>
                 </div>
                 {connection.loading && <p role="status">Loading connection…</p>}
@@ -206,7 +206,7 @@ export default function LeadRouter() {
                 onConfirm={disconnect}
                 title="Disconnect LeadRouter?"
                 confirmText="Disconnect"
-                message="This removes your saved key and personal brand, product, and campaign links from BreadWinner. Your LeadRouter account and existing ads remain available. Reconnect with a new key to switch accounts."
+                message="This removes your saved key and personal brand, product, and campaign links from this ad workspace. Your LeadRouter account and existing ads remain available. Reconnect with a new key to switch accounts."
             />
         </div>
     );

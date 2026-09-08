@@ -1,6 +1,6 @@
 # Scrape Brand Ads
 
-BreadWinner · Powered by theLeadRouter.com
+theLeadRouter — Ad Builder & Manager
 
 Open Research → Scrape Brand Ads. Enter a brand name and Facebook Page ID or supported Ads Library URL, then start the scrape. The list shows pending, scraping, completed, or failed status and media counts. Open a completed scrape to inspect its ads.
 

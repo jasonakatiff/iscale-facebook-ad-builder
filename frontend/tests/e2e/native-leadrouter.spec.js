@@ -106,7 +106,7 @@ test('native connection, defaults, campaign draft, reporting, and disconnect', a
         await expect(page.getByText('Lifetime leads', { exact: true }).locator('..')).toContainText(
             '7',
         );
-        await expect(page.getByText(/not attributed to individual BreadWinner ads/)).toBeVisible();
+        await expect(page.getByText(/not attributed to individual ads in this workspace/)).toBeVisible();
         await page.goto('/settings/leadrouter');
         await page.getByRole('button', { name: 'Disconnect LeadRouter', exact: true }).click();
         await page

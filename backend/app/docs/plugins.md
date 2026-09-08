@@ -1,8 +1,8 @@
 # Plugins: local packages and connected services
 
-BreadWinner · Powered by theLeadRouter.com
+theLeadRouter — Ad Builder & Manager
 
-Open Plugins to import a package file, use an included example, or run an installed plugin. Installations, configuration and run history are private to your BreadWinner user. Every installed plugin can also be run through the same API using a BreadWinner read/write user key.
+Open Plugins to import a package file, use an included example, or run an installed plugin. Installations, configuration and run history are private to your Ad Builder & Manager user. Every installed plugin can also be run through the same API using a Ad Builder & Manager read/write user key.
 
 ## Import and run a local package
 
@@ -14,9 +14,9 @@ Outputs appear in run history and can be copied or downloaded. Export package do
 
 Import the service operator's package, or install Service Starter to try the protocol. A service package declares inputs and nonsecret configuration. Under Service connection, create a worker key and provide it securely to that service. The plaintext key appears once and is not included in exported packages or ordinary reads. The service uses the documented job API to claim and complete jobs for this installation only.
 
-A worker can run on a company server or your own computer. It polls BreadWinner over outbound HTTPS; the application does not need access to localhost or an inbound port. An existing arbitrary vendor API needs a small adapter implementing this protocol. The example worker is a connection demonstration; the vendor supplies its own processing logic and manages its own provider credentials.
+A worker can run on a company server or your own computer. It polls Ad Builder & Manager over outbound HTTPS; the application does not need access to localhost or an inbound port. An existing arbitrary vendor API needs a small adapter implementing this protocol. The example worker is a connection demonstration; the vendor supplies its own processing logic and manages its own provider credentials.
 
-The service receives only the inputs and configuration you submit for its jobs. It has no automatic access to your brands, ad accounts, performance data, LeadRouter key, platform key or provider OAuth credentials. Do not place credentials or unnecessary personal data in plugin inputs/configuration. Review the operator's terms and handling of the submitted data before connecting a service. Any external usage fees are arranged with that operator; BreadWinner does not collect plugin fees in this release.
+The service receives only the inputs and configuration you submit for its jobs. It has no automatic access to your brands, ad accounts, performance data, LeadRouter key, platform key or provider OAuth credentials. Do not place credentials or unnecessary personal data in plugin inputs/configuration. Review the operator's terms and handling of the submitted data before connecting a service. Any external usage fees are arranged with that operator; Ad Builder & Manager does not collect plugin fees in this release.
 
 ## Configuration, runs and history
 

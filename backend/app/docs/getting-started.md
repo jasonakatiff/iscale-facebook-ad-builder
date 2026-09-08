@@ -1,8 +1,8 @@
 # Getting started
 
-BreadWinner · Powered by theLeadRouter.com
+theLeadRouter — Ad Builder & Manager
 
-BreadWinner is an ad workspace powered by theLeadRouter.com. Research competitors, build creatives, configure campaigns, and inspect performance. An administrator creates your user account; sign in at /login.
+Ad Builder & Manager is an ad workspace powered by theLeadRouter.com. Research competitors, build creatives, configure campaigns, and inspect performance. An administrator creates your user account; sign in at /login.
 
 ## Your workflow
 1. Research: find ads and save useful references.

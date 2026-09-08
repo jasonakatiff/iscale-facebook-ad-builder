@@ -99,7 +99,7 @@ export default function Reporting() {
                         )}
                         <p className="text-xs text-muted">
                             Source: LeadRouter campaign API. Counts cover the campaign’s lifetime
-                            and are not attributed to individual BreadWinner ads.{' '}
+                            and are not attributed to individual ads in this workspace.{' '}
                             {catalog.data?.fetchedAt
                                 ? `Fetched ${new Date(catalog.data.fetchedAt).toLocaleString()}.`
                                 : ''}
@@ -109,7 +109,7 @@ export default function Reporting() {
             </section>
             {selected && (
                 <section className="studio-panel p-5 space-y-3">
-                    <h2 className="font-semibold">Your BreadWinner campaign links</h2>
+                    <h2 className="font-semibold">Your linked ad campaigns</h2>
                     {associations.loading && <p role="status">Loading campaign links…</p>}
                     {associations.error && (
                         <p role="alert" className="text-danger">
@@ -122,14 +122,14 @@ export default function Reporting() {
                             <ul className="space-y-2">
                                 {linked.map((row) => (
                                     <li key={row.resourceId} className="text-sm break-all">
-                                        BreadWinner campaign {row.resourceId} · Saved{' '}
+                                        Workspace campaign {row.resourceId} · Saved{' '}
                                         {new Date(row.updatedAt).toLocaleString()}
                                     </li>
                                 ))}
                             </ul>
                         ) : (
                             <p className="text-sm text-muted">
-                                No published BreadWinner campaigns are linked to this campaign for
+                                No published campaigns from this workspace are linked to this campaign for
                                 your user.
                             </p>
                         ))}

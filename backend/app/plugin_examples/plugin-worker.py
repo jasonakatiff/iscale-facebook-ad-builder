@@ -1,4 +1,4 @@
-"""Example BreadWinner service worker. Reads process environment; never saves credentials."""
+"""Example Ad Builder & Manager service worker. Reads process environment; never saves credentials."""
 
 import argparse
 import json
@@ -18,7 +18,7 @@ class NoRedirects(HTTPRedirectHandler):
 class ApiError(Exception):
     def __init__(self, status):
         self.status = status
-        super().__init__(f"BreadWinner request failed (HTTP {status}).")
+        super().__init__(f"Ad workspace request failed (HTTP {status}).")
 
 
 def process_job(job):
@@ -57,7 +57,7 @@ def run_once(origin, key):
         except HTTPError as error:
             raise ApiError(error.code) from None
         except URLError:
-            raise RuntimeError("Unable to reach BreadWinner") from None
+            raise RuntimeError("Unable to reach the ad workspace") from None
 
     jobs = api("/jobs?limit=1")["data"]
     if not jobs:
@@ -93,7 +93,7 @@ def run_once(origin, key):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="BreadWinner plugin connection demonstration"
+        description="Ad Builder & Manager plugin connection demonstration"
     )
     parser.add_argument(
         "--once", action="store_true", help="Process at most one queued job"

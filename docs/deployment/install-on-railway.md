@@ -1,4 +1,4 @@
-# Install your own BreadWinner
+# Install theLeadRouter — Ad Builder & Manager
 
 Release status: the one-click template is being verified. There is no published installer link yet. The application setup wizard and Integrations settings are implemented on the installer branch.
 

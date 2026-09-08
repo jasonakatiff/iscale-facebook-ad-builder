@@ -1,16 +1,12 @@
 <p align="center">
-
-## Guided Railway installation (release preview)
-
-The installer adds a first-run wizard and Settings → Integrations for encrypted AI keys, brand/product setup, and a first image ad. The Railway template is still being verified; a public deploy button is not available yet. See the [customer installation guide](docs/deployment/install-on-railway.md) for the intended setup and [release procedure](docs/deployment/railway-template-maintainer.md) for verification requirements.
-  <img src="frontend/public/breadwinner_logo.png" alt="Facebook Ad Builder" width="120" />
+  <img src="frontend/public/leadrouter-mark.svg" alt="theLeadRouter — Ad Builder &amp; Manager" width="120" />
 </p>
 
-<h1 align="center">Facebook Ad Builder</h1>
+<h1 align="center">theLeadRouter — Ad Builder &amp; Manager</h1>
 
 <p align="center">
-  <strong>AI-powered Facebook ad automation platform</strong><br>
-  From competitor research to ad generation and campaign management
+  <strong>Version 2 · Release candidate</strong><br>
+  Research, create, launch, and manage ad campaigns from one workspace
 </p>
 
 <p align="center">
@@ -38,7 +34,13 @@ The installer adds a first-run wizard and Settings → Integrations for encrypte
 
 ## Overview
 
-Facebook Ad Builder is a full-stack application that streamlines the entire Facebook advertising workflow. Use AI to research competitors, generate compelling ad copy and images, and manage campaigns—all from one platform.
+**theLeadRouter — Ad Builder & Manager** is the v2 ad workspace, formerly BreadWinner / Facebook Ad Builder. Research competitors, generate ad copy and creative, launch campaigns, manage delivery, and review performance in one place. LeadRouter campaign connections, workspace API keys, plugins, and guided setup are included in the v2 release candidate.
+
+### Guided Railway installation (release preview)
+
+The installer adds a first-run wizard and Settings → Integrations for encrypted AI keys, brand/product setup, and a first image ad. The Railway template is still being verified; a public deploy button is not available yet. See the [customer installation guide](docs/deployment/install-on-railway.md) and [release procedure](docs/deployment/railway-template-maintainer.md).
+
+See [product naming and compatibility](docs/brand-guidelines.md) for the v2 identity.
 
 ### Key Capabilities
 
@@ -96,8 +98,8 @@ Manage Facebook campaigns directly:
 Run the setup wizard which will guide you through the entire configuration:
 
 ```bash
-git clone https://github.com/yourusername/facebook_ad_builder.git
-cd facebook_ad_builder
+git clone https://github.com/jasonakatiff/iscale-facebook-ad-builder.git leadrouter-ad-builder-manager
+cd leadrouter-ad-builder-manager
 ./setup.sh
 ```
 
@@ -115,8 +117,8 @@ The wizard will:
 #### 1. Clone and Install
 
 ```bash
-git clone https://github.com/yourusername/facebook_ad_builder.git
-cd facebook_ad_builder
+git clone https://github.com/jasonakatiff/iscale-facebook-ad-builder.git leadrouter-ad-builder-manager
+cd leadrouter-ad-builder-manager
 
 # Backend
 cd backend

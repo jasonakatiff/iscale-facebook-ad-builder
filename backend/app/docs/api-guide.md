@@ -1,6 +1,6 @@
 # API guide and examples
 
-BreadWinner · Powered by theLeadRouter.com
+theLeadRouter — Ad Builder & Manager
 
 ## Base URL and authentication
 Production API origin: https://ad-builder-backend-production.up.railway.app
