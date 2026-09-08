@@ -1,9 +1,11 @@
-# Local development stack: hot-reloading backend + frontend against a
-# disposable Postgres for optional self-hosted development.
-#
-# Usage: docker compose up
-#   backend:  http://localhost:8000  (uvicorn --reload)
-#   frontend: http://localhost:5173  (vite dev server, proxies /api to backend)
+# Local development only. Supply credentials through the process environment.
+# Start: docker compose --env-file /dev/null up --build
+# Stop, preserving data: docker compose --env-file /dev/null down
+
+x-backend-environment: &backend-environment
+  DATABASE_URL: postgresql://ads_studio:ads_studio_dev_password@postgres:5432/ads_studio_dev
+  SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in the process environment}
+  OAUTH_TOKEN_ENCRYPTION_KEY: ${OAUTH_TOKEN_ENCRYPTION_KEY:?Set OAUTH_TOKEN_ENCRYPTION_KEY in the process environment}
 
 services:
   postgres:
@@ -24,38 +26,64 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
-    env_file:
-      - .env
+    command:
+      - sh
+      - -c
+      - python -c 'from startup import bootstrap_database; bootstrap_database()' && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
     environment:
-      DATABASE_URL: postgresql://ads_studio:ads_studio_dev_password@postgres:5432/ads_studio_dev
-      ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
-      FRONTEND_URL: http://localhost:5173
-      GOOGLE_ADS_OAUTH_REDIRECT_URI: http://localhost:8000/api/v1/google-ads/oauth/callback
-      TIKTOK_ADS_OAUTH_REDIRECT_URI: http://localhost:8000/api/v1/tiktok-ads/oauth/callback
+      <<: *backend-environment
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ALLOWED_ORIGINS: http://localhost:${AD_STUDIO_FRONTEND_PORT:-5173},http://127.0.0.1:${AD_STUDIO_FRONTEND_PORT:-5173}
+      FRONTEND_URL: http://localhost:${AD_STUDIO_FRONTEND_PORT:-5173}
+      PUBLIC_API_URL: http://localhost:${AD_STUDIO_BACKEND_PORT:-8000}
+      MEDIA_STORAGE_PATH: /app/uploads
+      GOOGLE_ADS_OAUTH_REDIRECT_URI: http://localhost:${AD_STUDIO_BACKEND_PORT:-8000}/api/v1/google-ads/oauth/callback
+      TIKTOK_ADS_OAUTH_REDIRECT_URI: http://localhost:${AD_STUDIO_BACKEND_PORT:-8000}/api/v1/tiktok-ads/oauth/callback
     volumes:
       - ./backend:/app
+      - ads_studio_media:/app/uploads
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${AD_STUDIO_BACKEND_PORT:-8000}:8000"
     depends_on:
       postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health/ready', timeout=5)"]
+      interval: 5s
+      timeout: 10s
+      retries: 24
+      start_period: 10s
+
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.sync-worker
+    command: ["python", "-m", "app.sync_worker"]
+    environment: *backend-environment
+    volumes:
+      - ./backend/app:/app/app
+    depends_on:
+      backend:
         condition: service_healthy
 
   frontend:
     image: node:20-alpine
     working_dir: /app
-    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+    command: sh -c "npm ci && exec npm run dev -- --host 0.0.0.0 --port 5173 --strictPort"
     environment:
-      # Used by vite dev's own proxy for relative-path requests (container-to-container)
-      VITE_BACKEND_PROXY_TARGET: http://backend:8000
-      # Browser requests use the backend port published on the host.
-      VITE_API_URL: http://localhost:8000/api/v1
+      DEV_API_PROXY_TARGET: http://backend:8000
+      VITE_API_URL: /api/v1
     volumes:
       - ./frontend:/app
+      - ads_studio_node_modules:/app/node_modules
     ports:
-      - "127.0.0.1:5173:5173"
+      - "127.0.0.1:${AD_STUDIO_FRONTEND_PORT:-5173}:5173"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   ads_studio_postgres_data:
+  ads_studio_media:
+  ads_studio_node_modules:

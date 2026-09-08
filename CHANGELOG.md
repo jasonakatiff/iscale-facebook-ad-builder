@@ -1,5 +1,11 @@
 # Changelog
 
+## Local v2 setup and Docker Compose — 2026-09-08
+
+Replace the legacy secret-writing wizard with process-environment validation and the shared v2 bootstrap. Repeated setup preserves the owner and saved encrypted provider credentials. Repair fresh Compose startup, add the sync worker and readiness ordering, keep database/media/dependency data in named volumes, and restrict development HTTP ports to loopback. Update the README and add a [local development guide](docs/deployment/local-development.md).
+
+[Plan and test status](docs/plans/local-installers-v2.md): eight standalone setup checks and four isolated PostgreSQL integration tests passed locally, including actual setup reruns and provider decryption. Shell syntax and Compose configuration checks passed. CI now exercises the actual Compose stack, frontend proxy, worker, and container recreation with disposable storage; runtime and required PR checks are pending. No production data or paid provider calls used.
+
 ## Security: critical dependencies and exception privacy — 2026-09-08
 
 - Patch python-jose, Vitest/coverage and the transitive shell-quote dependency.

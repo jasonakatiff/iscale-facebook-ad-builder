@@ -109,13 +109,24 @@ The commands below are for developers running the code locally. The Railway inst
 
 ### Prerequisites
 
-- **Node.js** 18+ ([download](https://nodejs.org))
+- **Node.js** 20.19+ or 22.12+ ([download](https://nodejs.org))
 - **Python** 3.11+ ([download](https://python.org))
 - **PostgreSQL** 15+ (local or cloud: [Railway](https://railway.app), [Supabase](https://supabase.com))
 
+### Guided Local Setup
+
+Clone this public repository and configure the process settings described in the [local development guide](docs/deployment/local-development.md). Then run:
+
+```bash
+./setup.sh --check  # Read-only prerequisite and configuration check
+./setup.sh          # Install dependencies and initialize the v2 database
+```
+
+The setup command preserves supplied signing/encryption keys and existing owners. It never creates or overwrites secret files. Use `./setup.sh --skip-install` when dependencies are already installed. It prints separate backend, worker, and frontend start commands.
+
 ### Manual Local Setup
 
-Use the steps below for v2. The legacy `setup.sh` wizard does not configure the required encryption key or use the current installation bootstrap; it is not a supported v2 setup path.
+Use the steps below to install and start each component yourself.
 
 <details>
 <summary>Click to expand manual setup instructions</summary>
@@ -219,7 +230,7 @@ Sign in with the owner credentials to reach the setup wizard. Use the [customer 
 6. Find your Ad Account ID in [Ads Manager](https://adsmanager.facebook.com) → Settings
 
 ```bash
-# Add to .env.local
+# Configure in the backend and worker process environments
 FACEBOOK_ACCESS_TOKEN=your-token
 FACEBOOK_AD_ACCOUNT_ID=act_123456789
 FACEBOOK_APP_ID=your-app-id
@@ -242,7 +253,7 @@ FACEBOOK_APP_SECRET=your-app-secret
 5. Enable public access: Bucket Settings → Public Access → Enable R2.dev subdomain
 
 ```bash
-# Add to .env.local
+# Configure in the backend process environment
 R2_ACCOUNT_ID=your-account-id
 R2_ACCESS_KEY_ID=your-access-key
 R2_SECRET_ACCESS_KEY=your-secret-key
@@ -455,11 +466,18 @@ docker build -f backend/Dockerfile -t theleadrouter-ad-studio-backend .
 docker build -f frontend/Dockerfile -t theleadrouter-ad-studio-frontend frontend
 ```
 
-The existing [docker-compose.yml](docker-compose.yml) needs v2 startup fixes: it runs migrations directly against an empty database and omits the background worker. It is not a supported fresh v2 installation path. Use [Manual Local Setup](#manual-local-setup) for development or the Railway installer for a hosted workspace.
+For local development, [Docker Compose](docker-compose.yml) runs PostgreSQL, the backend, the sync worker, and Vite. Supply `SECRET_KEY`, `OAUTH_TOKEN_ENCRYPTION_KEY`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` through your process environment, then run:
+
+```bash
+docker compose --env-file /dev/null up --build
+```
+
+The backend performs the v2 bootstrap before the worker starts. Named volumes preserve the database and media across `docker compose --env-file /dev/null down` and subsequent startup. HTTP ports bind to your own computer. See [local development](docs/deployment/local-development.md) for prerequisites, stable credentials, ports, and restart instructions. This development stack uses source mounts and the Vite dev server; the Railway installer remains the hosted deployment path.
 
 ## Documentation
 
 - [Install Ad Studio on Railway](docs/deployment/install-on-railway.md)
+- [Local development and Docker Compose](docs/deployment/local-development.md)
 - [Railway template maintenance and verification](docs/deployment/railway-template-maintainer.md)
 - [Product naming and compatibility](docs/brand-guidelines.md)
 - [Release history](CHANGELOG.md)
@@ -556,4 +574,4 @@ Connect accounts from **Google Ads**, **TikTok Ads**, or **Facebook Campaigns**.
 - **OAuth storage:** Set `OAUTH_TOKEN_ENCRYPTION_KEY` to a Fernet key for encrypted provider credentials. Set `FRONTEND_URL` to the frontend origin and register each configured callback URL with its provider.
 - **Bot API keys:** From `backend/`, run `python scripts/create_api_key.py --name "campaign-bot" --scopes ads:read ads:draft --created-by-user-id USER_UUID`, replacing `USER_UUID` with the account owner's ID. Save the printed key securely; it is displayed once.
 
-`frontend/Dockerfile` and `frontend/nginx.conf` provide a static frontend with a same-origin backend proxy; the Docker build defaults `VITE_API_URL` to `/api/v1`. See [Docker — developer builds](#docker--developer-builds) for the current Compose limitations.
+`frontend/Dockerfile` and `frontend/nginx.conf` provide a static frontend with a same-origin backend proxy; the Docker build defaults `VITE_API_URL` to `/api/v1`. See [Docker — developer builds](#docker--developer-builds) for the local Compose stack.
