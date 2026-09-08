@@ -12,14 +12,19 @@ on:
           - production
           - staging
 
+permissions:
+  contents: read
+
 jobs:
   wait-for-deploy:
+    permissions: {}
     runs-on: ubuntu-latest
     steps:
       - name: Wait for Railway deploy
         run: sleep 120  # Wait 2 min for Railway to rebuild
 
   backend-health:
+    permissions: {}
     needs: wait-for-deploy
     runs-on: ubuntu-latest
     steps:
@@ -64,6 +69,7 @@ jobs:
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
 
   notify-failure:
+    permissions: {}
     needs: [backend-health, e2e-smoke-tests]
     if: failure()
     runs-on: ubuntu-latest

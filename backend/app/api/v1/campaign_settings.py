@@ -13,6 +13,7 @@ from app.core.deps import get_current_active_user, require_permission
 from app.database import get_db
 from app.models import CampaignPreset, CampaignPreference, User
 from app.services.campaign_validation import (
+    CampaignValidationError,
     campaign_params,
     adset_params,
     validate_objective,
@@ -319,7 +320,7 @@ def preflight(
             not adset.get("isExisting")
             or (not campaign.get("isExisting") and campaign.get("budgetType") == "CBO")
         ) and account.get("min_daily_budget") is None:
-            raise ValueError(
+            raise CampaignValidationError(
                 "Ad account minimum daily budget is unavailable. Sync the ad account."
             )
         if campaign.get("isExisting"):
@@ -337,7 +338,9 @@ def preflight(
                 )
             )
             if str(live["account_id"]) != payload.ad_account_id.removeprefix("act_"):
-                raise ValueError("Existing campaign belongs to another ad account.")
+                raise CampaignValidationError(
+                    "Existing campaign belongs to another ad account."
+                )
             campaign["objective"] = live["objective"]
             campaign["budgetType"] = (
                 "CBO"
@@ -347,16 +350,20 @@ def preflight(
             campaign_review = live
         else:
             if not campaign.get("name", "").strip():
-                raise ValueError("Campaign Name is required.")
+                raise CampaignValidationError("Campaign Name is required.")
             campaign_review = campaign_params({**campaign, "status": "PAUSED"})
             if campaign_review.get(
                 "daily_budget", int(account.get("min_daily_budget") or 1)
             ) < int(account.get("min_daily_budget") or 1):
-                raise ValueError("Campaign budget is below the ad account minimum.")
+                raise CampaignValidationError(
+                    "Campaign budget is below the ad account minimum."
+                )
             if campaign_review["special_ad_categories"] and not campaign.get(
                 "specialAdCategoryCountries"
             ):
-                raise ValueError("Select countries for the Special Ad Category.")
+                raise CampaignValidationError(
+                    "Select countries for the Special Ad Category."
+                )
         if adset.get("isExisting"):
             adset_review = dict(
                 AdSet(adset.get("fbAdsetId"), api=service.api).api_get(
@@ -374,10 +381,12 @@ def preflight(
                 )
             )
             if adset_review["campaign_id"] != campaign.get("fbCampaignId"):
-                raise ValueError("Existing ad set belongs to another campaign.")
+                raise CampaignValidationError(
+                    "Existing ad set belongs to another campaign."
+                )
         else:
             if not adset.get("name", "").strip():
-                raise ValueError("Ad Set Name is required.")
+                raise CampaignValidationError("Ad Set Name is required.")
             validate_objective(
                 campaign["objective"],
                 adset.get("optimizationGoal"),
@@ -398,18 +407,22 @@ def preflight(
             )
             minimum = int(account.get("min_daily_budget") or 1)
             if adset_review.get("daily_budget", minimum) < minimum:
-                raise ValueError("Daily budget is below the ad account minimum.")
+                raise CampaignValidationError(
+                    "Daily budget is below the ad account minimum."
+                )
             if not adset_review["targeting"].get("geo_locations"):
-                raise ValueError("Include at least one location.")
+                raise CampaignValidationError("Include at least one location.")
             if not adset_review.get("start_time") or datetime.fromisoformat(
                 adset_review["start_time"].replace("Z", "+00:00")
             ) <= datetime.now(timezone.utc):
-                raise ValueError("Start time must be in the future.")
+                raise CampaignValidationError("Start time must be in the future.")
         page_id = creative.get("pageId")
         if not page_id or page_id not in {
             page["id"] for page in service.get_pages(payload.ad_account_id)
         }:
-            raise ValueError("Select an accessible Facebook Page for this ad account.")
+            raise CampaignValidationError(
+                "Select an accessible Facebook Page for this ad account."
+            )
         instagram_id = creative.get("instagramId")
         if "instagram" in adset_review["targeting"].get(
             "publisher_platforms", ["instagram"]
@@ -418,17 +431,17 @@ def preflight(
                 row["id"]
                 for row in service.get_instagram_accounts(payload.ad_account_id)
             }:
-                raise ValueError(
+                raise CampaignValidationError(
                     "Select an accessible Instagram account or remove Instagram placements."
                 )
         url = urlparse(creative.get("websiteUrl", ""))
         if url.scheme not in ("http", "https") or not url.netloc:
-            raise ValueError("A valid Website URL is required.")
+            raise CampaignValidationError("A valid Website URL is required.")
         PreferenceRequest(urlParameters=creative.get("urlParameters", ""))
         ads = []
         for ad in payload.adsData:
             if not ad.get("name", "").strip():
-                raise ValueError("Every ad needs a name.")
+                raise CampaignValidationError("Every ad needs a name.")
             try:
                 headline, body = (
                     creative["headlines"][ad["headlineIndex"]],
@@ -440,9 +453,11 @@ def preflight(
                     if item["id"] == ad["creativeId"]
                 )
             except (KeyError, IndexError, StopIteration):
-                raise ValueError("Ad variant references missing media or copy.")
+                raise CampaignValidationError(
+                    "Ad variant references missing media or copy."
+                )
             if not headline.strip() or not body.strip():
-                raise ValueError(
+                raise CampaignValidationError(
                     "Each ad requires a nonempty headline and primary text."
                 )
             ads.append(
@@ -467,9 +482,14 @@ def preflight(
             "adset": adset_review,
             "ads": ads,
         }
+    except CampaignValidationError as error:
+        capture_exception(error, "campaign_settings.preflight")
+        return failure(400, "INVALID_CAMPAIGN", error.user_message)
     except ValueError as error:
         capture_exception(error, "campaign_settings.preflight")
-        return failure(400, "INVALID_CAMPAIGN", str(error))
+        return failure(400, "INVALID_CAMPAIGN", "Check the supplied campaign settings.")
     except Exception as error:
         capture_exception(error, "campaign_settings.preflight")
-        return failure(502, "FACEBOOK_ERROR", str(error))
+        return failure(
+            502, "FACEBOOK_ERROR", "Facebook preflight failed. Try again later."
+        )

@@ -2,6 +2,9 @@ name: Installation journey
 on:
   pull_request:
   workflow_dispatch:
+permissions:
+  contents: read
+
 jobs:
   installation:
     runs-on: ubuntu-latest
