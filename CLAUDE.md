@@ -1,6 +1,8 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Read [AGENTS.md](AGENTS.md) before working. It defines the canonical public
+repository, mandatory target checks and environment boundaries for every agent.
+This file adds architecture and coding context; keep it consistent with AGENTS.md.
 
 ## Startup Checks
 
@@ -19,59 +21,21 @@ Facebook Ad Automation App - A full-stack application for automating the lifecyc
 - Frontend: React 19 + Vite + TailwindCSS
 - Backend: Python FastAPI (Python 3.11+)
 - Database: PostgreSQL on Railway
-- Storage: Cloudflare R2 (S3-compatible)
+- Storage: Persistent Railway media volume; optional Cloudflare R2 (S3-compatible)
 - Testing: agent-browser (e2e), Vitest (unit)
-- Hosting: Railway (backend + frontend + database)
+- Hosting: Railway (backend + frontend + worker + PostgreSQL)
 
 ## Development Commands
 
-### Backend
+Follow [Manual Local Setup in README](README.md#manual-local-setup) with a dedicated
+PostgreSQL database and process environment. Backend startup is `python startup.py`
+from `backend/`; the worker uses `python -m app.sync_worker`. Do not use the legacy
+setup wizard, Compose startup or `init_db.py` alone for a fresh v2 installation.
 
-```bash
-cd backend
-
-# Setup virtual environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Initialize database (PostgreSQL required)
-python init_db.py
-
-# Run development server
-uvicorn app.main:app --reload --port 8000
-
-# Run tests
-pytest
-pytest test_research.py  # Run single test file
-```
-
-### Frontend
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Run development server
-npm run dev  # Runs on http://localhost:5173
-
-# Build for production
-npm run build
-
-# Lint code
-npm run lint
-
-# Preview production build
-npm run preview
-```
-
-### Full Stack Development
-
-The backend API runs on `http://localhost:8000` and the frontend on `http://localhost:5173`. API documentation is available at `http://localhost:8000/api/v1/docs`.
+Frontend commands from `frontend/`: `npm ci`, `npm run dev`, `npm run test:unit`,
+`npm run test:coverage`, and `npm run build`. Tests and servers require the target
+checks and cleanup in AGENTS.md. Use the isolated database variables and commands
+in [.github/workflows/test.yml](.github/workflows/test.yml) for backend validation.
 
 ## Architecture
 
@@ -218,49 +182,15 @@ Modal design requirements:
 - Non-destructive actions use gray/neutral buttons
 - Icon to indicate action type (trash, warning, etc.)
 
-## Database Requirements
+## Database and Environment Configuration
 
-**PostgreSQL is REQUIRED.** SQLite is deprecated and will cause startup errors.
-
-Production uses Railway PostgreSQL. Local dev connects to the same Railway database for shared data.
-
-### Local Development
-
-Uses Railway PostgreSQL (configured in `.env.local`). No local database setup needed.
-
-### Environment Variables
-
-Create `.env.local` in project root:
-
-```bash
-# Database (Railway PostgreSQL)
-DATABASE_URL=postgresql://postgres:xxx@host.proxy.rlwy.net:port/railway
-
-# Cloudflare R2 Storage
-R2_ACCOUNT_ID=...
-R2_ACCESS_KEY_ID=...
-R2_SECRET_ACCESS_KEY=...
-R2_BUCKET_NAME=your-bucket
-R2_PUBLIC_URL=https://pub-xxx.r2.dev
-
-# AI Services
-GEMINI_API_KEY=...
-FAL_AI_API_KEY=...
-KIE_AI_API_KEY=...
-
-# Facebook Marketing API
-VITE_FACEBOOK_ACCESS_TOKEN=...
-VITE_FACEBOOK_API_VERSION=v24.0
-
-# Auth
-SECRET_KEY=...  # Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
-```
-
-**Railway Environment Variables** (set in dashboard):
-- `DATABASE_URL` → Use `${{Postgres.DATABASE_URL}}` to auto-sync with Postgres service
-- `SECRET_KEY` → Strong random key for JWT auth
-- All R2_* variables for storage
-- All AI API keys
+PostgreSQL is required. Use a dedicated development/test database and isolated
+media storage; never reuse the private BreadWinner database for public work.
+Supply configuration through the command's process environment, preserving stable
+signing/encryption values for an existing installation. Never create or overwrite
+user-owned secret files. See [README environment variables](README.md#environment-variables)
+and the [installer guide](docs/deployment/install-on-railway.md) for required values.
+A missing public credential does not authorize a private-environment fallback.
 
 ## Search & Refactoring Tools
 
@@ -307,49 +237,17 @@ SECRET_KEY=...  # Generate with: python -c "import secrets; print(secrets.token_
 8. **Generated Ads Gallery**: View ads grouped by bundle_id
 9. **Reporting**: Analytics dashboard (in development)
 
-## Deployment
+## Deployment and Verification
 
-**Railway Setup:**
-1. Backend auto-deploys from `main` branch via Dockerfile
-2. Frontend auto-deploys from `main` branch via Nixpacks
-3. Database is Railway PostgreSQL service
-4. Custom domain → CNAME to Railway
+This public repository distributes installer source; it has no shared production
+application URL. Follow the [release procedure](docs/deployment/railway-template-maintainer.md)
+and [installer guide](docs/deployment/install-on-railway.md). Identify the actual
+installation and authorized scope before deployment or runtime checks.
 
-**Post-Deploy Verification:**
-```bash
-railway logs --tail 30  # Look for "Uvicorn running on http://0.0.0.0:8080"
-```
-
-**MANDATORY - Feature Testing After Deployment:**
-For ANY new feature deployment, run ALL applicable tests:
-
-1. **Smoke Tests** (agent-browser):
-```bash
-cd frontend
-BASE_URL=https://your-app.com npm run test:smoke
-
-# Or run individual tests:
-BASE_URL=https://your-app.com npm run test:login
-TEST_EMAIL=user@example.com TEST_PASSWORD=xxx npm run test:auth
-```
-
-2. **Unit Tests** (backend):
-```bash
-cd backend
-pytest tests/test_<feature>.py -v
-```
-
-3. **Unit Tests** (frontend):
-```bash
-cd frontend
-npm run test:unit
-```
-
-**Test file locations:**
-- Frontend e2e (agent-browser smoke): `frontend/tests/agent-browser/*.sh`
-- Frontend e2e (Playwright, 42 tests: auth, brands, campaigns, gallery, video ads, UI policy): `frontend/tests/**/*.spec.js`; run with `BASE_URL=http://localhost:5173 TEST_EMAIL=... TEST_PASSWORD=... npm run test:e2e` against a running stack
-- Frontend unit: `frontend/src/**/*.test.js`
-- Backend unit: `backend/tests/test_*.py`
+Use [.github/workflows/test.yml](.github/workflows/test.yml) and
+[.github/workflows/installation.yml](.github/workflows/installation.yml) for current
+isolated backend, frontend, browser and container checks. Keep simulated providers,
+skipped live-app checks and actual customer-runtime verification distinct.
 
 **agent-browser Quick Reference:**
 ```bash
@@ -373,4 +271,4 @@ agent-browser close               # Close browser
 - Frontend API URL set via `VITE_API_URL` env var (build-time, not runtime)
 - When adding new origins: update CORS in `main.py` AND CSP in `index.html`
 - Ad account IDs auto-prefixed with 'act_' if missing (facebook_service.py)
-- Local dev uses same Railway DB + R2 as production (shared data)
+- Local development and tests use dedicated databases and isolated storage; public work must not fall back to the deprecated private installation.
