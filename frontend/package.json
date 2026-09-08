@@ -28,7 +28,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.83.0",
-    "adm-zip": "^0.5.16",
+    "adm-zip": "^0.6.0",
     "axios": "^1.13.2",
     "better-sqlite3": "^12.4.1",
     "cors": "^2.8.5",
@@ -43,6 +43,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.57.0",
     "@testing-library/jest-dom": "^6.4.0",
     "@testing-library/react": "^16.3.0",
     "@types/react": "^19.2.2",
@@ -60,7 +61,6 @@
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "vite": "^7.2.2",
-    "vitest": "^1.6.0",
-    "@playwright/test": "^1.57.0"
+    "vitest": "^1.6.0"
   }
 }
