@@ -1,3 +1,9 @@
+## Railway installer preview — 2026-09-08
+
+An unlisted [Deploy on Railway preview](https://railway.com/deploy/rNhJ3h) creates the four connected services and persistent storage from two owner fields. Sign in to configure AI keys in the first-run wizard or Settings → Integrations.
+
+Cloud checks passed for fresh owner setup, independent credentials, worker heartbeat, encrypted-key decryption, and record/media persistence after restart and update. Fixed nginx startup under Railway command overrides and clear Gemini invalid-key feedback. Paid generation and nontechnical pilot acceptance remain open.
+
 # Changelog
 
 ## Unreleased — guided installation

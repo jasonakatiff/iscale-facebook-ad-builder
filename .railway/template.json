@@ -1,42 +1,47 @@
 {
   "name": "BreadWinner \u2014 your own AI ad studio",
   "description": "Deploy your application, sign in, and connect Gemini and fal.ai in the setup wizard. Create, save, and download your first image ad. Railway and AI services bill your own accounts.",
-  "publicationStatus": "blocked_until_fresh_railway_install_verified",
-  "templateUrl": null,
+  "publicationStatus": "unlisted_preview_automated_install_verified",
+  "templateUrl": "https://railway.com/deploy/rNhJ3h",
   "sourceRepository": "jasonakatiff/iscale-facebook-ad-builder",
-  "sourceRevision": null,
-  "sourceGate": "Export reviewed release files onto public history, merge, and record the public commit before creating the template.",
+  "sourceRevision": "e4c64143404b4389d39d2a66a4e24ee74bae92b2",
+  "sourceGate": "Reviewed release files exported onto public repository history on the dedicated installer branch; private main and public main remain separate.",
   "installFields": [
     {
       "service": "Backend",
       "variable": "ADMIN_EMAIL",
       "label": "Owner email",
       "description": "Use this email to sign in to your new application.",
-      "required": true
+      "required": true,
+      "preserveExisting": true
     },
     {
       "service": "Backend",
       "variable": "ADMIN_PASSWORD",
       "label": "Owner password",
       "description": "Choose 12 or more characters, at most 72 UTF-8 bytes. Save it in your password manager.",
-      "required": true
+      "required": true,
+      "preserveExisting": true
     }
   ],
   "generatedVariables": [
     {
       "service": "Postgres",
       "variable": "POSTGRES_PASSWORD",
-      "value": "${{secret(48)}}"
+      "value": "${{secret(48)}}",
+      "preserveExisting": true
     },
     {
       "service": "Backend",
       "variable": "SECRET_KEY",
-      "value": "${{secret(64)}}"
+      "value": "${{secret(64)}}",
+      "preserveExisting": true
     },
     {
       "service": "Backend",
       "variable": "OAUTH_TOKEN_ENCRYPTION_KEY",
-      "value": "${{secret(43, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_\")}}="
+      "value": "${{secret(43, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_\")}}=",
+      "preserveExisting": true
     }
   ],
   "publicServices": [
@@ -56,5 +61,13 @@
   "generatedPublicDomains": {
     "Frontend": 8080,
     "Backend": 8080
-  }
+  },
+  "templateId": "fddb5b7e-1e34-421e-85c4-832c90182a50",
+  "sourceBranch": "codex/railway-installer-public-20260908",
+  "remainingValidation": [
+    "Funded live AI generation",
+    "Independent Railway account dashboard walkthrough",
+    "Nontechnical pilot timing",
+    "Cloud backup and restore rehearsal"
+  ]
 }
