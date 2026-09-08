@@ -1,5 +1,11 @@
 # Changelog
 
+## Public installation guidance and worker destination — 2026-09-08
+
+Require an explicit API origin in the downloadable plugin worker so a missing setting cannot send its key to the private installation. Remove private deployment URLs from the API and plugin guides. Replace the obsolete Railway deployment walkthrough with the four-service installer reference, correct README API routes, and use the v2 bootstrap and sync worker in manual setup. Mark the legacy setup wizard and Compose startup as unsupported for fresh v2 installations pending repair.
+
+Verification: three worker configuration regression tests passed after reproducing the missing-origin failure; GitHub Markdown rendering, document links, all seven README API routes, and Railway configuration checks passed. Worker requests were mocked; no production database or provider calls were made.
+
 ## README installation paths — 2026-09-08
 
 Make the Railway one-click preview the Quick Start and Deployment path for **theLeadRouter — Ad Studio**. Label local development separately, add the missing documentation navigation target, and document Render, Northflank, DigitalOcean, and Coolify as future installation options with official sources. Railway remains the only published installer. Verification: GitHub Markdown rendering, README anchors and relative links, and the Railway configuration check passed.

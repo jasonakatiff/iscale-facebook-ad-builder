@@ -113,23 +113,9 @@ The commands below are for developers running the code locally. The Railway inst
 - **Python** 3.11+ ([download](https://python.org))
 - **PostgreSQL** 15+ (local or cloud: [Railway](https://railway.app), [Supabase](https://supabase.com))
 
-### Option 1: Interactive Local Setup
+### Manual Local Setup
 
-Run the setup wizard which will guide you through the entire configuration:
-
-```bash
-git clone https://github.com/jasonakatiff/theleadrouter-ad-studio.git theleadrouter-ad-studio
-cd theleadrouter-ad-studio
-./setup.sh
-```
-
-The wizard will:
-1. Check all prerequisites
-2. Walk you through configuring API keys
-3. Set up the database
-4. Create your admin account
-
-### Option 2: Manual Local Setup
+Use the steps below for v2. The legacy `setup.sh` wizard does not configure the required encryption key or use the current installation bootstrap; it is not a supported v2 setup path.
 
 <details>
 <summary>Click to expand manual setup instructions</summary>
@@ -153,35 +139,40 @@ npm install
 
 #### 2. Configure Environment
 
-Return to the repository root after installing the frontend dependencies:
+Use a dedicated development PostgreSQL database. Configure `DATABASE_URL`, `SECRET_KEY`, `OAUTH_TOKEN_ENCRYPTION_KEY`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` in the backend process environment before starting it. Supply the same database and signing/encryption values to the worker. See [Environment Variables](#environment-variables) and `.env.example` for the complete configuration.
 
-```bash
-cd ..
-cp .env.example .env.local
-```
+The owner password needs at least 12 characters and at most 72 UTF-8 bytes. The first startup creates the owner; subsequent starts preserve the existing account and credentials. Keep the signing and encryption keys stable between starts.
 
-Edit `.env.local` with your credentials. See [Environment Variables](#environment-variables) for details.
+The commands below assume these process environments are already configured. Merely creating a root `.env.local` does not load it into backend commands. AI keys can be added after signing in through **Settings → Integrations**.
 
-#### 3. Initialize Database
+#### 3. Start the Backend
+
+In a terminal at the repository root:
 
 ```bash
 cd backend
 source venv/bin/activate
-python init_db.py
+python startup.py
 ```
 
-#### 4. Start the Application
+The startup entry point initializes an empty database, records the Alembic revision, creates the owner and setup state, and starts the API on port 8000 by default. For an existing versioned database, it applies migrations. `init_db.py` alone does not perform the v2 installation bootstrap.
+
+#### 4. Start the Worker and Frontend
+
+Open two more terminals at the repository root:
 
 ```bash
-# Terminal 1: Backend
+# Terminal 2: Worker, with the same backend process environment
 cd backend
 source venv/bin/activate
-uvicorn app.main:app --reload --port 8000
+python -m app.sync_worker
 
-# Terminal 2: Frontend
+# Terminal 3: Frontend
 cd frontend
 npm run dev
 ```
+
+Sign in with the owner credentials to reach the setup wizard. Use the [customer guide](docs/deployment/install-on-railway.md) for the provider and brand/product steps after login.
 
 </details>
 
@@ -267,18 +258,19 @@ R2_PUBLIC_URL=https://pub-xxx.r2.dev
 
 For local development or a custom deployment, configure the values below. The Railway installer creates the database connection and signing/encryption keys automatically; its setup wizard stores AI keys through **Settings → Integrations**.
 
-For local development, use a `.env.local` file in the project root:
+The backend and worker read their process environments. A root `.env.local` file is not loaded by these commands automatically. Keep provider tokens and other secrets out of frontend `VITE_*` settings.
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DATABASE_URL` | ✅ | PostgreSQL connection string |
 | `SECRET_KEY` | ✅ | JWT signing key (generate random string) |
 | `OAUTH_TOKEN_ENCRYPTION_KEY` | ✅ | Fernet key for encrypted integration credentials; share the same value with the worker |
-| `GEMINI_API_KEY` | ✅ | Google Gemini API key |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | First startup | Owner account created by `startup.py`; existing installations keep their owner |
+| `GEMINI_API_KEY` | For AI features | Optional environment fallback; the owner can configure Gemini in Settings → Integrations |
 | `ALLOWED_ORIGINS` | Production | Comma-separated CORS origins |
 | `FACEBOOK_ACCESS_TOKEN` | For FB features | Facebook Marketing API token |
 | `FACEBOOK_AD_ACCOUNT_ID` | For FB features | Facebook Ad Account ID |
-| `R2_*` | For uploads | Cloudflare R2 credentials |
+| `R2_*` | Optional | Cloudflare R2 credentials; the Railway installer uses a persistent media volume by default |
 | `FAL_AI_API_KEY` | For image gen | Fal.ai API key |
 
 See `.env.example` for all available options.
@@ -389,8 +381,8 @@ Interactive API documentation is available at `/api/v1/docs` when running the ba
 | `GET` | `/api/v1/brands` | List all brands |
 | `POST` | `/api/v1/brands` | Create a brand |
 | `GET` | `/api/v1/products` | List all products |
-| `POST` | `/api/v1/research/scrape` | Scrape competitor ads |
-| `POST` | `/api/v1/ad-remix/generate` | Generate ad variations |
+| `POST` | `/api/v1/research/search` | Search competitor ads |
+| `POST` | `/api/v1/ad-remix/reconstruct` | Reconstruct an ad concept from a blueprint |
 | `POST` | `/api/v1/facebook/campaigns` | Create Facebook campaign |
 
 ---
@@ -463,7 +455,7 @@ docker build -f backend/Dockerfile -t theleadrouter-ad-studio-backend .
 docker build -f frontend/Dockerfile -t theleadrouter-ad-studio-frontend frontend
 ```
 
-For a connected local development stack, [docker-compose.yml](docker-compose.yml) provides PostgreSQL, the backend, and the Vite frontend. It reads backend environment values from `.env`. This development configuration does not include the background worker or provide a production one-click installation.
+The existing [docker-compose.yml](docker-compose.yml) needs v2 startup fixes: it runs migrations directly against an empty database and omits the background worker. It is not a supported fresh v2 installation path. Use [Manual Local Setup](#manual-local-setup) for development or the Railway installer for a hosted workspace.
 
 ## Documentation
 
@@ -479,7 +471,7 @@ For a connected local development stack, [docker-compose.yml](docker-compose.yml
 <details>
 <summary><strong>DATABASE_URL environment variable is required</strong></summary>
 
-- Ensure `.env.local` exists in the project root
+- Ensure `DATABASE_URL` is available in the backend process environment
 - Verify the DATABASE_URL format: `postgresql://user:pass@host:5432/dbname`
 - Check PostgreSQL is running: `pg_isready`
 
@@ -488,7 +480,7 @@ For a connected local development stack, [docker-compose.yml](docker-compose.yml
 <details>
 <summary><strong>CORS errors in browser</strong></summary>
 
-- Add your frontend URL to `ALLOWED_ORIGINS` in `.env.local`
+- Add your frontend URL to `ALLOWED_ORIGINS` in the backend process environment
 - Restart the backend server
 
 </details>
@@ -564,4 +556,4 @@ Connect accounts from **Google Ads**, **TikTok Ads**, or **Facebook Campaigns**.
 - **OAuth storage:** Set `OAUTH_TOKEN_ENCRYPTION_KEY` to a Fernet key for encrypted provider credentials. Set `FRONTEND_URL` to the frontend origin and register each configured callback URL with its provider.
 - **Bot API keys:** From `backend/`, run `python scripts/create_api_key.py --name "campaign-bot" --scopes ads:read ads:draft --created-by-user-id USER_UUID`, replacing `USER_UUID` with the account owner's ID. Save the printed key securely; it is displayed once.
 
-For optional local self-hosting, `docker-compose.yml` runs PostgreSQL, the backend on port 8000, and Vite on port 5173. `frontend/Dockerfile` and `frontend/nginx.conf` provide a static frontend with a same-origin backend proxy; the Docker build defaults `VITE_API_URL` to `/api/v1`.
+`frontend/Dockerfile` and `frontend/nginx.conf` provide a static frontend with a same-origin backend proxy; the Docker build defaults `VITE_API_URL` to `/api/v1`. See [Docker — developer builds](#docker--developer-builds) for the current Compose limitations.
