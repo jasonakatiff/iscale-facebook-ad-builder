@@ -1,6 +1,6 @@
 # Repair v2 local installation paths
 
-Status: implemented; PR runtime verification pending
+Status: acceptance verified; publication through PR #52
 Started: 2026-09-08
 
 ## Outcome
@@ -16,8 +16,8 @@ Developers can initialize Ad Studio from an empty PostgreSQL database through th
 - [x] Compose runs PostgreSQL, backend, sync worker, and Vite; the backend bootstraps before serving and the worker waits for readiness.
 - [x] Compose reads explicitly supplied process settings, keeps secrets out of frontend configuration, and binds HTTP ports to loopback.
 - [x] Named database and media volumes survive container recreation; frontend dependencies use a container volume rather than the host node_modules directory.
-- [ ] Fresh Compose install, owner login, pending setup, worker heartbeat, provider-key decryption, media persistence, and cleanup pass using disposable resources in CI.
-- [ ] README and changelog describe verified supported paths and link this plan.
+- [x] Fresh Compose install, owner login, pending setup, worker heartbeat, provider-key decryption, media persistence, and cleanup pass using disposable resources in CI.
+- [x] README and changelog describe verified supported paths and link this plan.
 
 ## Scope and authorization
 
@@ -39,13 +39,15 @@ Jason authorized repairing the two open findings from the release consistency au
 
 ## Verification
 
-Local Docker daemon is unavailable. Local PostgreSQL 15 binaries and Python 3.12 are available for isolated setup tests. Compose runtime verification will run on GitHub's Docker runner; local Compose configuration validation does not require a daemon. No paid providers or production data will be used. Every task-owned local process and CI resource is cleaned up after testing.
+Local Docker daemon is unavailable. Local PostgreSQL 15 binaries and Python 3.12 are available for isolated setup tests. Compose runtime verification ran successfully on GitHub's Docker runner; local Compose configuration validation did not require a daemon. No paid providers or production data will be used. Every task-owned local process and CI resource is cleaned up after testing.
 
-Local evidence: the initial six helper tests failed because the v2 helper did not exist; the old secret-writing wizard was never executed. Eight completed preflight/CLI tests now pass. Four real PostgreSQL integration tests pass, including empty/concurrent bootstrap and actual setup-command reruns preserving one owner, its password hash, and the unchanged encrypted provider key with successful decryption. `bash -n setup.sh`, Python compilation, and Docker Compose configuration checks pass. Compose rejects missing signing/encryption settings and keeps frontend configuration free of secrets. Local database cleanup is recorded in the delivery evidence.
+Local evidence: the initial six helper tests failed because the v2 helper did not exist; the old secret-writing wizard was never executed. Eight completed preflight/CLI tests now pass. Four real PostgreSQL integration tests pass, including empty/concurrent bootstrap and actual setup-command reruns preserving one owner, its password hash, and the unchanged encrypted provider key with successful decryption. `bash -n setup.sh`, Python compilation, and Docker Compose configuration checks pass. Compose rejects missing signing/encryption settings and keeps frontend configuration free of secrets. The owned PostgreSQL PID 81997 exited, port 57187 was verified closed, and its disposable cluster was moved to Trash.
 
 ## Release and documentation
 
-Publish through a PR after required backend, frontend, installation, image/persistence, and CodeQL checks. Restore README support claims only after corresponding verification succeeds.
+[PR #52](https://github.com/jasonakatiff/theleadrouter-ad-studio/pull/52) passed all required checks on implementation head `24ccee9`. [Test Suite evidence](https://github.com/jasonakatiff/theleadrouter-ad-studio/actions/runs/34248307984) confirms the actual Compose file bootstraps an empty database and serves owner login through Vite, saves encrypted credentials, records worker heartbeats, and preserves the owner/JWT/setup state/provider key/media after `down` and `up`. All test containers, volumes, and networks were removed. The existing container verification also passed.
+
+Frontend verification passed 85 unit tests, a production build, and 41 browser tests; 27 existing tests requiring a separate live app were skipped. The installation/telemetry workflow passed five browser tests with simulated AI. CodeQL and secret checks passed. Documentation support claims now correspond to verified local setup and Compose behavior. No paid AI generation, hosted deployment, or private-repository changes form part of this repair.
 
 ## Unresolved questions
 

@@ -87,6 +87,8 @@ docker compose --env-file /dev/null down
 
 Run `up --build` again from the same checkout with the same keys. Named volumes retain the owner, setup progress, encrypted provider keys, and uploaded media. Preserve the Compose project name when relocating the checkout, because it determines which volumes are used. Do not add `--volumes` to `down` for an installation whose data you want to keep.
 
+The older Compose file stored uploads in the host's `backend/uploads` directory. This directory remains on disk; the new media volume does not import its files automatically. When upgrading that development stack, retain a backup and copy those existing uploads into the backend container's `/app/uploads` volume before removing the old checkout.
+
 The bundled database password and source mounts are for local development. OAuth applications and optional external storage need their own backend/worker settings added to Compose; the default stack uses local media and in-app AI configuration.
 
 ## Automated verification
