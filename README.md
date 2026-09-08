@@ -1,10 +1,10 @@
 ## Install on Railway — preview
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/rNhJ3h)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/rNhJ3h?version=ad-studio)
 
 Deploy your own **theLeadRouter — Ad Studio** workspace, enter your owner email/password, then connect AI keys in the setup wizard. Keys can be changed later in **Settings → Integrations**. No terminal or manual database wiring is needed.
 
-The unlisted preview passed fresh cloud installation and persistence checks. Paid AI generation and nontechnical pilot acceptance remain open. Hosting and AI usage use your own accounts. See the [installation guide](docs/deployment/install-on-railway.md).
+The unlisted **Ad Studio** preview passed a fresh cloud installation, owner login/setup, worker readiness, and browser branding check. Earlier installer checks covered database and media persistence. Paid AI generation and nontechnical pilot acceptance remain open. Hosting and AI usage use your own accounts. See the [installation guide](docs/deployment/install-on-railway.md).
 
 <p align="center">
   <img src="frontend/public/leadrouter-mark.svg" alt="theLeadRouter — Ad Studio" width="120" />
@@ -34,7 +34,7 @@ The unlisted preview passed fresh cloud installation and persistence checks. Pai
 
 <p align="center">
   Created by <strong>Jason Akatiff</strong><br>
-  <a href="https://iscale.com">iSCALE.com</a> • <a href="https://a4d.com">A4D.com</a><br>
+  <a href="https://theleadrouter.com">theLeadRouter.com</a> • <a href="https://iscale.com">iSCALE.com</a> • <a href="https://a4d.com">A4D.com</a><br>
   <a href="https://t.me/jasonakatiff">Telegram</a> • <a href="mailto:jason@jasonakatiff.com">jason@jasonakatiff.com</a>
 </p>
 
@@ -230,7 +230,7 @@ FACEBOOK_APP_SECRET=your-app-secret
 <summary>Click to expand R2 storage setup</summary>
 
 1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com) → R2
-2. Create a bucket (e.g., `facebook-ads`)
+2. Create a bucket (e.g., `theleadrouter-ad-studio`)
 3. Go to R2 → Manage R2 API Tokens → Create API token
 4. Grant read/write permissions for your bucket
 5. Enable public access: Bucket Settings → Public Access → Enable R2.dev subdomain
@@ -240,7 +240,7 @@ FACEBOOK_APP_SECRET=your-app-secret
 R2_ACCOUNT_ID=your-account-id
 R2_ACCESS_KEY_ID=your-access-key
 R2_SECRET_ACCESS_KEY=your-secret-key
-R2_BUCKET_NAME=facebook-ads
+R2_BUCKET_NAME=theleadrouter-ad-studio
 R2_PUBLIC_URL=https://pub-xxx.r2.dev
 ```
 
@@ -320,7 +320,7 @@ Navigate to **Campaigns**
 ## Architecture
 
 ```
-facebook_ad_builder/
+theleadrouter-ad-studio/
 ├── backend/                 # Python FastAPI
 │   ├── app/
 │   │   ├── api/v1/         # REST endpoints
@@ -426,16 +426,12 @@ Deploy to [Railway](https://railway.app) in minutes:
 ### Docker
 
 ```bash
-# Backend
-cd backend
-docker build -t fb-ad-backend .
-docker run -p 8000:8000 --env-file ../.env.local fb-ad-backend
-
-# Frontend
-cd frontend
-docker build -t fb-ad-frontend .
-docker run -p 5173:5173 fb-ad-frontend
+# From the repository root, build the application images
+docker build -f backend/Dockerfile -t theleadrouter-ad-studio-backend .
+docker build -f frontend/Dockerfile -t theleadrouter-ad-studio-frontend frontend
 ```
+
+For a connected local stack, [docker-compose.yml](docker-compose.yml) provides PostgreSQL, the backend, and the frontend. It reads backend environment values from `.env`.
 
 ---
 
@@ -494,7 +490,8 @@ Contributions are welcome! Please:
 
 **Jason Akatiff**
 
-- Website: [iSCALE.com](https://iscale.com) | [A4D.com](https://a4d.com)
+- Product: [theLeadRouter.com](https://theleadrouter.com)
+- Creator websites: [iSCALE.com](https://iscale.com) | [A4D.com](https://a4d.com)
 - Telegram: [@jasonakatiff](https://t.me/jasonakatiff)
 - Email: [jason@jasonakatiff.com](mailto:jason@jasonakatiff.com)
 
@@ -513,6 +510,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 <p align="center">
+  <a href="https://theleadrouter.com"><strong>theLeadRouter — Ad Studio</strong></a><br>
   Built with ❤️ by <a href="https://iscale.com">iSCALE</a> using FastAPI, React, and AI
 </p>
 

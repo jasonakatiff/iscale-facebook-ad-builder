@@ -1,10 +1,11 @@
 # Railway installer release procedure
 
-The [unlisted preview template](https://railway.com/deploy/rNhJ3h) is available. A fresh template deployment passed in an isolated Railway project using only owner email/password. Four services, two persistent volumes, generated public domains, independent secrets, owner login, worker heartbeat, encrypted provider-key decryption, and database/media persistence after restart and an application update were verified. A free Gemini request with an invalid test key verified rejection handling. Paid AI generation was not performed.
+The [unlisted Ad Studio preview](https://railway.com/deploy/rNhJ3h?version=ad-studio) is available. A fresh template deployment verified the renamed public runtime in all three application services alongside PostgreSQL, generated public domains, backend readiness, owner login/setup, worker heartbeat, and browser branding. The disposable projects were removed. Earlier preview checks verified two persistent volumes, independent secrets, encrypted provider-key decryption, and database/media persistence after restart and update. A free Gemini request with an invalid test key verified rejection handling. Paid AI generation was not performed.
 
 ## Source and configuration
 
 - Public repository: `jasonakatiff/theleadrouter-ad-studio`, branch `main` (v2 release source).
+- Verified Ad Studio runtime revision: `fcf30f14e343d5811fa84c8c684c96ce05f9b23f`.
 - Previous preview runtime revision: `e4c64143404b4389d39d2a66a4e24ee74bae92b2`.
 - Template ID: `fddb5b7e-1e34-421e-85c4-832c90182a50`; code `rNhJ3h`.
 - [serialized-template.json](../../.railway/serialized-template.json) is the API-accepted template definition. It contains symbolic references, generators, and two blank owner fields, with no resolved secrets.
@@ -13,7 +14,7 @@ The [unlisted preview template](https://railway.com/deploy/rNhJ3h) is available.
 
 ## Reproduce the deployment
 
-1. Use a workspace token held in process memory. Inspect existing templates before creating another. The GraphQL public endpoint supports deployment and inspection; Railway's authenticated template composer API creates and stages template configuration.
+1. Use a workspace token held in process memory. Inspect existing templates and staged changes before editing. Railway's authenticated composer endpoint, `https://backboard.railway.com/graphql/internal`, accepts `templateChangeSetStage` with a `TemplatePatch` containing `config` and `metadata`, followed by `templateChangeSetApply`. The public `/graphql/v2` endpoint supports deployment and inspection. Preserve the template ID and unlisted status during naming/source updates.
 2. Load the hosted template configuration, fill only Backend `ADMIN_EMAIL` and `ADMIN_PASSWORD`, and deploy into a new isolated project. Leave the three secret expressions and cross-service references intact. Never persist resolved credentials locally.
 3. Confirm Postgres and Worker have no public domains; Backend and Frontend receive generated domains on port 8080. Confirm Postgres mounts `/var/lib/postgresql/data` and Backend mounts `/app/uploads`.
 4. Confirm Backend `/health/ready` returns 200, the owner can sign in, and the installation response reports the worker online. The frontend start command must call `/docker-entrypoint.sh nginx -g "daemon off;"` so Railway's command override still generates the nginx port configuration.
@@ -21,6 +22,8 @@ The [unlisted preview template](https://railway.com/deploy/rNhJ3h) is available.
 6. Remove disposable test projects and their fixtures when verification finishes. Keep the hosted template and reviewed source branch.
 
 The customer guide is [install-on-railway.md](install-on-railway.md). Railway provisioning was tested through the API in the maintainer workspace. The complete dashboard clickthrough from an independent account remains unverified.
+
+The preview link includes `?version=ad-studio` because Railway cached the old listing name after the rename. The versioned page was checked for the Ad Studio heading, renamed repository links, and exactly two owner inputs.
 
 The Post-Deploy Verification workflow is manual: publishing public source does not deploy a shared application. Before dispatching it, configure `BACKEND_URL`, `FRONTEND_URL`, `TEST_EMAIL`, and `TEST_PASSWORD` for the intended installation. The inherited repository URLs currently reference the separate private BreadWinner installation; their results do not verify this public release.
 

@@ -1,8 +1,8 @@
 # Install theLeadRouter — Ad Studio
 
-[Deploy Ad Studio on Railway — preview](https://railway.com/deploy/rNhJ3h)
+[Deploy Ad Studio on Railway — preview](https://railway.com/deploy/rNhJ3h?version=ad-studio)
 
-The unlisted preview has passed a fresh Railway installation, owner login, independent credential generation, and database/media persistence checks. Live paid AI generation and nontechnical pilot acceptance remain unverified. The template is not listed in the Railway marketplace.
+The unlisted Ad Studio preview passed a fresh Railway installation, owner login/setup, worker readiness, and browser branding check. Earlier installer checks verified independent credential generation and database/media persistence. Live paid AI generation and nontechnical pilot acceptance remain unverified. The template is not listed in the Railway marketplace.
 
 Install your preview:
 

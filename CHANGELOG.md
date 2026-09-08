@@ -1,5 +1,9 @@
 # Changelog
 
+## README and Railway branding — 2026-09-08
+
+Complete **theLeadRouter — Ad Studio** branding in README product links, footer, and setup examples while preserving author credits. Rename the existing Railway project and one-click template, and point the hosted template at public `main`. Fresh cloud verification passed for all four services on `fcf30f1`, owner login/setup, backend readiness, worker heartbeat, and live browser branding. Disposable projects were removed. README rendering and installer configuration checks passed. See the [completed preview release plan](docs/deployment/v2-railway-release.md).
+
 ## Ad Studio naming — 2026-09-08
 
 Use **theLeadRouter — Ad Studio** for the public product and `theleadrouter-ad-studio` for its repository. Update the UI, API title, guides, downloads, package metadata, and Railway source references. Existing workspace branding overrides and integration identifiers remain compatible. See the [release and rename plan](docs/deployment/v2-railway-release.md). Verification: 85 frontend tests, production build, scoped lint, installer checks, public login smoke, and desktop/mobile branding passed. Hosted Railway naming is recorded separately from checked-in configuration.

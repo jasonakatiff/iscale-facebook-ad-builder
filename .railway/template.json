@@ -2,9 +2,9 @@
   "name": "theLeadRouter \u2014 Ad Studio",
   "description": "Deploy your application, sign in, and connect Gemini and fal.ai in the setup wizard. Create, save, and download your first image ad. Railway and AI services bill your own accounts.",
   "publicationStatus": "unlisted_preview_automated_install_verified",
-  "templateUrl": "https://railway.com/deploy/rNhJ3h",
+  "templateUrl": "https://railway.com/deploy/rNhJ3h?version=ad-studio",
   "sourceRepository": "jasonakatiff/theleadrouter-ad-studio",
-  "sourceRevision": "e4c64143404b4389d39d2a66a4e24ee74bae92b2",
+  "sourceRevision": "fcf30f14e343d5811fa84c8c684c96ce05f9b23f",
   "sourceGate": "Release from reviewed public main after CI and pull-request merge; private Git history is excluded.",
   "installFields": [
     {
