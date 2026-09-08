@@ -30,3 +30,7 @@ Railway workspace credentials are required to update and deploy the hosted templ
 ## Source configuration check
 
 The initial check failed because the template still targeted `codex/railway-installer-public-20260908`. Updated the template manifest, serialized Backend/Frontend/Worker sources, and reference scaffold to public `main`. Added assertions for the release branch and product name; retain checks for exactly two owner fields and preserved/generated credentials.
+
+## Deployment verification scope
+
+The public repository's existing `BACKEND_URL` and `FRONTEND_URL` variables target the private BreadWinner installation, which deploys from a different repository. Removed automatic push triggering from Post-Deploy Verification. Maintainers can dispatch it after configuring the intended deployment URLs and test credentials. Public release CI verifies disposable containers and an isolated installation journey.

@@ -22,6 +22,8 @@ The [unlisted preview template](https://railway.com/deploy/rNhJ3h) is available.
 
 The customer guide is [install-on-railway.md](install-on-railway.md). Railway provisioning was tested through the API in the maintainer workspace. The complete dashboard clickthrough from an independent account remains unverified.
 
+The Post-Deploy Verification workflow is manual: publishing public source does not deploy a shared application. Before dispatching it, configure `BACKEND_URL`, `FRONTEND_URL`, `TEST_EMAIL`, and `TEST_PASSWORD` for the intended installation. The inherited repository URLs currently reference the separate private BreadWinner installation; their results do not verify this public release.
+
 ## Remaining acceptance before marketplace publication
 
 - Use funded Gemini/fal accounts to complete a real generated, saved, downloaded image. Record the charge and distinguish this from simulated browser tests.

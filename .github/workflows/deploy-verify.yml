@@ -11,8 +11,6 @@ on:
         options:
           - production
           - staging
-  push:
-    branches: [main]
 
 jobs:
   wait-for-deploy:
