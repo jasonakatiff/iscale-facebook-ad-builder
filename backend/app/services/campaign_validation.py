@@ -6,6 +6,15 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
 
+
+class CampaignValidationError(ValueError):
+    """A trusted campaign validation message safe to return to the caller."""
+
+    def __init__(self, message):
+        super().__init__(message)
+        self.user_message = message
+
+
 OBJECTIVES = {
     "OUTCOME_SALES": (
         ["OFFSITE_CONVERSIONS", "LINK_CLICKS"],
@@ -41,24 +50,28 @@ PLATFORMS = ("facebook", "instagram", "audience_network", "messenger")
 def money_to_minor(value):
     text = str(value).strip()
     if not re.fullmatch(r"\d+(?:\.\d{1,2})?", text):
-        raise ValueError("Enter a nonnegative amount with at most two decimal places.")
+        raise CampaignValidationError(
+            "Enter a nonnegative amount with at most two decimal places."
+        )
     try:
         amount = Decimal(text) * 100
         if not amount.is_finite() or amount > 9007199254740991:
-            raise ValueError("Amount is too large.")
+            raise CampaignValidationError("Amount is too large.")
         return int(amount)
     except InvalidOperation:
-        raise ValueError("Invalid amount.")
+        raise CampaignValidationError("Invalid amount.")
 
 
 def account_time_to_utc(value, timezone_name):
     if not timezone_name:
-        raise ValueError("Ad account timezone is unavailable. Sync the ad account.")
+        raise CampaignValidationError(
+            "Ad account timezone is unavailable. Sync the ad account."
+        )
     try:
         zone = ZoneInfo(timezone_name)
         local = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except (ValueError, KeyError):
-        raise ValueError("Invalid start time or ad account timezone.")
+        raise CampaignValidationError("Invalid start time or ad account timezone.")
     if local.tzinfo:
         return local.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     candidates = set()
@@ -67,7 +80,7 @@ def account_time_to_utc(value, timezone_name):
         if utc.astimezone(zone).replace(tzinfo=None) == local:
             candidates.add(utc)
     if len(candidates) != 1:
-        raise ValueError(
+        raise CampaignValidationError(
             "This time is skipped or repeated by daylight saving. Choose another start time."
         )
     return candidates.pop().strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -76,11 +89,11 @@ def account_time_to_utc(value, timezone_name):
 def validate_objective(objective, goal, event):
     config = OBJECTIVES.get(objective)
     if not config or goal not in config[0]:
-        raise ValueError(
+        raise CampaignValidationError(
             "Optimization goal is incompatible with the campaign objective."
         )
     if goal == "OFFSITE_CONVERSIONS" and event not in config[1]:
-        raise ValueError(
+        raise CampaignValidationError(
             "The conversion event is incompatible with the campaign objective."
         )
 
@@ -96,7 +109,7 @@ def normalize_targeting(targeting):
         or not isinstance(maximum, int)
         or not 18 <= minimum <= maximum <= 65
     ):
-        raise ValueError(
+        raise CampaignValidationError(
             "Target ages must be between 18 and 65, with minimum no greater than maximum."
         )
     for field in (
@@ -116,10 +129,12 @@ def normalize_targeting(targeting):
             and field in targeting
         ):
             if not targeting[field]:
-                raise ValueError(f"Select at least one {platform} placement.")
+                raise CampaignValidationError(
+                    f"Select at least one {platform} placement."
+                )
             result[field] = list(targeting[field])
     if "publisher_platforms" in targeting and not targeting["publisher_platforms"]:
-        raise ValueError("Select at least one placement.")
+        raise CampaignValidationError("Select at least one placement.")
     geo = targeting.get("geo_locations", {"countries": targeting.get("countries", [])})
     excluded = targeting.get("excluded_geo_locations", {})
     for field, source, prefix in [
@@ -135,7 +150,7 @@ def normalize_targeting(targeting):
             for value in values:
                 key = str(value.get("key", "") if isinstance(value, dict) else value)
                 if not key:
-                    raise ValueError("Location key is required.")
+                    raise CampaignValidationError("Location key is required.")
                 if kind == "countries":
                     locations.append(key.upper())
                 else:
@@ -158,7 +173,9 @@ def normalize_targeting(targeting):
             for value in result.get("excluded_geo_locations", {}).get(kind, [])
         }
         if included & excluded:
-            raise ValueError("The same location cannot be both included and excluded.")
+            raise CampaignValidationError(
+                "The same location cannot be both included and excluded."
+            )
     for field in ("custom_audiences", "excluded_custom_audiences"):
         if targeting.get(field):
             result[field] = [{"id": str(value["id"])} for value in targeting[field]]
@@ -166,7 +183,9 @@ def normalize_targeting(targeting):
     if included_ids.intersection(
         value["id"] for value in result.get("excluded_custom_audiences", [])
     ):
-        raise ValueError("An audience cannot be both included and excluded.")
+        raise CampaignValidationError(
+            "An audience cannot be both included and excluded."
+        )
     return result
 
 
@@ -180,7 +199,7 @@ def campaign_params(data):
         ),
     }
     if not set(params["special_ad_categories"]).issubset(SPECIAL_CATEGORIES):
-        raise ValueError("Invalid Special Ad Category.")
+        raise CampaignValidationError("Invalid Special Ad Category.")
     countries = data.get(
         "specialAdCategoryCountries", data.get("special_ad_category_country", [])
     )
@@ -223,7 +242,7 @@ def adset_params(data, timezone_name=None):
     if goal == "OFFSITE_CONVERSIONS":
         pixel = data.get("pixelId") or data.get("pixel_id")
         if not pixel or not event:
-            raise ValueError(
+            raise CampaignValidationError(
                 "Pixel and conversion event are required for website conversions."
             )
         params["promoted_object"] = {"pixel_id": pixel, "custom_event_type": event}
@@ -242,7 +261,7 @@ def adset_params(data, timezone_name=None):
             ],
         }
         if attribution not in attribution_map:
-            raise ValueError("Select a supported attribution window.")
+            raise CampaignValidationError("Select a supported attribution window.")
         params["attribution_spec"] = attribution_map[attribution]
     budget_type = data.get("budgetType") or data.get("budget_type")
     strategy = (
@@ -258,7 +277,7 @@ def adset_params(data, timezone_name=None):
             data.get("bidAmount", data.get("bid_amount"))
         )
         if not params["bid_amount"]:
-            raise ValueError("Bid amount must be positive.")
+            raise CampaignValidationError("Bid amount must be positive.")
     start = data.get("startTime") or data.get("start_time")
     if start:
         params["start_time"] = account_time_to_utc(start, timezone_name)

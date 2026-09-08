@@ -1,5 +1,19 @@
 # Changelog
 
+## Security: critical dependencies and exception privacy — 2026-09-08
+
+- Patch python-jose, Vitest/coverage and the transitive shell-quote dependency.
+- Campaign preflight hides unexpected provider exception details while preserving
+  application-authored campaign and budget validation guidance.
+- Restrict workflow tokens and pin Codecov to a verified upstream commit.
+- [Plan and test status](docs/plans/security-dependencies-and-alerts.md): phase 0
+  reproduced three failures; 14 focused backend tests and 85 frontend tests with
+  coverage passed, production frontend build passed, and npm audit reports zero
+  critical entries. All 509 backend tests passed with one existing XPASS. GitHub CI verification is
+  in progress.
+- [Review of all 21 remaining CodeQL alerts](docs/security/remaining-codeql-review-2026-09-08.md)
+  distinguishes repaired issues from false positives supported by source/tests.
+
 ## Security: media uploads and Graph reads — 2026-09-08
 
 - Facebook uploads reject private network destinations and server file paths,
