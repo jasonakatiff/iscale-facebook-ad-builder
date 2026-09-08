@@ -4,7 +4,6 @@ import re
 from contextlib import ExitStack, contextmanager
 from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
-from urllib.parse import quote
 
 import requests
 
@@ -149,10 +148,16 @@ class DeliveryProvider(FacebookService):
         return self.request("GET", path, params)
 
     def request(self, method, path, params=None):
-        if not isinstance(path, str) or (
-            path and not re.fullmatch(r"(?:act_)?[0-9]+(?:/(?:ads|insights|thumbnails))?", path)
-        ):
+        if not isinstance(path, str):
             raise ProviderError("Invalid Facebook resource path")
+        resource = ""
+        if path:
+            match = re.fullmatch(r"(act_)?([0-9]{1,32})(?:/(ads|insights|thumbnails))?", path)
+            if match is None:
+                raise ProviderError("Invalid Facebook resource path")
+            prefix = "act_" if match.group(1) else ""
+            edge = {None: "", "ads": "/ads", "insights": "/insights", "thumbnails": "/thumbnails"}[match.group(3)]
+            resource = prefix + str(int(match.group(2))) + edge
         if not self.access_token:
             raise ProviderError(
                 "Facebook access token is missing; an administrator must configure it"
@@ -161,7 +166,7 @@ class DeliveryProvider(FacebookService):
 
             def send():
                 return (requests.get if method == "GET" else requests.post)(
-                    f"https://graph.facebook.com/{config.GRAPH_VERSION}/{quote(path, safe='/')}",
+                    f"https://graph.facebook.com/{config.GRAPH_VERSION}/{resource}",
                     headers={"Authorization": "Bearer " + self.access_token},
                     **({"params": params} if method == "GET" else {"data": params}),
                     timeout=(5, 30),
@@ -173,8 +178,8 @@ class DeliveryProvider(FacebookService):
                 budget.call(
                     send,
                     account_id=(
-                        path.split("/")[0]
-                        if path.startswith("act_")
+                        resource.split("/")[0]
+                        if resource.startswith("act_")
                         else self.account_scope
                     ),
                     lane=self.lane,
