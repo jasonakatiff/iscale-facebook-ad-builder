@@ -32,7 +32,8 @@ const templateServices = Object.values(template.services) as Array<{
 }>;
 assert.equal(templateServices.length, 4);
 assert.equal(spec.sourceBranch, 'main', 'Public installs must use the release branch');
-assert.equal(spec.name, 'theLeadRouter — Ad Builder & Manager');
+assert.equal(spec.sourceRepository, 'jasonakatiff/theleadrouter-ad-studio');
+assert.equal(spec.name, 'theLeadRouter — Ad Studio');
 const customerInputs: string[] = [];
 for (const service of templateServices) {
     if (service.source.repo) {

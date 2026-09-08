@@ -1,12 +1,12 @@
 # Public v2 and Railway installer
 
-Status: release integration in progress.
+Status: public v2 merged in PR #36; Ad Studio rename in progress; hosted Railway template synchronization requires workspace credentials.
 
-The public product is **theLeadRouter — Ad Builder & Manager**. A recipient opens one Railway link, supplies an owner email/password, and receives an isolated ad workspace with a guided setup flow. Existing public installer PR #36 and template `rNhJ3h` provide the release base.
+The public product is **theLeadRouter — Ad Studio**. A recipient opens one Railway link, supplies an owner email/password, and receives an isolated ad workspace with a guided setup flow. Existing public installer PR #36 and template `rNhJ3h` provide the release base.
 
 ## Acceptance
 
-- Public repository `jasonakatiff/iscale-facebook-ad-builder` contains the branded v2 application and current installer fixes without private Git ancestry.
+- Public repository `jasonakatiff/theleadrouter-ad-studio` contains the branded v2 application and current installer fixes without private Git ancestry.
 - Public README and customer guide link to `https://railway.com/deploy/rNhJ3h`.
 - Hosted template uses the same product name and reviewed public source, with four services, two volumes, two owner inputs, generated private credentials, and credential preservation during updates.
 - Public release CI passes. An isolated template deployment verifies the source revision, branded frontend, API readiness, owner login/setup, and worker heartbeat.
@@ -34,3 +34,11 @@ The initial check failed because the template still targeted `codex/railway-inst
 ## Deployment verification scope
 
 The public repository's existing `BACKEND_URL` and `FRONTEND_URL` variables target the private BreadWinner installation, which deploys from a different repository. Removed automatic push triggering from Post-Deploy Verification. Maintainers can dispatch it after configuring the intended deployment URLs and test credentials. Public release CI verifies disposable containers and an isolated installation journey.
+
+## Ad Studio naming
+
+The owner selected **theLeadRouter — Ad Studio** and repository `jasonakatiff/theleadrouter-ad-studio`. Update product titles, downloadable filenames, docs, public repository metadata, Git remotes, and the three template GitHub sources together. Keep the current installer branch synchronized until the hosted template can move to `main`. Verify Git access through both repository URLs after renaming.
+
+The Railway project and hosted template are separate resources. Verify their names independently; checked-in template files do not rename either hosted resource. No schema, credential, service, or domain change is required for naming.
+
+The GitHub repository was renamed successfully; Git access through both the new URL and the former `iscale-facebook-ad-builder` URL resolved to the same commit. The Railway API rejected the project-name update with `Not Authorized` for the available project token. Both hosted naming updates require a workspace credential.

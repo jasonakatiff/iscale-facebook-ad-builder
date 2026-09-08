@@ -1,12 +1,12 @@
-# Install theLeadRouter — Ad Builder & Manager
+# Install theLeadRouter — Ad Studio
 
-[Deploy Ad Builder & Manager on Railway — preview](https://railway.com/deploy/rNhJ3h)
+[Deploy Ad Studio on Railway — preview](https://railway.com/deploy/rNhJ3h)
 
 The unlisted preview has passed a fresh Railway installation, owner login, independent credential generation, and database/media persistence checks. Live paid AI generation and nontechnical pilot acceptance remain unverified. The template is not listed in the Railway marketplace.
 
 Install your preview:
 
-1. Open the **Deploy Ad Builder & Manager on Railway** link above, sign in to Railway, and select your workspace. Your Railway account pays for hosting, database storage, and saved creative files. Check [Railway pricing](https://railway.com/pricing) before deploying.
+1. Open the **Deploy Ad Studio on Railway** link above, sign in to Railway, and select your workspace. Your Railway account pays for hosting, database storage, and saved creative files. Check [Railway pricing](https://railway.com/pricing) before deploying.
 2. Configure **Backend** with `ADMIN_EMAIL` (your owner email) and `ADMIN_PASSWORD` (your owner password), then choose **Deploy**. These are the only two required inputs. The password needs at least 12 characters and at most 72 UTF-8 bytes. Save it in your password manager.
 3. When deployment finishes, open **Frontend** and its website link. Sign in with your owner credentials.
 4. In the setup wizard, connect **Google Gemini** for copy and **fal.ai** for images. Each card includes instructions and a link to get a key. Your providers bill your own accounts. Saving a key does not use generation credits. Gemini offers a connection check; fal.ai verifies its generation key when you create the first image.
@@ -36,4 +36,4 @@ Enable scheduled backups for both the database and creative-media volumes in Rai
 
 Apply template updates only after checking the release notes and taking backups. Media storage uses one backend instance; updates can briefly interrupt access. Increasing traffic or storage needs is a separate capacity decision.
 
-Report installation problems through [the project issue tracker](https://github.com/jasonakatiff/iscale-facebook-ad-builder/issues). Include the failing step and displayed message. Never include API keys, passwords, tokens, or database URLs.
+Report installation problems through [the project issue tracker](https://github.com/jasonakatiff/theleadrouter-ad-studio/issues). Include the failing step and displayed message. Never include API keys, passwords, tokens, or database URLs.

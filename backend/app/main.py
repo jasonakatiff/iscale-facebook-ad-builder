@@ -1,5 +1,5 @@
 """
-theLeadRouter — Ad Builder & Manager API
+theLeadRouter — Ad Studio API
 
 Created by Jason Akatiff
 iSCALE.com | A4D.com

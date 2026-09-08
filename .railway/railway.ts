@@ -6,7 +6,7 @@ export default defineRailway((ctx) => {
     if (ctx.projectName !== 'test-breadwinner-installer') {
         throw new Error('This scaffold only targets the isolated test-breadwinner-installer project.');
     }
-    const source = github('jasonakatiff/iscale-facebook-ad-builder', { branch: 'main' });
+    const source = github('jasonakatiff/theleadrouter-ad-studio', { branch: 'main' });
     const databaseVolume = volume('Database data', { sizeMB: 1024, region: 'us-west2' });
     const mediaVolume = volume('Creative media', { sizeMB: 1024, region: 'us-west2' });
     const database = service('Postgres', {

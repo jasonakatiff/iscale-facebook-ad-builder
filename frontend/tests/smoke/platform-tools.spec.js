@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 
 test('public login shows the product branding', async ({ page }) => {
     await page.goto('/login');
-    await expect(page).toHaveTitle('theLeadRouter — Ad Builder & Manager');
+    await expect(page).toHaveTitle('theLeadRouter — Ad Studio');
     await expect(
         page.getByRole('button', { name: 'Sign In', exact: true }),
     ).toBeVisible();

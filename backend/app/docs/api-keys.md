@@ -1,10 +1,10 @@
 # User API keys
 
-theLeadRouter — Ad Builder & Manager
+theLeadRouter — Ad Studio
 
 Open API Keys and choose a descriptive name, access level, and expiry. Read-only is the default. Read/write adds POST, PUT, PATCH, and DELETE access but still enforces the user's roles and resource permissions. Keys expire after 1–365 days; the default is 90 days. A user can have at most 20 active keys.
 
-The key is displayed once after creation. Copy it before dismissing the panel. Ad Builder & Manager stores only its SHA-256 hash and a short display prefix. Existing keys list their name, scope, creation, last-use, expiry, and revocation state. Rename a label without changing its token. Revoke a key to stop future authentication; revocation is idempotent.
+The key is displayed once after creation. Copy it before dismissing the panel. Ad Studio stores only its SHA-256 hash and a short display prefix. Existing keys list their name, scope, creation, last-use, expiry, and revocation state. Rename a label without changing its token. Revoke a key to stop future authentication; revocation is idempotent.
 
 Send `Authorization: Bearer bw_live_REPLACE_WITH_YOUR_KEY` on requests. Never put a key in a URL, Git repository, shared Markdown file, screenshot, or committed Claude Code settings. API keys cannot create/list/rename/revoke other API keys; management requires a signed-in browser session.
 

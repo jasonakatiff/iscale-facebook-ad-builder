@@ -4,7 +4,7 @@ The [unlisted preview template](https://railway.com/deploy/rNhJ3h) is available.
 
 ## Source and configuration
 
-- Public repository: `jasonakatiff/iscale-facebook-ad-builder`, branch `main` (v2 release source).
+- Public repository: `jasonakatiff/theleadrouter-ad-studio`, branch `main` (v2 release source).
 - Previous preview runtime revision: `e4c64143404b4389d39d2a66a4e24ee74bae92b2`.
 - Template ID: `fddb5b7e-1e34-421e-85c4-832c90182a50`; code `rNhJ3h`.
 - [serialized-template.json](../../.railway/serialized-template.json) is the API-accepted template definition. It contains symbolic references, generators, and two blank owner fields, with no resolved secrets.

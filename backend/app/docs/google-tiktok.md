@@ -1,6 +1,6 @@
 # Google Ads and TikTok Ads
 
-theLeadRouter — Ad Builder & Manager
+theLeadRouter — Ad Studio
 
 Open Ad Deployment and select Google Ads or TikTok Ads. Connect an account through the browser, choose the account, and review the platform-specific campaign and performance controls. Provider OAuth setup must be configured for that deployment. Reconnect when the app reports expired or unavailable access.
 

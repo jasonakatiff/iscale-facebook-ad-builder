@@ -116,7 +116,7 @@ export default function Help() {
                     className="studio-button primary"
                     disabled={busy}
                     onClick={() =>
-                        download('/help/download', 'leadrouter-ad-builder-manager-docs.zip')
+                        download('/help/download', 'theleadrouter-ad-studio-docs.zip')
                     }
                 >
                     <Download size={16} />

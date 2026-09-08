@@ -1,8 +1,8 @@
 # Theme Library and GitHub skins
 
-theLeadRouter — Ad Builder & Manager
+theLeadRouter — Ad Studio
 
-Open Themes. Workflow is the default blue skin based on the workflow prototype. Ad Builder & Manager Classic restores the earlier warm palette; Forest provides a green alternative. Apply a built-in theme immediately, or Customize it to save a private copy. The top-bar appearance switch still chooses light, dark, or system mode.
+Open Themes. Workflow is the default blue skin based on the workflow prototype. Ad Studio Classic restores the earlier warm palette; Forest provides a green alternative. Apply a built-in theme immediately, or Customize it to save a private copy. The top-bar appearance switch still chooses light, dark, or system mode.
 
 ## Build and manage a skin
 Choose Create theme, enter a name, and edit both palettes. Each palette defines canvas, panel, text, muted, accent, accentText, accentInk, and border as six-digit hex colors. Save validates readable text and button contrast of at least 4.5:1. Theme files contain colors only, not CSS, scripts, fonts, or arbitrary HTML.

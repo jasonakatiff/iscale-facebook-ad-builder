@@ -1,15 +1,15 @@
 # Native LeadRouter integration
 
-theLeadRouter — Ad Builder & Manager
+theLeadRouter — Ad Studio
 
-LeadRouter is built into Ad Builder & Manager. No plugin installation is required.
+LeadRouter is built into Ad Studio. No plugin installation is required.
 
 ## Connect once
 
 Open Connections → Configure LeadRouter, or Settings → Configure LeadRouter.
-Choose Partner account for a LeadRouter partner portal key, or Organization API key for organization campaign access. Enter an `lr_` API key with campaign read access and select Connect LeadRouter. Ad Builder & Manager verifies the key before saving it.
+Choose Partner account for a LeadRouter partner portal key, or Organization API key for organization campaign access. Enter an `lr_` API key with campaign read access and select Connect LeadRouter. Ad Studio verifies the key before saving it.
 
-The connection is private to your Ad Builder & Manager user. Even an organization key does not grant its access to your Ad Builder & Manager teammates. Credentials are encrypted on the backend, never returned to the browser, and never included in exported docs, campaign drafts, or AI prompts. A `pk_` posting key is a different credential and cannot be used to browse campaigns.
+The connection is private to your Ad Studio user. Even an organization key does not grant its access to your Ad Studio teammates. Credentials are encrypted on the backend, never returned to the browser, and never included in exported docs, campaign drafts, or AI prompts. A `pk_` posting key is a different credential and cannot be used to browse campaigns.
 
 To replace a key or switch accounts, disconnect and reconnect. Disconnecting removes your stored credential and personal default/campaign associations. It does not alter your LeadRouter account or published ads. Existing browser drafts retain their campaign reference until cleared; an old connection reference cannot pass live validation after reconnection.
 
@@ -25,7 +25,7 @@ The built-in connector uses https://theleadrouter.com. Custom installation domai
 | Image Ads → Campaign | Select a campaign or explicitly use the product/brand default; Use LeadRouter offer in brief copies its current offer name into the editable offer field. |
 | Facebook Campaigns → Campaign Setup | Select an optional LeadRouter campaign. The browser draft keeps the association. |
 | Review & Launch | Review the association; current connection and campaign access are checked before publishing. The resulting local campaign gets a private association. |
-| Campaign Reporting | Select a LeadRouter campaign to see its available lifetime lead count, status, offer, and your linked Ad Builder & Manager campaigns. |
+| Campaign Reporting | Select a LeadRouter campaign to see its available lifetime lead count, status, offer, and your linked Ad Studio campaigns. |
 | Help & API Docs | Download this guide and the current OpenAPI contract for API automation. |
 
 Product defaults take precedence over brand defaults. Applying a default in a creative brief is explicit and does not overwrite the offer until you select Use LeadRouter offer in brief. Save a new brand/product before assigning its native default. Campaign strategy presets remain reusable independently of your personal LeadRouter connection.
@@ -36,11 +36,11 @@ Only active campaigns can be saved as defaults or linked during publication. Rep
 
 Opening an expanded picker or the reporting page requests campaign pages from LeadRouter. Refresh campaigns requests them again. There is no background timer, scheduled polling, or automatic lead delivery. The UI displays the last fetched time. The searchable catalog supports up to 10,000 campaigns; larger accounts need a key with narrower campaign access.
 
-The API exposes only campaign identifiers, names, offer/vertical labels, status, and available lifetime lead counts. Posting keys, private specification tokens, lead records, and other provider fields are excluded. Lead counts are not filtered to a date range or attributed to an individual Ad Builder & Manager ad. A campaign association alone does not calculate conversions, revenue, or ROAS.
+The API exposes only campaign identifiers, names, offer/vertical labels, status, and available lifetime lead counts. Posting keys, private specification tokens, lead records, and other provider fields are excluded. Lead counts are not filtered to a date range or attributed to an individual Ad Studio ad. A campaign association alone does not calculate conversions, revenue, or ROAS.
 
 ## Use with Claude Code or another API client
 
-Connect LeadRouter once in your Ad Builder & Manager browser session. Then use a Ad Builder & Manager user API key in the Bearer header against these Ad Builder & Manager routes:
+Connect LeadRouter once in your Ad Studio browser session. Then use a Ad Studio user API key in the Bearer header against these Ad Studio routes:
 
 | Method | Path under /api/v1 | Purpose |
 | --- | --- | --- |
@@ -52,9 +52,9 @@ Connect LeadRouter once in your Ad Builder & Manager browser session. Then use a
 | GET | /leadrouter/defaults/resolve?brandId={brand_id} | Personal brand default. |
 | GET, PUT, DELETE | /leadrouter/defaults/{resource_type}/{resource_id} | Read, save, or remove a brand, product, or campaign association. |
 
-PUT accepts `{ "connectionId": "<connection UUID>", "campaignId": "<LeadRouter campaign UUID>" }`. `resource_type` is `brand`, `product`, or `campaign`; `resource_id` is an existing Ad Builder & Manager record identifier, not a LeadRouter identifier. PUT revalidates ownership of the connection and current upstream campaign access. Lists use `{ data, pagination: { total, limit, offset, hasMore } }`. Errors use `{ error: { code, message, details } }`.
+PUT accepts `{ "connectionId": "<connection UUID>", "campaignId": "<LeadRouter campaign UUID>" }`. `resource_type` is `brand`, `product`, or `campaign`; `resource_id` is an existing Ad Studio record identifier, not a LeadRouter identifier. PUT revalidates ownership of the connection and current upstream campaign access. Lists use `{ data, pagination: { total, limit, offset, hasMore } }`. Errors use `{ error: { code, message, details } }`.
 
-Read keys can read the owner's native metadata and campaign catalog. Read/write keys can also save/remove the owner's associations. Browser sessions are required for PUT/DELETE `/leadrouter/connection`. The LeadRouter key and Ad Builder & Manager API key are separate credentials with separate purposes.
+Read keys can read the owner's native metadata and campaign catalog. Read/write keys can also save/remove the owner's associations. Browser sessions are required for PUT/DELETE `/leadrouter/connection`. The LeadRouter key and Ad Studio API key are separate credentials with separate purposes.
 
 ## Deliver leads and preserve tracking
 
