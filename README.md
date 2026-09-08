@@ -1,3 +1,11 @@
+## Install on Railway — preview
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/rNhJ3h)
+
+Deploy your own **theLeadRouter — Ad Builder & Manager** workspace, enter your owner email/password, then connect AI keys in the setup wizard. Keys can be changed later in **Settings → Integrations**. No terminal or manual database wiring is needed.
+
+The unlisted preview passed fresh cloud installation and persistence checks. Paid AI generation and nontechnical pilot acceptance remain open. Hosting and AI usage use your own accounts. See the [installation guide](docs/deployment/install-on-railway.md).
+
 <p align="center">
   <img src="frontend/public/leadrouter-mark.svg" alt="theLeadRouter — Ad Builder &amp; Manager" width="120" />
 </p>
@@ -38,7 +46,7 @@
 
 ### Guided Railway installation (release preview)
 
-The installer adds a first-run wizard and Settings → Integrations for encrypted AI keys, brand/product setup, and a first image ad. The Railway template is still being verified; a public deploy button is not available yet. See the [customer installation guide](docs/deployment/install-on-railway.md) and [release procedure](docs/deployment/railway-template-maintainer.md).
+Use the **Deploy on Railway** button above. The installer provides a first-run wizard and Settings → Integrations for encrypted AI keys, brand/product setup, and a first image ad. See the [customer installation guide](docs/deployment/install-on-railway.md) and [release procedure](docs/deployment/railway-template-maintainer.md).
 
 See [product naming and compatibility](docs/brand-guidelines.md) for the v2 identity.
 

@@ -11,7 +11,7 @@ The public v2 product name is **theLeadRouter — Ad Builder & Manager**. It cov
 
 Use the existing blue theme and configurable workspace branding. Existing `VITE_APP_*` and `BRAND_NAME` settings remain supported. Stored identifiers, API routes, credential prefixes, environment keys, deployment service names, and historical release records keep their existing values for compatibility.
 
-Public source remains at `jasonakatiff/iscale-facebook-ad-builder`. This naming change does not rename the repository, publish a release, or establish that the v2 deployment and installer have passed release verification.
+Public source remains at `jasonakatiff/iscale-facebook-ad-builder`. The [public v2 release](deployment/v2-railway-release.md) connects this repository to the Railway one-click template. Repository renaming and marketplace publication are separate decisions.
 
 Verification covers the existing branding and frontend suites, the production frontend build, scoped lint, and desktop/mobile browser rendering. Naming changes do not require new database migrations or live advertising calls.
 

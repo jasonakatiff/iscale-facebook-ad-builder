@@ -24,4 +24,31 @@ for (const resource of services) {
     }
 }
 assert.throws(() => definition(createRailwayContext({ projectName: 'production' }), project));
-console.log('Validated four services, two volumes, build paths, frontend secret isolation, two install fields, and target guard. Cloud provisioning remains unverified.');
+const template = JSON.parse(readFileSync(new URL('./serialized-template.json', import.meta.url), 'utf8'));
+const templateServices = Object.values(template.services) as Array<{
+    name: string; source: { repo?: string; branch?: string };
+    variables: Record<string, { defaultValue: string; preserveExisting?: boolean; value?: string }>;
+    networking: { serviceDomains?: Record<string, { port: number }> };
+}>;
+assert.equal(templateServices.length, 4);
+assert.equal(spec.sourceBranch, 'main', 'Public installs must use the release branch');
+assert.equal(spec.name, 'theLeadRouter — Ad Builder & Manager');
+const customerInputs: string[] = [];
+for (const service of templateServices) {
+    if (service.source.repo) {
+        assert.equal(service.source.repo, spec.sourceRepository);
+        assert.equal(service.source.branch, spec.sourceBranch);
+    }
+    for (const [key, variable] of Object.entries(service.variables)) {
+        assert.equal(variable.value, undefined, 'Template must not contain resolved values');
+        if (variable.defaultValue === '') customerInputs.push(key);
+        if (variable.defaultValue === '' || variable.defaultValue.includes('${{secret(')) {
+            assert.equal(variable.preserveExisting, true, 'Updates must preserve installation credentials');
+        }
+    }
+    if (spec.publicServices.includes(service.name)) {
+        assert.equal(service.networking.serviceDomains?.['<hasDomain>'].port, 8080);
+    } else assert.equal(service.networking.serviceDomains, undefined);
+}
+assert.deepEqual(customerInputs.sort(), ['ADMIN_EMAIL', 'ADMIN_PASSWORD']);
+console.log('Validated four services, two volumes, build paths, public source, two owner inputs, generated domains, credential preservation, and target guard. Cloud results are recorded separately.');

@@ -26,7 +26,8 @@
         "POSTGRES_PASSWORD": {
           "defaultValue": "${{secret(48)}}",
           "isOptional": false,
-          "description": "Configured automatically for your installation."
+          "description": "Configured automatically for your installation.",
+          "preserveExisting": true
         },
         "PGDATA": {
           "defaultValue": "/var/lib/postgresql/data/pgdata",
@@ -49,7 +50,7 @@
       "name": "Backend",
       "source": {
         "repo": "jasonakatiff/iscale-facebook-ad-builder",
-        "branch": "codex/railway-installer-public-20260908",
+        "branch": "main",
         "rootDirectory": "/"
       },
       "build": {
@@ -85,22 +86,26 @@
         "ADMIN_EMAIL": {
           "defaultValue": "",
           "isOptional": false,
-          "description": "Owner email: sign in to your new Ad Builder & Manager workspace."
+          "description": "Owner email: sign in to your new Ad Builder & Manager workspace.",
+          "preserveExisting": true
         },
         "ADMIN_PASSWORD": {
           "defaultValue": "",
           "isOptional": false,
-          "description": "Owner password: choose at least 12 characters (maximum 72 UTF-8 bytes)."
+          "description": "Owner password: choose at least 12 characters (maximum 72 UTF-8 bytes).",
+          "preserveExisting": true
         },
         "SECRET_KEY": {
           "defaultValue": "${{secret(64)}}",
           "isOptional": false,
-          "description": "Configured automatically for your installation."
+          "description": "Configured automatically for your installation.",
+          "preserveExisting": true
         },
         "OAUTH_TOKEN_ENCRYPTION_KEY": {
           "defaultValue": "${{secret(43, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_\")}}=",
           "isOptional": false,
-          "description": "Configured automatically for your installation."
+          "description": "Configured automatically for your installation.",
+          "preserveExisting": true
         },
         "MEDIA_STORAGE_PATH": {
           "defaultValue": "/app/uploads",
@@ -138,7 +143,7 @@
       "name": "Frontend",
       "source": {
         "repo": "jasonakatiff/iscale-facebook-ad-builder",
-        "branch": "codex/railway-installer-public-20260908",
+        "branch": "main",
         "rootDirectory": "/frontend"
       },
       "build": {
@@ -177,7 +182,7 @@
       "name": "Worker",
       "source": {
         "repo": "jasonakatiff/iscale-facebook-ad-builder",
-        "branch": "codex/railway-installer-public-20260908",
+        "branch": "main",
         "rootDirectory": "/"
       },
       "build": {

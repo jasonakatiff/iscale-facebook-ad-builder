@@ -1,42 +1,40 @@
 # Railway installer release procedure
 
-Current state: implementation verified in local tests and private branch CI. All three images build; disposable-container checks cover fresh startup, worker heartbeat, encrypted-key decryption and media persistence after restart. No template created, no public-source publication, no production deployment, and no live AI call performed by this task.
+The [unlisted preview template](https://railway.com/deploy/rNhJ3h) is available. A fresh template deployment passed in an isolated Railway project using only owner email/password. Four services, two persistent volumes, generated public domains, independent secrets, owner login, worker heartbeat, encrypted provider-key decryption, and database/media persistence after restart and an application update were verified. A free Gemini request with an invalid test key verified rejection handling. Paid AI generation was not performed.
 
-The customer guide is [install-on-railway.md](install-on-railway.md). Resource settings live in [railway.ts](../../.railway/railway.ts); template fields and generated-variable expressions live in [template.json](../../.railway/template.json). These files form a reference-project scaffold and composition manifest. A manifest is not a published Railway template.
+## Source and configuration
 
-## Preconditions and reproducible reference project
+- Public repository: `jasonakatiff/iscale-facebook-ad-builder`, branch `main` (v2 release source).
+- Previous preview runtime revision: `e4c64143404b4389d39d2a66a4e24ee74bae92b2`.
+- Template ID: `fddb5b7e-1e34-421e-85c4-832c90182a50`; code `rNhJ3h`.
+- [serialized-template.json](../../.railway/serialized-template.json) is the API-accepted template definition. It contains symbolic references, generators, and two blank owner fields, with no resolved secrets.
+- [template.json](../../.railway/template.json) records release status and input descriptions. [railway.ts](../../.railway/railway.ts) provides a guarded reference-project scaffold. These files do not replace the hosted template.
+- Export reviewed runtime, migrations, tests, and build files onto public history. Exclude private history, plans, evidence, customer data, and secret files. Do not merge private Git ancestry into public history.
 
-1. Obtain a workspace/account Railway API token in the process environment. The available project token is restricted to existing production and cannot create the isolated reference project. Never apply this scaffold to production. Use a current Railway CLI supporting the installed SDK (SDK 3.11.0 documents CLI 5.42.1 or later).
-2. Inspect that workspace's template inventory before creating a duplicate. Create or select the empty project named `test-breadwinner-installer`. Confirm its project/environment IDs are separate from all production resources.
-3. Reconcile the release onto public repository history with a reviewed file-level export of application, migrations, tests, and deployment configuration. Do not merge private Git ancestry, customer data, local evidence, secret files, or private plans into the public repository. The current public main predates this feature. Record the merged public SHA in `template.json.sourceRevision` before deploying the reference project.
-4. Provision the scaffold's five preserved values directly in Railway: test owner email/password, a random Postgres password, a random signing secret, and a Fernet encryption key. Generate these in memory and send them directly through the API; do not write resolved values into files. `preserve()` protects existing values during subsequent plans. The customer template replaces them with its two input fields and three generation expressions.
-5. Run `npm ci --ignore-scripts --prefix .railway` and `npm run check --prefix .railway`. Review `railway config plan` against the isolated project, then apply that concrete plan. New services use explicit service configuration; do not opt them into deprecated legacy TOML/JSON config. Verify frontend root `/frontend`, Dockerfile `Dockerfile.railway`; backend/worker root `/`, their `backend/` Dockerfiles. Railway's current IaC reference excludes generated service domains. Generate Backend and Frontend domains through the Railway API/dashboard on port 8080 before starting builds; template composition must capture those automatic domains. The manifest records both public-domain ports.
-6. Require four healthy services, backend readiness `/health/ready`, a current worker heartbeat in the installation response, private Postgres, and the backend volume mounted at `/app/uploads`. The worker has no public domain or migration command. Confirm the frontend build references only the new API domain and no secret variables.
+## Reproduce the deployment
 
-Local typechecking proves DSL shape and file paths; domain creation, reference resolution, volume provisioning, and template capture remain cloud verification gates. Source and generated-domain settings must be inspected in Railway's actual plan before applying.
+1. Use a workspace token held in process memory. Inspect existing templates before creating another. The GraphQL public endpoint supports deployment and inspection; Railway's authenticated template composer API creates and stages template configuration.
+2. Load the hosted template configuration, fill only Backend `ADMIN_EMAIL` and `ADMIN_PASSWORD`, and deploy into a new isolated project. Leave the three secret expressions and cross-service references intact. Never persist resolved credentials locally.
+3. Confirm Postgres and Worker have no public domains; Backend and Frontend receive generated domains on port 8080. Confirm Postgres mounts `/var/lib/postgresql/data` and Backend mounts `/app/uploads`.
+4. Confirm Backend `/health/ready` returns 200, the owner can sign in, and the installation response reports the worker online. The frontend start command must call `/docker-entrypoint.sh nginx -g "daemon off;"` so Railway's command override still generates the nginx port configuration.
+5. Save test-owned records and a media file, restart the database and deploy the next backend release, then verify owner login, installation ID/progress, provider-key decryption, record IDs, and media hashes. Internal signing/encryption/database credentials and owner fields use `preserveExisting` during template updates.
+6. Remove disposable test projects and their fixtures when verification finishes. Keep the hosted template and reviewed source branch.
 
-## Compose and verify the distributable template
+The customer guide is [install-on-railway.md](install-on-railway.md). Railway provisioning was tested through the API in the maintainer workspace. The complete dashboard clickthrough from an independent account remains unverified.
 
-Use Railway's **Generate Template** flow from the clean reference project. Include all four services and both volumes. Replace owner credential defaults with the two required fields in the manifest. Replace actual Postgres/signing/encryption values with the manifest's generation expressions. Preserve cross-service references. Remove private deployment IDs, production domains, fixed secret values, test owner values, OAuth credentials, and provider keys from template defaults.
+## Remaining acceptance before marketplace publication
 
-The Fernet expression generates 43 URL-safe Base64 characters followed by `=`. Verify two fresh deployments produce different decodable 32-byte keys, and that an update preserves each existing key. Verify two databases and owner accounts are independent.
+- Use funded Gemini/fal accounts to complete a real generated, saved, downloaded image. Record the charge and distinguish this from simulated browser tests.
+- Run the dashboard installer from an independent Railway account without private-repository access.
+- Have three nontechnical owners complete setup without maintainer help. Record elapsed time and stumbling points against the 15-minute target after external accounts are ready.
+- Rehearse cloud database/media backup and restore with the compatible encryption configuration. Verify records, hashes, and decryption after restoration.
 
-Deploy the private template into a fresh project from an unrelated Railway account. No terminal, variable editor, manual domain wiring, or pre-existing admin is allowed in the customer journey. Require:
-
-- Exactly two customer fields, owner email and password.
-- Login → wizard → Gemini/fal connections → brand/product → a real generated, saved, downloaded image. Record live-provider usage separately from simulated tests.
-- Invalid keys, provider failures, expired session, mobile input, and interrupted setup show recoverable errors.
-- Replacing/disconnecting a key changes subsequent generation without redeploy.
-- Restart preserves login, progress, encrypted keys, brand/product, gallery rows, and uploaded/generated file bytes.
-- Release update preserves those same records. Restore database and media into a separate installation with compatible encryption/signing configuration; verify row counts, file hashes and decryption. Never roll back with automatic down-migrations.
-- Three nontechnical pilot users complete the journey with no maintainer intervention. Record elapsed time and stumbling points against the plan's 15-minute target.
-
-Only after these gates pass: publish the template; store its real URL and public source SHA in the manifest; add the actual Railway badge/button to the README and customer guide; verify the button deploys that release.
+The unlisted preview is shareable for testing. Marketplace publication remains pending these acceptance checks.
 
 ## Updates, backup and rollback
 
-Before updating, capture database and media backups plus the compatible environment configuration through the owner's secure secret-storage mechanism. Keep internal keys stable across deploys. Run migrations only in backend startup; the worker waits for the exact supported schema. Prefer rollback of app images only when that version understands the current additive schema. Otherwise restore both volumes together into an isolated project, verify decryption and media checksums, then arrange a controlled cutover.
+Before updating, capture database and media backups and retain compatible encryption/signing configuration through the owner's password manager. Keep internal keys stable. Run migrations only in backend startup; the worker waits for the supported schema. Roll back app images only when the version understands the current additive schema; otherwise restore both volumes into an isolated installation and verify before cutover. Never run automatic down-migrations.
 
-Railway's volume constraints mean one backend instance and brief redeploy downtime. Database and media backup schedules require live verification in the deployed template; local filesystem tests do not establish cloud backup coverage.
+The backend uses one media volume and one instance; deploys can briefly interrupt access. Enable scheduled backups for both volumes. Cloud backup/restore behavior has not yet been rehearsed.
 
-Official references: [template composition and generators](https://docs.railway.com/templates/create), [IaC](https://docs.railway.com/infrastructure-as-code), [IaC reference](https://docs.railway.com/infrastructure-as-code/reference), [volume backups](https://docs.railway.com/volumes/backups), [template updates](https://docs.railway.com/templates/updates). Provider verification: [Kie credit endpoint](https://docs.kie.ai/common-api/get-account-credits), [Gemini models](https://ai.google.dev/api/models), [fal client](https://docs.fal.ai/model-apis/client-libraries/python).
+Official references: [template composition and generators](https://docs.railway.com/templates/create), [template sharing](https://docs.railway.com/templates/publish-and-share), [volume backups](https://docs.railway.com/volumes/backups), [template updates](https://docs.railway.com/templates/updates).
