@@ -109,6 +109,15 @@ async def check_provider_key(provider, key):
                 response = await client.get(url, headers=headers)
         if response.status_code in {401, 403}:
             return "invalid", "The provider rejected this key. Check its permissions or replace it."
+        if provider == "gemini" and response.status_code == 400:
+            data = response.json()
+            error = data.get("error") if isinstance(data, dict) else None
+            details = error.get("details", []) if isinstance(error, dict) else []
+            if isinstance(details, list) and any(
+                isinstance(detail, dict) and detail.get("reason") == "API_KEY_INVALID"
+                for detail in details
+            ):
+                return "invalid", "Google rejected this API key. Copy the complete key from Google AI Studio or replace it."
         if response.status_code == 402:
             return "insufficient_credit", "Add credits in your provider account, then test again."
         if response.status_code == 429 or response.status_code >= 500:

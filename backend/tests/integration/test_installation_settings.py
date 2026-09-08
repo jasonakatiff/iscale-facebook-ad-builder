@@ -96,6 +96,25 @@ def test_provider_validation_is_truthful_and_redacted(client, auth_headers, monk
     assert "test-rejected-secret" not in result.text
 
 
+def test_gemini_reports_structured_invalid_key_response(monkeypatch):
+    import asyncio
+    import httpx
+    from app.services.provider_settings import check_provider_key
+
+    async def invalid_key(_client, url, **kwargs):
+        return httpx.Response(400, json={"error": {
+            "message": "API key not valid: test-rejected-secret",
+            "status": "INVALID_ARGUMENT",
+            "details": [{"reason": "API_KEY_INVALID"}],
+        }})
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", invalid_key)
+    status, message = asyncio.run(check_provider_key("gemini", "test-rejected-secret"))
+    assert status == "invalid"
+    assert "replace" in message.lower()
+    assert "test-rejected-secret" not in message
+
+
 def test_unknown_and_blank_provider_values_rejected(client, auth_headers):
     assert client.put("/api/v1/installation/providers/unknown", headers=auth_headers,
                       json={"api_key": "test-provider-key"}).status_code == 404
