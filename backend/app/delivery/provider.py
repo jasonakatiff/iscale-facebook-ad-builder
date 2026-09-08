@@ -4,6 +4,7 @@ import re
 from contextlib import ExitStack, contextmanager
 from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
+from urllib.parse import quote
 
 import requests
 
@@ -160,7 +161,7 @@ class DeliveryProvider(FacebookService):
 
             def send():
                 return (requests.get if method == "GET" else requests.post)(
-                    f"https://graph.facebook.com/{config.GRAPH_VERSION}/{path}",
+                    f"https://graph.facebook.com/{config.GRAPH_VERSION}/{quote(path, safe='/')}",
                     headers={"Authorization": "Bearer " + self.access_token},
                     **({"params": params} if method == "GET" else {"data": params}),
                     timeout=(5, 30),

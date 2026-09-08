@@ -52,9 +52,9 @@ export function FirstInstallationAd({ onCreated }) {
                     productShots: shots, useProductImage: shots.length > 0 }),
             });
             const image = result.images?.[0];
-            if (!image?.url) throw new Error('The provider did not return an image. Check its request history before retrying.');
+            if (!image?.url || !image.id) throw new Error('The image service did not return a saved creative. Check its request history before retrying.');
             const nextAsset = { ...image, url: resolveMediaUrl(image.url), ...copy };
-            const ad = { id: crypto.randomUUID(), adBundleId: crypto.randomUUID(), brandId: brand.id,
+            const ad = { id: image.id, adBundleId: image.adBundleId, brandId: brand.id,
                 productId: product.id, templateId: null, imageUrl: nextAsset.url, headline: copy.headline,
                 body: copy.body || '', cta: copy.cta || '', sizeName: image.size,
                 dimensions: image.dimensions, prompt: image.prompt };

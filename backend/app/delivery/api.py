@@ -51,7 +51,7 @@ class DeliveryRoute(APIRoute):
                     content={
                         "error": {
                             "code": "REQUEST_BUDGET_BUSY",
-                            "message": str(error),
+                            "message": "Request budget is busy; work has been deferred.",
                             "details": None,
                         }
                     },
