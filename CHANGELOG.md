@@ -1,5 +1,9 @@
 # Changelog
 
+## README installation paths — 2026-09-08
+
+Make the Railway one-click preview the Quick Start and Deployment path for **theLeadRouter — Ad Studio**. Label local development separately, add the missing documentation navigation target, and document Render, Northflank, DigitalOcean, and Coolify as future installation options with official sources. Railway remains the only published installer. Verification: GitHub Markdown rendering, README anchors and relative links, and the Railway configuration check passed.
+
 ## README and Railway branding — 2026-09-08
 
 Complete **theLeadRouter — Ad Studio** branding in README product links, footer, and setup examples while preserving author credits. Rename the existing Railway project and one-click template, and point the hosted template at public `main`. Fresh cloud verification passed for all four services on `fcf30f1`, owner login/setup, backend readiness, worker heartbeat, and live browser branding. Disposable projects were removed. README rendering and installer configuration checks passed. See the [completed preview release plan](docs/deployment/v2-railway-release.md).
