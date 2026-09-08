@@ -3,12 +3,12 @@
 theLeadRouter — Ad Studio
 
 ## Base URL and authentication
-Production API origin: https://ad-builder-backend-production.up.railway.app
-Browser app: https://breadwinner.a4d.com
+Use the API origin and frontend website for your own Ad Studio installation. For Railway installs, these are the public domains of your **Backend** and **Frontend** services. There is no shared production API for public installations.
+
 Interactive reference: /api/v1/docs
 OpenAPI JSON: /api/v1/openapi.json
 
-Export BREADWINNER_API_URL as the origin (without /api/v1) and BREADWINNER_API_KEY securely in your shell. These variables are examples for your client; they are not application deployment settings.
+Provide BREADWINNER_API_URL as your Backend origin (including https://, without /api/v1) and BREADWINNER_API_KEY securely in your process environment. These names are retained for client compatibility; they are not application deployment settings. Verify that the origin belongs to the installation that issued the key before making authenticated requests.
 
 ```sh
 curl --fail-with-body "$BREADWINNER_API_URL/api/v1/auth/me" \

@@ -14,6 +14,12 @@
 - [Review of all 21 remaining CodeQL alerts](docs/security/remaining-codeql-review-2026-09-08.md)
   distinguishes repaired issues from false positives supported by source/tests.
 
+## Public installation guidance and worker destination — 2026-09-08
+
+Require an explicit API origin in the downloadable plugin worker so a missing setting cannot send its key to the private installation. Remove private deployment URLs from the API, plugin, and telemetry guides. Replace the obsolete Railway deployment walkthrough with the four-service installer reference, correct README API routes, and use the v2 bootstrap and sync worker in manual setup. Mark the legacy setup wizard and Compose startup as unsupported for fresh v2 installations pending repair.
+
+Verification: three worker configuration regression tests passed after reproducing the missing-origin failure; GitHub Markdown rendering, document links, all seven README API routes, and Railway configuration checks passed. Worker requests were mocked; no production database or provider calls were made.
+
 ## Security: media uploads and Graph reads — 2026-09-08
 
 - Facebook uploads reject private network destinations and server file paths,
