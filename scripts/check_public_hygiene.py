@@ -40,10 +40,10 @@ def scan(root: Path) -> dict:
     checked = 0
     for name in sorted(set(paths) - {""}):
         path = root / name
-        if not path.is_file() or path.is_symlink():
-            continue
         if name.startswith((".env", "backend/.env", "frontend/.env")) and not name.endswith(".example"):
             findings.append({"path": name, "line": 0, "rule": "secret-file"})
+            continue
+        if not path.is_file() or path.is_symlink():
             continue
         try:
             raw = path.read_bytes()
