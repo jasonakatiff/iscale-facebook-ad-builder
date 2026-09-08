@@ -1,55 +1,80 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FileImage, Video, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Image, Play, ArrowRight, Layers2 } from 'lucide-react';
 
 export default function CreateAds() {
-    const navigate = useNavigate();
-
     return (
         <div className="max-w-5xl mx-auto">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900">Create New Ad</h1>
-                <p className="text-gray-600 mt-2">Select the format you want to create</p>
+            <div className="studio-page-header">
+                <div>
+                    <p className="studio-eyebrow">Creative studio</p>
+                    <h1 className="studio-heading">Build Creatives</h1>
+                    <p className="studio-description">
+                        Choose a format. Bring your brand and your next idea.
+                    </p>
+                </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Image Ad Card */}
-                <button
-                    onClick={() => navigate('/image-ads')}
-                    className="group relative flex flex-col items-start p-8 bg-white rounded-2xl border-2 border-gray-100 hover:border-amber-200 hover:shadow-xl transition-all duration-300 text-left"
+            <div className="format-grid">
+                <Link to="/image-ads" className="format-card" aria-label="Create an image ad">
+                    <div className="format-art" aria-hidden="true">
+                        <div className="format-frame back" />
+                        <div className="format-frame">
+                            <div className="format-image">
+                                <Image size={28} strokeWidth={1.3} />
+                            </div>
+                            <div className="format-line" />
+                            <div className="format-line short" />
+                        </div>
+                    </div>
+                    <div className="format-copy">
+                        <p className="studio-eyebrow !min-h-0 !mt-0 !mb-3">01 / Static creative</p>
+                        <h2>Image ads</h2>
+                        <p>
+                            Build from a winning template or generate new visuals for feeds and
+                            stories.
+                        </p>
+                        <span className="format-link">
+                            Create an image ad
+                            <ArrowRight size={17} />
+                        </span>
+                    </div>
+                </Link>
+                <Link to="/video-ads" className="format-card" aria-label="Create a video ad">
+                    <div className="format-art" aria-hidden="true">
+                        <div className="format-video">
+                            <Play size={30} strokeWidth={1.3} />
+                            <div className="format-timeline">
+                                {Array.from({ length: 5 }, (_, index) => (
+                                    <span key={index} />
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="format-copy">
+                        <p className="studio-eyebrow !min-h-0 !mt-0 !mb-3">02 / Motion creative</p>
+                        <h2>Video ads</h2>
+                        <p>
+                            Shape your product shots and footage into video creative for your next
+                            campaign.
+                        </p>
+                        <span className="format-link">
+                            Create a video ad
+                            <ArrowRight size={17} />
+                        </span>
+                    </div>
+                </Link>
+            </div>
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-4 px-5 py-4 border border-line rounded-xl text-xs text-muted">
+                <span className="flex items-center gap-3">
+                    <Layers2 size={17} />
+                    Looking for a starting point?
+                </span>
+                <Link
+                    to="/winning-ads"
+                    className="text-brand-ink font-medium inline-flex items-center gap-2"
                 >
-                    <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                        <FileImage size={32} className="text-amber-600" />
-                    </div>
-
-                    <h3 className="text-2xl font-bold text-gray-900 mb-3">Image Ad</h3>
-                    <p className="text-gray-500 mb-8 leading-relaxed">
-                        Create high-converting static image ads using our template library or AI generation. Perfect for feed posts and stories.
-                    </p>
-
-                    <div className="mt-auto flex items-center gap-2 text-amber-600 font-semibold group-hover:gap-3 transition-all">
-                        Start Creating <ArrowRight size={20} />
-                    </div>
-                </button>
-
-                {/* Video Ad Card */}
-                <button
-                    onClick={() => navigate('/video-ads')}
-                    className="group relative flex flex-col items-start p-8 bg-white rounded-2xl border-2 border-gray-100 hover:border-blue-200 hover:shadow-xl transition-all duration-300 text-left"
-                >
-                    <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                        <Video size={32} className="text-blue-600" />
-                    </div>
-
-                    <h3 className="text-2xl font-bold text-gray-900 mb-3">Video Ad</h3>
-                    <p className="text-gray-500 mb-8 leading-relaxed">
-                        Generate engaging video ads from product shots or stock footage. Ideal for Reels, Stories, and TikTok.
-                    </p>
-
-                    <div className="mt-auto flex items-center gap-2 text-blue-600 font-semibold group-hover:gap-3 transition-all">
-                        Start Creating <ArrowRight size={20} />
-                    </div>
-                </button>
+                    Browse winning templates
+                    <ArrowRight size={14} />
+                </Link>
             </div>
         </div>
     );

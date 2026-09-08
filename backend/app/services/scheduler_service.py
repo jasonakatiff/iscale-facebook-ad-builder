@@ -1,8 +1,10 @@
+from app.telemetry.runtime import capture_exception
 from sqlalchemy.orm import Session
 from app.models import SavedSearch
 from app.services.research_service import ResearchService
 from app.schemas.research import AdSearchRequest
 from datetime import datetime, timedelta
+from app.telemetry.runtime import observe
 import logging
 
 logger = logging.getLogger(__name__)
@@ -48,6 +50,7 @@ class SchedulerService:
 
         return False
 
+    @observe("research.scheduled_search", kind="job")
     async def execute_scheduled_search(self, search: SavedSearch):
         """Execute a scheduled search and update last_run timestamp"""
         try:
@@ -73,9 +76,11 @@ class SchedulerService:
             logger.info(f"Successfully executed scheduled search: {search.query}")
 
         except Exception as e:
+            capture_exception(e, "scheduler_service.execute_scheduled_search")
             logger.error(f"Failed to execute scheduled search {search.id}: {str(e)}")
             raise
 
+    @observe("research.scheduler", kind="job")
     async def run_scheduled_searches(self):
         """Main method to run all due scheduled searches"""
         due_searches = self.get_due_searches()
@@ -90,5 +95,6 @@ class SchedulerService:
             try:
                 await self.execute_scheduled_search(search)
             except Exception as e:
+                capture_exception(e, "scheduler_service.run_scheduled_searches")
                 logger.error(f"Error running scheduled search {search.id}: {str(e)}")
                 continue

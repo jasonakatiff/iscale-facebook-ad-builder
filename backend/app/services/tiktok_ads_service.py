@@ -5,6 +5,7 @@ HTTP contract in one place. API version/base URL is configurable because TikTok
 periodically versions Open API endpoints. OAuth tokens are encrypted by callers
 before persistence; this service only handles provider requests.
 """
+from app.telemetry.runtime import capture_exception
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import urlencode
@@ -59,6 +60,7 @@ async def _post(path: str, payload: dict, access_token: Optional[str] = None) ->
     try:
         body = response.json()
     except ValueError as exc:
+        capture_exception(exc, "tiktok_ads_service._post")
         raise TikTokAdsApiError(f"TikTok Ads returned an invalid response (HTTP {response.status_code}).") from exc
     if response.status_code >= 400 or body.get("code") not in (None, 0):
         message = body.get("message") or body.get("msg") or f"HTTP {response.status_code}"

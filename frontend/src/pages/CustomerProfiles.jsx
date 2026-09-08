@@ -57,40 +57,40 @@ const CustomerProfiles = () => {
         <div className="max-w-6xl mx-auto">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                        <Users size={32} className="text-amber-600" />
+                    <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
+                        <Users size={32} className="text-brand-ink shrink-0" />
                         Customer Profiles
                     </h1>
-                    <p className="text-gray-600 mt-2">Define and manage target audiences for your brands.</p>
+                    <p className="text-secondary mt-2">Define and manage target audiences for your brands.</p>
                 </div>
-                <div className="flex items-center gap-4 w-full md:w-auto">
-                    <div className="relative flex-1 md:w-64">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
+                    <div className="relative w-full md:flex-1 md:w-64">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-faint" size={20} />
                         <input
                             type="text"
                             placeholder="Search profiles..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full pl-10 pr-4 py-2 border border-line-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
                     </div>
-                    <div className="flex bg-gray-100 p-1 rounded-lg shrink-0">
+                    <div className="flex bg-inset p-1 rounded-lg shrink-0">
                         <button
                             onClick={() => setViewMode('list')}
-                            className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-amber-600' : 'text-gray-500 hover:text-gray-700'}`}
+                            className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-panel shadow-sm text-brand-ink' : 'text-muted hover:text-secondary'}`}
                         >
                             <List size={20} />
                         </button>
                         <button
                             onClick={() => setViewMode('grid')}
-                            className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-amber-600' : 'text-gray-500 hover:text-gray-700'}`}
+                            className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-panel shadow-sm text-brand-ink' : 'text-muted hover:text-secondary'}`}
                         >
                             <LayoutGrid size={20} />
                         </button>
                     </div>
                     <button
                         onClick={() => { setEditingProfile(null); setIsFormOpen(true); }}
-                        className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors shrink-0 font-medium shadow-sm"
+                        className="flex items-center gap-2 px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand-hover transition-colors shrink-0 font-medium shadow-sm"
                     >
                         <Plus size={20} />
                         Add Profile
@@ -99,15 +99,15 @@ const CustomerProfiles = () => {
             </div>
 
             {customerProfiles.length === 0 ? (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-                    <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Users className="text-amber-600" size={32} />
+                <div className="bg-panel rounded-xl shadow-sm border border-line p-12 text-center">
+                    <div className="w-16 h-16 bg-brand-soft rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Users className="text-brand-ink" size={32} />
                     </div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No customer profiles yet</h3>
-                    <p className="text-gray-500 mb-6">Create profiles to better target your ad copy.</p>
+                    <h3 className="text-lg font-medium text-foreground mb-2">No customer profiles yet</h3>
+                    <p className="text-muted mb-6">Create profiles to better target your ad copy.</p>
                     <button
                         onClick={() => setIsFormOpen(true)}
-                        className="text-amber-600 font-medium hover:underline"
+                        className="text-brand-ink font-medium hover:underline"
                     >
                         Add a Profile
                     </button>
@@ -122,15 +122,15 @@ const CustomerProfiles = () => {
                                     <div
                                         key={profile.id}
                                         onClick={() => handleEdit(profile)}
-                                        className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden group hover:shadow-md transition-shadow cursor-pointer"
+                                        className="bg-panel rounded-xl shadow-sm border border-line overflow-hidden group hover:shadow-md transition-shadow cursor-pointer"
                                     >
-                                        <div className="h-24 bg-gray-50 relative flex items-center justify-center">
-                                            <UserCircle className="text-gray-300" size={48} />
+                                        <div className="h-24 bg-subtle relative flex items-center justify-center">
+                                            <UserCircle className="text-faint" size={48} />
                                             <div className="absolute top-4 right-4 flex -space-x-2">
                                                 {linkedBrands.slice(0, 3).map(brand => (
                                                     <div
                                                         key={brand.id}
-                                                        className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-[10px] text-white font-bold"
+                                                        className="w-6 h-6 rounded-full border-2 border-panel flex items-center justify-center text-[10px] text-white font-bold"
                                                         style={{ backgroundColor: brand.colors.primary }}
                                                         title={brand.name}
                                                     >
@@ -138,7 +138,7 @@ const CustomerProfiles = () => {
                                                     </div>
                                                 ))}
                                                 {linkedBrands.length > 3 && (
-                                                    <div className="w-6 h-6 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center text-[10px] text-gray-600 font-bold">
+                                                    <div className="w-6 h-6 rounded-full border-2 border-panel bg-soft flex items-center justify-center text-[10px] text-secondary font-bold">
                                                         +{linkedBrands.length - 3}
                                                     </div>
                                                 )}
@@ -146,26 +146,26 @@ const CustomerProfiles = () => {
                                         </div>
                                         <div className="p-6">
                                             <div className="flex justify-between items-start mb-2">
-                                                <h3 className="text-lg font-bold text-gray-900">{profile.name}</h3>
+                                                <h3 className="text-lg font-bold text-foreground">{profile.name}</h3>
                                                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleEdit(profile); }}
-                                                        className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg"
+                                                        className="p-1.5 text-muted hover:bg-inset rounded-lg"
                                                     >
                                                         <Edit2 size={16} />
                                                     </button>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleDelete(profile.id); }}
-                                                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
+                                                        className="p-1.5 text-danger hover:bg-danger-soft rounded-lg"
                                                     >
                                                         <Trash2 size={16} />
                                                     </button>
                                                 </div>
                                             </div>
-                                            <p className="text-sm text-gray-500 line-clamp-2 mb-2">{profile.demographics}</p>
+                                            <p className="text-sm text-muted line-clamp-2 mb-2">{profile.demographics}</p>
                                             <div className="space-y-1">
-                                                <p className="text-xs text-gray-400 uppercase font-semibold">Pain Points</p>
-                                                <p className="text-sm text-gray-600 line-clamp-2">{profile.painPoints}</p>
+                                                <p className="text-xs text-faint uppercase font-semibold">Pain Points</p>
+                                                <p className="text-sm text-secondary line-clamp-2">{profile.painPoints}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -173,31 +173,31 @@ const CustomerProfiles = () => {
                             })}
                         </div>
                     ) : (
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="bg-panel rounded-xl shadow-sm border border-line overflow-hidden">
                             <table className="w-full text-left">
-                                <thead className="bg-gray-50 border-b border-gray-200">
+                                <thead className="bg-subtle border-b border-line">
                                     <tr>
-                                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Profile Name</th>
-                                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Linked Brands</th>
-                                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Demographics</th>
-                                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                                        <th className="px-6 py-4 text-xs font-semibold text-muted uppercase tracking-wider">Profile Name</th>
+                                        <th className="px-6 py-4 text-xs font-semibold text-muted uppercase tracking-wider">Linked Brands</th>
+                                        <th className="px-6 py-4 text-xs font-semibold text-muted uppercase tracking-wider">Demographics</th>
+                                        <th className="px-6 py-4 text-xs font-semibold text-muted uppercase tracking-wider text-right">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-200">
+                                <tbody className="divide-y divide-line">
                                     {filteredProfiles.map(profile => {
                                         const linkedBrands = getLinkedBrands(profile.id);
                                         return (
                                             <tr
                                                 key={profile.id}
                                                 onClick={() => handleEdit(profile)}
-                                                className="hover:bg-amber-50 transition-colors cursor-pointer"
+                                                className="hover:bg-brand-soft transition-colors cursor-pointer"
                                             >
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500">
+                                                        <div className="w-8 h-8 bg-inset rounded-lg flex items-center justify-center text-muted">
                                                             <UserCircle size={16} />
                                                         </div>
-                                                        <span className="font-medium text-gray-900">{profile.name}</span>
+                                                        <span className="font-medium text-foreground">{profile.name}</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4">
@@ -205,37 +205,37 @@ const CustomerProfiles = () => {
                                                         {linkedBrands.length > 0 ? linkedBrands.slice(0, 3).map(brand => (
                                                             <div
                                                                 key={brand.id}
-                                                                className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-[10px] text-white font-bold"
+                                                                className="w-6 h-6 rounded-full border-2 border-panel flex items-center justify-center text-[10px] text-white font-bold"
                                                                 style={{ backgroundColor: brand.colors.primary }}
                                                                 title={brand.name}
                                                             >
                                                                 {brand.name[0]}
                                                             </div>
                                                         )) : (
-                                                            <span className="text-xs text-gray-400 italic">None</span>
+                                                            <span className="text-xs text-faint italic">None</span>
                                                         )}
                                                         {linkedBrands.length > 3 && (
-                                                            <div className="w-6 h-6 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center text-[10px] text-gray-600 font-bold">
+                                                            <div className="w-6 h-6 rounded-full border-2 border-panel bg-soft flex items-center justify-center text-[10px] text-secondary font-bold">
                                                                 +{linkedBrands.length - 3}
                                                             </div>
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
+                                                <td className="px-6 py-4 text-sm text-secondary max-w-xs truncate">
                                                     {profile.demographics}
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
                                                     <div className="flex justify-end gap-2">
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); handleEdit(profile); }}
-                                                            className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                                                            className="p-1.5 text-muted hover:bg-inset rounded-lg transition-colors"
                                                             title="Edit"
                                                         >
                                                             <Edit2 size={16} />
                                                         </button>
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); handleDelete(profile.id); }}
-                                                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                            className="p-1.5 text-danger hover:bg-danger-soft rounded-lg transition-colors"
                                                             title="Delete"
                                                         >
                                                             <Trash2 size={16} />

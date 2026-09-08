@@ -76,8 +76,11 @@ def test_campaign_writes_require_permission(client, auth_headers, test_user, db_
 
 @pytest.mark.parametrize("path,provider,model,field,value", PROVIDERS)
 def test_reselect_active_connection_stays_active(client, auth_headers, test_user, db_session, path, provider, model, field, value):
+    from app.core.token_encryption import encrypt_token
+
     token_field = "encrypted_access_token" if model is MetaAdsConnection else "encrypted_refresh_token"
-    selected = model(user_id=test_user.id, **{field: value, token_field: "test-token"}, is_active=True)
+    token = encrypt_token("test-token") if model is MetaAdsConnection else "test-token"
+    selected = model(user_id=test_user.id, **{field: value, token_field: token}, is_active=True)
     db_session.add(selected)
     db_session.commit()
     response = client.post(f"/api/v1/{path}/connection/select", headers=auth_headers, json={field: value})

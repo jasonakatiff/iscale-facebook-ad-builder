@@ -4,14 +4,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Settings:
-    PROJECT_NAME: str = "Facebook Ad Automation App"
+    PROJECT_NAME: str = "theLeadRouter — Ad Builder & Manager"
     API_V1_STR: str = "/api/v1"
 
     # White-label brand (per-client deployments; server-side references)
-    BRAND_NAME: str = os.getenv("BRAND_NAME", "BreadWinner")
+    BRAND_NAME: str = os.getenv("BRAND_NAME", "theLeadRouter — Ad Builder & Manager")
 
     # Where to send the browser after a successful OAuth connect flow
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+    PUBLIC_API_URL: str = os.getenv("PUBLIC_API_URL", "").rstrip("/")
 
     # Database - PostgreSQL Required
     DATABASE_URL: str = os.getenv("DATABASE_URL")

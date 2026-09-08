@@ -1,8 +1,8 @@
 {
-  "name": "facebook_ad_builder",
+  "name": "leadrouter-ad-builder-manager",
   "private": true,
-  "version": "1.0.0",
-  "description": "AI-powered Facebook ad automation platform",
+  "version": "2.0.0-rc.1",
+  "description": "theLeadRouter — Ad Builder & Manager: research, create, launch, and manage ad campaigns",
   "author": "Jason Akatiff <jason@jasonakatiff.com> (https://iscale.com)",
   "license": "MIT",
   "type": "module",

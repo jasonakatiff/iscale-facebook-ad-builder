@@ -1,6 +1,7 @@
 """
 Ad Remix API Endpoints
 """
+from app.telemetry.runtime import capture_exception
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
@@ -19,7 +20,8 @@ from app.schemas.ad_blueprint import (
 )
 from app.services.ad_remix_service import deconstruct_template, reconstruct_ad
 from app.models import User
-from app.core.deps import get_current_active_user
+from app.core.deps import get_current_active_user, require_permission
+from app.core.installation import InstallationError
 
 router = APIRouter()
 
@@ -28,7 +30,7 @@ router = APIRouter()
 async def deconstruct_ad_template(
     request: DeconstructRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission("ads:write")),
 ):
     """
     Deconstruct a template into a structural blueprint
@@ -47,7 +49,7 @@ async def deconstruct_ad_template(
     
     # Deconstruct the template
     try:
-        blueprint = await deconstruct_template(template.image_url)
+        blueprint = await deconstruct_template(template.image_url, db)
         
         # Save the blueprint to the template
         template.blueprint_json = blueprint.model_dump()
@@ -56,15 +58,18 @@ async def deconstruct_ad_template(
         
         return blueprint
         
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Deconstruction failed: {str(e)}")
+    except InstallationError:
+        raise
+    except Exception as exc:
+        capture_exception(exc, "ad_remix.deconstruct_ad_template", message="Template analysis failed.")
+        raise HTTPException(status_code=502, detail="Template analysis failed. Check the image and try again.") from None
 
 
 @router.post("/reconstruct", response_model=AdConcept)
 async def reconstruct_ad_from_blueprint(
     request: ReconstructRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_permission("ads:write")),
 ):
     """
     Reconstruct an ad by applying brand data to a blueprint
@@ -114,11 +119,14 @@ async def reconstruct_ad_from_blueprint(
     blueprint = AdBlueprint(**template.blueprint_json)
     
     try:
-        ad_concept = await reconstruct_ad(blueprint, brand_data)
+        ad_concept = await reconstruct_ad(blueprint, brand_data, db)
         return ad_concept
         
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Reconstruction failed: {str(e)}")
+    except InstallationError:
+        raise
+    except Exception as exc:
+        capture_exception(exc, "ad_remix.reconstruct_ad_from_blueprint", message="Ad reconstruction failed.")
+        raise HTTPException(status_code=502, detail="The provider returned unusable ad content. Check your brief and try again.") from None
 
 
 @router.get("/blueprints/{template_id}", response_model=AdBlueprint)

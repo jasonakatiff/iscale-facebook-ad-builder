@@ -264,16 +264,16 @@ export default function GoogleAdsCampaigns() {
         <div className="max-w-6xl mx-auto space-y-6">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-                        <TrendingUp size={32} className="text-amber-600" />
+                    <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-3">
+                        <TrendingUp size={32} className="text-brand-ink" />
                         Google Ads
                     </h1>
-                    <p className="text-gray-600">Connect a Google Ads account to see campaign performance</p>
+                    <p className="text-secondary">Connect a Google Ads account to see campaign performance</p>
                 </div>
                 {connection?.connected && (
                     <button
                         onClick={() => setShowCreateForm((v) => !v)}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 transition-colors shadow-sm shrink-0"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-brand text-white rounded-lg font-medium hover:bg-brand-hover transition-colors shadow-sm shrink-0"
                     >
                         <Plus size={18} />
                         Create campaign
@@ -297,7 +297,7 @@ export default function GoogleAdsCampaigns() {
                         <button
                             type="button"
                             onClick={() => setSelectingAccount(true)}
-                            className="text-sm font-medium text-amber-700 hover:text-amber-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600"
+                            className="text-sm font-medium text-brand-ink hover:text-brand-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600"
                         >
                             Change Google Ads account
                         </button>
@@ -306,11 +306,11 @@ export default function GoogleAdsCampaigns() {
             )}
 
             {selectingAccount && connections.length > 0 && (
-                <section aria-labelledby="google-account-heading" className="border-y border-gray-200 py-5">
+                <section aria-labelledby="google-account-heading" className="border-y border-line py-5">
                     <div className="flex items-center justify-between gap-4 mb-3">
-                        <h2 id="google-account-heading" className="text-lg font-bold text-gray-900">Choose a Google Ads account</h2>
+                        <h2 id="google-account-heading" className="text-lg font-bold text-foreground">Choose a Google Ads account</h2>
                         {connection?.connected && (
-                            <button type="button" onClick={() => setSelectingAccount(false)} className="text-sm text-gray-600 hover:text-gray-900">
+                            <button type="button" onClick={() => setSelectingAccount(false)} className="text-sm text-secondary hover:text-foreground">
                                 Cancel
                             </button>
                         )}
@@ -323,13 +323,13 @@ export default function GoogleAdsCampaigns() {
                                 onClick={() => handleSelectAccount(candidate.customer_id)}
                                 disabled={selectingCustomerId !== null}
                                 aria-pressed={candidate.selected}
-                                className={`min-h-16 border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 disabled:opacity-60 ${candidate.selected ? 'border-amber-600 bg-amber-50' : 'border-gray-300 bg-white hover:border-amber-500'}`}
+                                className={`min-h-16 border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 disabled:opacity-60 ${candidate.selected ? 'border-amber-600 bg-brand-soft' : 'border-line-strong bg-panel hover:border-amber-500'}`}
                             >
-                                <span className="block font-semibold text-gray-900">
+                                <span className="block font-semibold text-foreground">
                                     {candidate.account_name || `Account ${formatCustomerId(candidate.customer_id)}`}
                                 </span>
-                                {candidate.account_name && <span className="block text-sm text-gray-500">{formatCustomerId(candidate.customer_id)}</span>}
-                                {selectingCustomerId === candidate.customer_id && <span className="block text-xs text-amber-700 mt-1">Selecting…</span>}
+                                {candidate.account_name && <span className="block text-sm text-muted">{formatCustomerId(candidate.customer_id)}</span>}
+                                {selectingCustomerId === candidate.customer_id && <span className="block text-xs text-brand-ink mt-1">Selecting…</span>}
                             </button>
                         ))}
                     </div>
@@ -337,7 +337,7 @@ export default function GoogleAdsCampaigns() {
             )}
 
             {campaignError && connection?.connected && (
-                <section role="alert" className="border border-amber-300 bg-amber-50 px-4 py-4 text-amber-950">
+                <section role="alert" className="border border-brand-line bg-brand-soft px-4 py-4 text-amber-950">
                     <h2 className="font-bold">Google Ads data is not available yet</h2>
                     <p className="mt-1 text-sm leading-6">{campaignError}</p>
                     {campaignError.includes('developer token is only approved') && (
@@ -349,21 +349,21 @@ export default function GoogleAdsCampaigns() {
             )}
 
             {showCreateForm && connection?.connected && (
-                <form onSubmit={handleReviewCreate} className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
-                    <h2 className="text-lg font-bold text-gray-900">New Search campaign</h2>
+                <form onSubmit={handleReviewCreate} className="bg-panel rounded-xl border border-line shadow-sm p-6 space-y-4">
+                    <h2 className="text-lg font-bold text-foreground">New Search campaign</h2>
                     <div className="grid sm:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Campaign name</label>
+                            <label className="block text-sm font-medium text-secondary mb-1">Campaign name</label>
                             <input
                                 type="text"
                                 value={newName}
                                 onChange={(e) => setNewName(e.target.value)}
                                 placeholder="e.g. Spring Sale - Search"
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                className="w-full border border-line-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Daily budget (USD)</label>
+                            <label className="block text-sm font-medium text-secondary mb-1">Daily budget (USD)</label>
                             <input
                                 type="number"
                                 min="1"
@@ -371,32 +371,32 @@ export default function GoogleAdsCampaigns() {
                                 value={newBudget}
                                 onChange={(e) => setNewBudget(e.target.value)}
                                 placeholder="e.g. 25"
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                className="w-full border border-line-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                             />
                         </div>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Keywords (optional, comma or newline separated)</label>
+                        <label className="block text-sm font-medium text-secondary mb-1">Keywords (optional, comma or newline separated)</label>
                         <textarea
                             value={newKeywords}
                             onChange={(e) => setNewKeywords(e.target.value)}
                             rows={3}
                             placeholder="running shoes, trail shoes, marathon training"
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                            className="w-full border border-line-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                         />
                     </div>
-                    <p className="text-xs text-gray-500">The campaign is created PAUSED. Nothing spends until you enable it from the table below.</p>
+                    <p className="text-xs text-muted">The campaign is created PAUSED. Nothing spends until you enable it from the table below.</p>
                     <div className="flex justify-end gap-3">
                         <button
                             type="button"
                             onClick={() => setShowCreateForm(false)}
-                            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium"
+                            className="px-4 py-2 text-secondary hover:bg-inset rounded-lg transition-colors font-medium"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="px-4 py-2 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 transition-colors shadow-sm"
+                            className="px-4 py-2 bg-brand text-white rounded-lg font-medium hover:bg-brand-hover transition-colors shadow-sm"
                         >
                             Review &amp; create
                         </button>
@@ -416,7 +416,7 @@ export default function GoogleAdsCampaigns() {
                         <button
                             onClick={() => handleRequestStatusChange(campaign)}
                             disabled={!['ENABLED', 'PAUSED'].includes(campaign.status)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 text-gray-700 hover:border-amber-500 hover:text-amber-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-line-strong text-secondary hover:border-amber-500 hover:text-brand-ink disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
                             {campaign.status === 'ENABLED' ? <Pause size={13} /> : <Play size={13} />}
                             {campaign.status === 'ENABLED' ? 'Pause' : 'Enable'}

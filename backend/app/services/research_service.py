@@ -1,4 +1,6 @@
+from app.telemetry.runtime import capture_exception
 from sqlalchemy.orm import Session
+from app.telemetry.runtime import observe
 from app.models import ScrapedAd, SavedSearch, FacebookPage
 from app.schemas.research import AdSearchRequest, ScrapedAdCreate
 from typing import Optional
@@ -21,6 +23,7 @@ class ResearchService:
         content = f"{ad_data.brand_name or ''}|{ad_data.headline or ''}|{ad_data.ad_copy or ''}|{ad_data.cta_text or ''}"
         return hashlib.sha256(content.encode('utf-8')).hexdigest()
 
+    @observe("research.search_and_save")
     async def search_and_save(self, request: AdSearchRequest):
         """Execute search and save as SavedSearch with all ads"""
         from app.services.scraper import FacebookAdsLibraryAPI
@@ -133,6 +136,7 @@ class ResearchService:
             self.db.flush()
         except Exception as e:
             # Handle duplicate content_hash errors gracefully
+            capture_exception(e, "research_service.search_and_save")
             if 'duplicate key value violates unique constraint' in str(e) and 'content_hash' in str(e):
                 print(f"Duplicate content_hash error during flush, rolling back and retrying with existing ads")
                 self.db.rollback()

@@ -1,4 +1,5 @@
 """Google Ads OAuth connect flow + read-only campaign/ad performance routes."""
+from app.telemetry.runtime import capture_exception
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -129,6 +130,7 @@ async def oauth_callback(
     try:
         user_id = verify_oauth_state(state, PROVIDER)
     except ValueError as exc:
+        capture_exception(exc, "google_ads.oauth_callback")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
 
@@ -140,6 +142,7 @@ async def oauth_callback(
             redirect_uri=settings.GOOGLE_ADS_OAUTH_REDIRECT_URI,
         )
     except GoogleOAuthError as exc:
+        capture_exception(exc, "google_ads.oauth_callback")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
     refresh_token = tokens.get("refresh_token")
@@ -156,6 +159,7 @@ async def oauth_callback(
     try:
         customer_ids = await list_accessible_customers(refresh_token)
     except Exception as exc:
+        capture_exception(exc, "google_ads.oauth_callback")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Failed to list Google Ads accounts: {exc}")
 
     if not customer_ids:
@@ -338,10 +342,13 @@ async def get_campaigns(
         await get_valid_access_token(db, connection)  # refreshes+persists if needed
         campaigns = await get_campaign_performance(refresh_token, connection.customer_id, date_preset=date_preset)
     except GoogleAdsConnectionError as exc:
+        capture_exception(exc, "google_ads.get_campaigns")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
     except GoogleAdsNotConfigured as exc:
+        capture_exception(exc, "google_ads.get_campaigns")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
     except GoogleAdsException as exc:
+        capture_exception(exc, "google_ads.get_campaigns")
         raise HTTPException(status_code=_google_ads_error_status(exc), detail=_clean_google_ads_error(exc))
     return {"customer_id": connection.customer_id, "campaigns": campaigns}
 
@@ -360,10 +367,13 @@ async def get_campaign_ads(
         await get_valid_access_token(db, connection)
         ads = await get_ad_performance(refresh_token, connection.customer_id, campaign_id)
     except GoogleAdsConnectionError as exc:
+        capture_exception(exc, "google_ads.get_campaign_ads")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
     except GoogleAdsNotConfigured as exc:
+        capture_exception(exc, "google_ads.get_campaign_ads")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
     except GoogleAdsException as exc:
+        capture_exception(exc, "google_ads.get_campaign_ads")
         raise HTTPException(status_code=_google_ads_error_status(exc), detail=_clean_google_ads_error(exc))
     return {"campaign_id": campaign_id, "ads": ads}
 
@@ -397,10 +407,13 @@ async def create_campaign(
             keywords=body.keywords,
         )
     except GoogleAdsConnectionError as exc:
+        capture_exception(exc, "google_ads.create_campaign")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
     except GoogleAdsNotConfigured as exc:
+        capture_exception(exc, "google_ads.create_campaign")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
     except GoogleAdsException as exc:
+        capture_exception(exc, "google_ads.create_campaign")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=_clean_google_ads_error(exc))
     return result
 
@@ -420,10 +433,13 @@ async def pause_campaign(
         await get_valid_access_token(db, connection)
         result = await pause_google_campaign(refresh_token, connection.customer_id, campaign_id)
     except GoogleAdsConnectionError as exc:
+        capture_exception(exc, "google_ads.pause_campaign")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
     except GoogleAdsNotConfigured as exc:
+        capture_exception(exc, "google_ads.pause_campaign")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
     except GoogleAdsException as exc:
+        capture_exception(exc, "google_ads.pause_campaign")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=_clean_google_ads_error(exc))
     return result
 
@@ -445,10 +461,13 @@ async def enable_campaign(
         await get_valid_access_token(db, connection)
         result = await enable_google_campaign(refresh_token, connection.customer_id, campaign_id)
     except GoogleAdsConnectionError as exc:
+        capture_exception(exc, "google_ads.enable_campaign")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
     except GoogleAdsNotConfigured as exc:
+        capture_exception(exc, "google_ads.enable_campaign")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
     except GoogleAdsException as exc:
+        capture_exception(exc, "google_ads.enable_campaign")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=_clean_google_ads_error(exc))
     return result
 
@@ -468,9 +487,12 @@ async def add_negative_keywords(
         await get_valid_access_token(db, connection)
         result = await add_google_negative_keywords(refresh_token, connection.customer_id, campaign_id, body.keywords)
     except GoogleAdsConnectionError as exc:
+        capture_exception(exc, "google_ads.add_negative_keywords")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
     except GoogleAdsNotConfigured as exc:
+        capture_exception(exc, "google_ads.add_negative_keywords")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
     except GoogleAdsException as exc:
+        capture_exception(exc, "google_ads.add_negative_keywords")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=_clean_google_ads_error(exc))
     return result

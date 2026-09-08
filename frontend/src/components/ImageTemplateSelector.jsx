@@ -161,16 +161,16 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
     const content = (
         <>
             {/* Header */}
-            <div className={embedded ? "mb-6" : "p-6 border-b border-gray-200"}>
+            <div className={embedded ? "mb-6" : "p-6 border-b border-line"}>
                 {!embedded && (
                     <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                            <Sparkles className="text-purple-600" size={24} />
+                        <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                            <Sparkles className="text-highlight" size={24} />
                             Select Template
                         </h2>
                         <button
                             onClick={onClose}
-                            className="text-gray-400 hover:text-gray-600 transition-colors"
+                            className="text-faint hover:text-secondary transition-colors"
                         >
                             <X size={24} />
                         </button>
@@ -181,20 +181,20 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
                 <div className="flex flex-wrap gap-4 items-center">
                     {/* Bulk Actions */}
                     {templates.length > 0 && (
-                        <div className="flex items-center gap-2 mr-2 border-r border-gray-200 pr-4">
+                        <div className="flex items-center gap-2 mr-2 border-r border-line pr-4">
                             <input
                                 type="checkbox"
                                 checked={selectedIds.size === templates.length && templates.length > 0}
                                 onChange={selectAll}
-                                className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                className="w-4 h-4 rounded border-line-strong text-highlight focus:ring-purple-500"
                             />
-                            <span className="text-sm text-gray-600">
+                            <span className="text-sm text-secondary">
                                 {selectedIds.size > 0 ? `${selectedIds.size} Selected` : 'Select All'}
                             </span>
                             {selectedIds.size > 0 && (
                                 <button
                                     onClick={confirmDelete}
-                                    className="ml-2 flex items-center gap-1 text-red-600 hover:text-red-700 text-sm font-medium bg-red-50 px-2 py-1 rounded"
+                                    className="ml-2 flex items-center gap-1 text-danger hover:text-danger text-sm font-medium bg-danger-soft px-2 py-1 rounded"
                                 >
                                     <Trash2 size={14} />
                                     Delete
@@ -204,15 +204,15 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
                     )}
 
                     <div className="flex items-center gap-2">
-                        <Filter size={16} className="text-gray-500" />
-                        <span className="text-sm font-medium text-gray-700">Filters:</span>
+                        <Filter size={16} className="text-muted" />
+                        <span className="text-sm font-medium text-secondary">Filters:</span>
                     </div>
 
                     {/* Category Filter */}
                     <select
                         value={selectedCategory}
                         onChange={(e) => setSelectedCategory(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent capitalize"
+                        className="px-3 py-2 border border-line-strong rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent capitalize"
                     >
                         <option value="">All Categories</option>
                         {filters.categories && filters.categories.map(cat => (
@@ -224,7 +224,7 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
                     <select
                         value={selectedStyle}
                         onChange={(e) => setSelectedStyle(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        className="px-3 py-2 border border-line-strong rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     >
                         <option value="">All Styles</option>
                         {filters.styles && filters.styles.map(style => (
@@ -236,7 +236,7 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
                     <select
                         value={sortBy}
                         onChange={(e) => setSortBy(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        className="px-3 py-2 border border-line-strong rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     >
                         <option value="newest">Newest First</option>
                         <option value="oldest">Oldest First</option>
@@ -246,7 +246,7 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
                     {(selectedCategory || selectedStyle) && (
                         <button
                             onClick={clearFilters}
-                            className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                            className="text-sm text-highlight hover:text-highlight font-medium"
                         >
                             Clear Filters
                         </button>
@@ -255,13 +255,13 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
                     <div className="ml-auto flex gap-2">
                         <button
                             onClick={() => setViewMode('grid')}
-                            className={`p-2 rounded ${viewMode === 'grid' ? 'bg-purple-100 text-purple-600' : 'text-gray-400 hover:text-gray-600'}`}
+                            className={`p-2 rounded ${viewMode === 'grid' ? 'bg-highlight-soft text-highlight' : 'text-faint hover:text-secondary'}`}
                         >
                             <Grid size={20} />
                         </button>
                         <button
                             onClick={() => setViewMode('list')}
-                            className={`p-2 rounded ${viewMode === 'list' ? 'bg-purple-100 text-purple-600' : 'text-gray-400 hover:text-gray-600'}`}
+                            className={`p-2 rounded ${viewMode === 'list' ? 'bg-highlight-soft text-highlight' : 'text-faint hover:text-secondary'}`}
                         >
                             <List size={20} />
                         </button>
@@ -277,8 +277,8 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
                     </div>
                 ) : templates.length === 0 ? (
                     <div className="text-center py-12">
-                        <p className="text-gray-500 text-lg">No templates found</p>
-                        <p className="text-gray-400 text-sm mt-2">Try adjusting your filters</p>
+                        <p className="text-muted text-lg">No templates found</p>
+                        <p className="text-faint text-sm mt-2">Try adjusting your filters</p>
                     </div>
                 ) : viewMode === 'grid' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -310,18 +310,18 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
             {/* Delete Confirmation Modal */}
             {showDeleteConfirm && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-                        <div className="flex items-center gap-3 text-red-600 mb-4">
+                    <div className="bg-panel rounded-lg shadow-xl max-w-md w-full p-6">
+                        <div className="flex items-center gap-3 text-danger mb-4">
                             <AlertTriangle size={24} />
                             <h3 className="text-lg font-bold">Delete Templates?</h3>
                         </div>
-                        <p className="text-gray-600 mb-6">
+                        <p className="text-secondary mb-6">
                             Are you sure you want to delete {selectedIds.size} selected template{selectedIds.size !== 1 ? 's' : ''}? This action cannot be undone.
                         </p>
                         <div className="flex justify-end gap-3">
                             <button
                                 onClick={() => setShowDeleteConfirm(false)}
-                                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium"
+                                className="px-4 py-2 text-secondary hover:bg-inset rounded-lg font-medium"
                             >
                                 Cancel
                             </button>
@@ -344,7 +344,7 @@ export default function ImageTemplateSelector({ onSelect, onClose, embedded = fa
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-7xl w-full max-h-[90vh] flex flex-col relative">
+            <div className="bg-panel rounded-xl shadow-2xl max-w-7xl w-full max-h-[90vh] flex flex-col relative">
                 {content}
             </div>
         </div>
@@ -362,7 +362,7 @@ function TemplateCard({ template, onSelect, isSelected, onToggleSelect }) {
 
     return (
         <div
-            className={`bg-white border-2 rounded-lg overflow-hidden transition-all group relative ${isSelected ? 'border-purple-600 ring-2 ring-purple-200' : 'border-gray-200 hover:border-purple-500 hover:shadow-lg'}`}
+            className={`bg-panel border-2 rounded-lg overflow-hidden transition-all group relative ${isSelected ? 'border-purple-600 ring-2 ring-purple-200' : 'border-line hover:border-purple-500 hover:shadow-lg'}`}
         >
             {/* Selection Checkbox */}
             <div className="absolute top-2 right-2 z-10">
@@ -373,13 +373,13 @@ function TemplateCard({ template, onSelect, isSelected, onToggleSelect }) {
                         e.stopPropagation();
                         onToggleSelect();
                     }}
-                    className="w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 shadow-sm cursor-pointer"
+                    className="w-5 h-5 rounded border-line-strong text-highlight focus:ring-purple-500 shadow-sm cursor-pointer"
                 />
             </div>
 
             <div onClick={onSelect} className="cursor-pointer">
                 {/* Image */}
-                <div className="aspect-square bg-gray-100 relative overflow-hidden">
+                <div className="aspect-square bg-inset relative overflow-hidden">
                     <img
                         src={template.image_url}
                         alt={template.name}
@@ -394,23 +394,23 @@ function TemplateCard({ template, onSelect, isSelected, onToggleSelect }) {
 
                 {/* Info */}
                 <div className="p-4">
-                    <h3 className="font-semibold text-gray-900 mb-2 line-clamp-1">{template.name}</h3>
+                    <h3 className="font-semibold text-foreground mb-2 line-clamp-1">{template.name}</h3>
 
                     {template.design_style && (
-                        <p className="text-xs text-gray-500 mb-3">{template.design_style}</p>
+                        <p className="text-xs text-muted mb-3">{template.design_style}</p>
                     )}
 
                     {/* Color Palette */}
                     {colorPalette && (
                         <div className="flex gap-1">
                             {colorPalette.primary && (
-                                <div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: colorPalette.primary }}></div>
+                                <div className="w-6 h-6 rounded border border-line-strong" style={{ backgroundColor: colorPalette.primary }}></div>
                             )}
                             {colorPalette.secondary && (
-                                <div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: colorPalette.secondary }}></div>
+                                <div className="w-6 h-6 rounded border border-line-strong" style={{ backgroundColor: colorPalette.secondary }}></div>
                             )}
                             {colorPalette.accent && (
-                                <div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: colorPalette.accent }}></div>
+                                <div className="w-6 h-6 rounded border border-line-strong" style={{ backgroundColor: colorPalette.accent }}></div>
                             )}
                         </div>
                     )}
@@ -431,7 +431,7 @@ function TemplateListItem({ template, onSelect, isSelected, onToggleSelect }) {
 
     return (
         <div
-            className={`w-full bg-white border-2 rounded-lg p-4 transition-all flex gap-4 items-center ${isSelected ? 'border-purple-600 bg-purple-50' : 'border-gray-200 hover:border-purple-500 hover:shadow-md'}`}
+            className={`w-full bg-panel border-2 rounded-lg p-4 transition-all flex gap-4 items-center ${isSelected ? 'border-purple-600 bg-highlight-soft' : 'border-line hover:border-purple-500 hover:shadow-md'}`}
         >
             {/* Selection Checkbox */}
             <div className="flex-shrink-0">
@@ -442,13 +442,13 @@ function TemplateListItem({ template, onSelect, isSelected, onToggleSelect }) {
                         e.stopPropagation();
                         onToggleSelect();
                     }}
-                    className="w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                    className="w-5 h-5 rounded border-line-strong text-highlight focus:ring-purple-500 cursor-pointer"
                 />
             </div>
 
             <div onClick={onSelect} className="flex-1 flex gap-4 cursor-pointer">
                 {/* Thumbnail */}
-                <div className="w-32 h-32 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                <div className="w-32 h-32 bg-inset rounded overflow-hidden flex-shrink-0">
                     <img
                         src={template.image_url}
                         alt={template.name}
@@ -459,15 +459,15 @@ function TemplateListItem({ template, onSelect, isSelected, onToggleSelect }) {
                 {/* Info */}
                 <div className="flex-1">
                     <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-semibold text-gray-900 text-lg">{template.name}</h3>
+                        <h3 className="font-semibold text-foreground text-lg">{template.name}</h3>
                         {template.template_category && (
-                            <span className="bg-purple-100 text-purple-700 text-xs px-3 py-1 rounded-full font-medium capitalize">
+                            <span className="bg-highlight-soft text-highlight text-xs px-3 py-1 rounded-full font-medium capitalize">
                                 {template.template_category}
                             </span>
                         )}
                     </div>
 
-                    <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-3">
+                    <div className="flex flex-wrap gap-4 text-sm text-secondary mb-3">
                         {template.design_style && (
                             <span>Style: <span className="font-medium">{template.design_style}</span></span>
                         )}
@@ -479,16 +479,16 @@ function TemplateListItem({ template, onSelect, isSelected, onToggleSelect }) {
                     {/* Color Palette */}
                     {colorPalette && (
                         <div className="flex gap-2 items-center">
-                            <span className="text-xs text-gray-500">Colors:</span>
+                            <span className="text-xs text-muted">Colors:</span>
                             <div className="flex gap-1">
                                 {colorPalette.primary && (
-                                    <div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: colorPalette.primary }}></div>
+                                    <div className="w-6 h-6 rounded border border-line-strong" style={{ backgroundColor: colorPalette.primary }}></div>
                                 )}
                                 {colorPalette.secondary && (
-                                    <div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: colorPalette.secondary }}></div>
+                                    <div className="w-6 h-6 rounded border border-line-strong" style={{ backgroundColor: colorPalette.secondary }}></div>
                                 )}
                                 {colorPalette.accent && (
-                                    <div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: colorPalette.accent }}></div>
+                                    <div className="w-6 h-6 rounded border border-line-strong" style={{ backgroundColor: colorPalette.accent }}></div>
                                 )}
                             </div>
                         </div>

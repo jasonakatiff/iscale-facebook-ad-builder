@@ -1,3 +1,4 @@
+from app.telemetry.runtime import capture_exception
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 import os
 import uuid
@@ -17,7 +18,7 @@ MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB for images
 MAX_VIDEO_SIZE = 500 * 1024 * 1024  # 500MB for videos
 
 # Local upload dir for fallback
-UPLOAD_DIR = Path(__file__).parent.parent.parent.parent / "uploads"
+UPLOAD_DIR = Path(os.getenv("MEDIA_STORAGE_PATH") or Path(__file__).parent.parent.parent.parent / "uploads")
 UPLOAD_DIR = UPLOAD_DIR.resolve()
 os.makedirs(UPLOAD_DIR, mode=0o755, exist_ok=True)
 
@@ -53,6 +54,7 @@ async def upload_to_r2(file_content: bytes, filename: str, content_type: str) ->
         )
         return f"{settings.R2_PUBLIC_URL}/{filename}"
     except Exception as e:
+        capture_exception(e, "uploads.upload_to_r2")
         raise HTTPException(status_code=500, detail=f"Failed to upload to R2: {str(e)}")
 
 
@@ -61,7 +63,7 @@ async def upload_to_local(file_content: bytes, filename: str) -> str:
     file_path = UPLOAD_DIR / filename
     with open(file_path, "wb") as buffer:
         buffer.write(file_content)
-    return f"/uploads/{filename}"
+    return f"{settings.PUBLIC_API_URL}/uploads/{filename}"
 
 
 @router.post("/", response_model=Dict[str, str])
@@ -107,4 +109,5 @@ async def upload_file(file: UploadFile = File(...), current_user: User = Depends
     except HTTPException:
         raise
     except Exception as e:
+        capture_exception(e, "uploads.upload_file")
         raise HTTPException(status_code=500, detail=f"Could not upload file: {str(e)}")

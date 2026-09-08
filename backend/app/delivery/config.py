@@ -1,0 +1,28 @@
+import os
+
+WORKER_ENABLED = (
+    os.getenv(
+        "DELIVERY_WORKER_ENABLED",
+        "true" if os.getenv("RAILWAY_ENVIRONMENT_NAME") else "false",
+    ).lower()
+    == "true"
+)
+WORKER_INTERVAL = 1
+LOCK_KEYS = {"posting": 195558001, "sync": 195558002}
+READ_DEADLINE_SECONDS = 900
+RETRY_BASE_SECONDS = 5
+RETRY_CAP_SECONDS = 300
+VIDEO_POLL_SECONDS = 10
+VIDEO_TIMEOUT_SECONDS = 600
+MAX_PENDING_PER_BUYER = 1000
+MAX_REPORT_PAGES = 1000
+LOOKBACK_DAYS = 7
+RECONCILE_DAYS = 28
+DATASET = "daily:7d_click,1d_view:conversion_time:no_breakdowns:v1"
+GRAPH_VERSION = (
+    os.getenv("FACEBOOK_API_VERSION")
+    or os.getenv("VITE_FACEBOOK_API_VERSION")
+    or "v24.0"
+)
+
+STATUS_BATCH_SIZE = 50

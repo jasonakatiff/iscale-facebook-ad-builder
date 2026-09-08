@@ -1,120 +1,71 @@
-"""
-Ad Remix Service - Business logic for deconstructing and reconstructing ads
-"""
+"""Template analysis using the installation's current Gemini connection."""
+import base64
 import json
-import google.generativeai as genai
-from typing import Dict, Any
+import mimetypes
+from urllib.parse import unquote, urlparse
+
+import httpx
+
+from app.core.config import settings
+from app.core.installation import InstallationError
 from app.schemas.ad_blueprint import AdBlueprint, AdConcept, BrandData
 from app.prompts.ad_remix_prompts import build_deconstruction_prompt, build_reconstruction_prompt
-import os
+from app.services.generation_provider import generate_gemini_text
+from app.services.provider_settings import require_provider_key
+
+MAX_TEMPLATE_BYTES = 10 * 1024 * 1024
 
 
-# Configure Gemini API
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+async def template_image_part(image_url):
+    from app.api.v1.uploads import UPLOAD_DIR
+    parsed = urlparse(image_url)
+    own = urlparse(settings.PUBLIC_API_URL)
+    local = not parsed.netloc or (own.netloc and parsed.netloc == own.netloc and parsed.scheme == own.scheme)
+    content = None
+    mime = mimetypes.guess_type(parsed.path)[0]
+    if mime not in {"image/png", "image/jpeg", "image/webp", "image/gif"}:
+        raise InstallationError("invalid_template_image", "Upload a PNG, JPG, WebP, or GIF template.", 422)
+    if local and parsed.path.startswith("/uploads/"):
+        path = (UPLOAD_DIR / unquote(parsed.path.removeprefix("/uploads/"))).resolve()
+        if path.is_relative_to(UPLOAD_DIR.resolve()) and path.is_file() and path.stat().st_size <= MAX_TEMPLATE_BYTES:
+            content = path.read_bytes()
+    elif settings.r2_enabled and image_url.startswith(settings.R2_PUBLIC_URL.rstrip("/") + "/"):
+        async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
+            async with client.stream("GET", image_url) as response:
+                response.raise_for_status()
+                chunks, size = [], 0
+                async for chunk in response.aiter_bytes():
+                    size += len(chunk)
+                    if size > MAX_TEMPLATE_BYTES:
+                        raise InstallationError("invalid_template_image", "Upload a template smaller than 10 MB.", 422)
+                    chunks.append(chunk)
+                content = b"".join(chunks)
+    if not content:
+        raise InstallationError("template_upload_required", "Upload this template to your workspace before analyzing it.", 422)
+    return {"inline_data": {"mime_type": mime, "data": base64.b64encode(content).decode()}}
 
 
-async def deconstruct_template(template_image_url: str) -> AdBlueprint:
-    """
-    Analyze a template image and extract its structural blueprint
-    
-    Args:
-        template_image_url: URL or path to the template image
-        
-    Returns:
-        AdBlueprint with extracted structure
-    """
-    try:
-        # Use Gemini Vision model
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        
-        # Build the prompt
-        prompt = build_deconstruction_prompt(template_image_url)
-        
-        # For now, we'll use the image URL directly
-        # In production, you might want to download and process the image
-        response = model.generate_content([
-            prompt,
-            {
-                'mime_type': 'image/jpeg',
-                'data': template_image_url  # This should be image data or URL
-            }
-        ])
-        
-        # Parse the JSON response
-        blueprint_data = json.loads(response.text)
-        
-        # Validate and return as AdBlueprint
-        return AdBlueprint(**blueprint_data)
-        
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Failed to parse blueprint JSON: {e}")
-    except Exception as e:
-        raise Exception(f"Failed to deconstruct template: {e}")
+async def deconstruct_template(template_image_url: str, db=None) -> AdBlueprint:
+    require_provider_key("gemini", db)
+    image = await template_image_part(template_image_url)
+    result = await generate_gemini_text(build_deconstruction_prompt(template_image_url), db, image_part=image)
+    return AdBlueprint(**extract_json_from_response(result))
 
 
-async def reconstruct_ad(
-    blueprint: AdBlueprint,
-    brand_data: BrandData
-) -> AdConcept:
-    """
-    Generate a new ad concept by applying brand data to a blueprint
-    
-    Args:
-        blueprint: The structural blueprint to follow
-        brand_data: The new brand/product information
-        
-    Returns:
-        AdConcept with generated content
-    """
-    try:
-        # Use Gemini model
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        
-        # Convert blueprint to dict
-        blueprint_dict = blueprint.model_dump()
-        
-        # Build the reconstruction prompt
-        prompt = build_reconstruction_prompt(
-            blueprint=blueprint_dict,
-            brand_name=brand_data.brand_name,
-            brand_voice=brand_data.brand_voice or "",
-            product_name=brand_data.product_name,
-            product_description=brand_data.product_description,
-            audience_demographics=brand_data.audience_demographics,
-            audience_pain_points=brand_data.audience_pain_points or "",
-            audience_goals=brand_data.audience_goals or "",
-            campaign_offer=brand_data.campaign_offer,
-            campaign_urgency=brand_data.campaign_urgency or "",
-            campaign_messaging=brand_data.campaign_messaging
-        )
-        
-        # Generate the ad concept
-        response = model.generate_content(prompt)
-        
-        # Parse the JSON response
-        concept_data = json.loads(response.text)
-        
-        # Validate and return as AdConcept
-        return AdConcept(**concept_data)
-        
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Failed to parse ad concept JSON: {e}")
-    except Exception as e:
-        raise Exception(f"Failed to reconstruct ad: {e}")
+async def reconstruct_ad(blueprint: AdBlueprint, brand_data: BrandData, db=None) -> AdConcept:
+    prompt = build_reconstruction_prompt(
+        blueprint=blueprint.model_dump(), brand_name=brand_data.brand_name,
+        brand_voice=brand_data.brand_voice or "", product_name=brand_data.product_name,
+        product_description=brand_data.product_description,
+        audience_demographics=brand_data.audience_demographics,
+        audience_pain_points=brand_data.audience_pain_points or "",
+        audience_goals=brand_data.audience_goals or "", campaign_offer=brand_data.campaign_offer,
+        campaign_urgency=brand_data.campaign_urgency or "", campaign_messaging=brand_data.campaign_messaging,
+    )
+    return AdConcept(**extract_json_from_response(await generate_gemini_text(prompt, db)))
 
 
-def extract_json_from_response(text: str) -> Dict[str, Any]:
-    """
-    Extract JSON from a response that might have markdown code blocks
-    """
-    # Try to find JSON in markdown code blocks
-    if "```json" in text:
-        start = text.find("```json") + 7
-        end = text.find("```", start)
-        text = text[start:end].strip()
-    elif "```" in text:
-        start = text.find("```") + 3
-        end = text.find("```", start)
-        text = text[start:end].strip()
-    
+def extract_json_from_response(text):
+    if "```" in text:
+        text = text.split("```", 2)[1].removeprefix("json").strip()
     return json.loads(text)

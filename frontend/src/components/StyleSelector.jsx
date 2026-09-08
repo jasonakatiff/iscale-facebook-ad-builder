@@ -36,13 +36,13 @@ export default function StyleSelector({ onSelect }) {
         <div className="space-y-6">
             {/* Search Bar */}
             <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-faint" size={20} />
                 <input
                     type="text"
                     placeholder="Search styles by name, industry, or use case..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-600 focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-3 border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-600 focus:border-transparent"
                 />
             </div>
 
@@ -51,8 +51,8 @@ export default function StyleSelector({ onSelect }) {
                 <button
                     onClick={() => setSelectedCategory('all')}
                     className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${selectedCategory === 'all'
-                            ? 'bg-amber-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            ? 'bg-brand text-white'
+                            : 'bg-inset text-secondary hover:bg-soft'
                         }`}
                 >
                     All Styles ({adStyles.length})
@@ -88,7 +88,7 @@ export default function StyleSelector({ onSelect }) {
 
             {/* Results Count */}
             {searchQuery && (
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-secondary">
                     Found {filteredStyles.length} style{filteredStyles.length !== 1 ? 's' : ''}
                 </p>
             )}
@@ -108,7 +108,7 @@ export default function StyleSelector({ onSelect }) {
                             onMouseLeave={() => setHoveredStyle(null)}
                             className={`relative p-6 rounded-xl border-2 cursor-pointer transition-all ${isHovered
                                     ? `border-${color}-600 shadow-lg scale-105`
-                                    : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+                                    : 'border-line hover:border-line-strong hover:shadow-md'
                                 }`}
                             style={isHovered ? {
                                 borderColor: `var(--${color}-600)`,
@@ -126,25 +126,25 @@ export default function StyleSelector({ onSelect }) {
                             </div>
 
                             {/* Style Name */}
-                            <h4 className="font-bold text-gray-900 mb-2 text-lg">{style.name}</h4>
+                            <h4 className="font-bold text-foreground mb-2 text-lg">{style.name}</h4>
 
                             {/* Description */}
-                            <p className="text-sm text-gray-600 mb-3">{style.description}</p>
+                            <p className="text-sm text-secondary mb-3">{style.description}</p>
 
                             {/* Visual Layout */}
                             <div className="mb-3">
-                                <span className="text-xs font-medium text-gray-500">Layout:</span>
-                                <p className="text-sm text-gray-700">{style.visualLayout}</p>
+                                <span className="text-xs font-medium text-muted">Layout:</span>
+                                <p className="text-sm text-secondary">{style.visualLayout}</p>
                             </div>
 
                             {/* Best For Tags */}
                             <div className="mb-3">
-                                <span className="text-xs font-medium text-gray-500 block mb-1">Best For:</span>
+                                <span className="text-xs font-medium text-muted block mb-1">Best For:</span>
                                 <div className="flex flex-wrap gap-1">
                                     {style.bestFor.map((industry) => (
                                         <span
                                             key={industry}
-                                            className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded"
+                                            className="px-2 py-0.5 bg-inset text-secondary text-xs rounded"
                                         >
                                             {industry}
                                         </span>
@@ -154,12 +154,12 @@ export default function StyleSelector({ onSelect }) {
 
                             {/* Psychology (shown on hover) */}
                             {isHovered && (
-                                <div className="mt-4 pt-4 border-t border-gray-200 animate-in fade-in slide-in-from-top-2 duration-200">
+                                <div className="mt-4 pt-4 border-t border-line animate-in fade-in slide-in-from-top-2 duration-200">
                                     <div className="flex items-start gap-2">
                                         <Sparkles className={`text-${color}-600 flex-shrink-0 mt-0.5`} size={16} />
                                         <div>
-                                            <span className="text-xs font-medium text-gray-500 block mb-1">Psychology:</span>
-                                            <p className="text-sm text-gray-700 italic">{style.psychology}</p>
+                                            <span className="text-xs font-medium text-muted block mb-1">Psychology:</span>
+                                            <p className="text-sm text-secondary italic">{style.psychology}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -179,9 +179,9 @@ export default function StyleSelector({ onSelect }) {
             {/* Empty State */}
             {filteredStyles.length === 0 && (
                 <div className="text-center py-12">
-                    <Search className="mx-auto text-gray-400 mb-4" size={48} />
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">No styles found</h3>
-                    <p className="text-gray-600">Try adjusting your search or browse all categories</p>
+                    <Search className="mx-auto text-faint mb-4" size={48} />
+                    <h3 className="text-lg font-bold text-foreground mb-2">No styles found</h3>
+                    <p className="text-secondary">Try adjusting your search or browse all categories</p>
                 </div>
             )}
         </div>

@@ -1,162 +1,202 @@
-import React, { createContext, useContext, useState } from 'react';
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
+import { useAuth } from './AuthContext';
+import { defaultWizardState, normalizeObjective } from '../lib/campaignWizard';
+import { tomorrowInTimezone } from '../lib/accountTime';
+import { clearCampaignDraft, loadCampaignDraft, saveCampaignDraft } from '../lib/campaignDraft';
 
 const CampaignContext = createContext();
-
+// The shared context hook accompanies this provider, as in the other app contexts.
+// eslint-disable-next-line react-refresh/only-export-components
 export const useCampaign = () => {
     const context = useContext(CampaignContext);
-    if (!context) {
-        throw new Error('useCampaign must be used within CampaignProvider');
-    }
+    if (!context) throw new Error('useCampaign must be used within CampaignProvider');
     return context;
 };
 
-export const CampaignProvider = ({ children }) => {
-    const [campaignData, setCampaignData] = useState({
-        id: null,
-        name: '',
-        objective: 'OUTCOME_SALES',
-        budgetType: 'ABO',
-        dailyBudget: 0,
-        bidStrategy: '',
-        status: 'PAUSED',
-        fbCampaignId: null,
-        isExisting: false
-    });
+export const CampaignProvider = ({ children, persist = false, draftScope = 'system' }) => {
+    const { user } = useAuth();
+    const [state, setState] = useState(defaultWizardState);
+    const [ready, setReady] = useState(!persist);
+    const [draftStatus, setDraftStatus] = useState('');
+    const [draftError, setDraftError] = useState('');
+    const key = persist && user?.id ? `breadwinner:campaign-draft:v1:${user.id}:${draftScope}` : null;
+    const saveQueue = useRef(Promise.resolve());
+    const latest = useRef(state);
+    useEffect(() => {
+        latest.current = state;
+    }, [state]);
 
-    const [adsetData, setAdsetData] = useState({
-        id: null,
-        name: '',
-        optimizationGoal: 'OFFSITE_CONVERSIONS',
-        dailyBudget: 0,
-        bidStrategy: 'LOWEST_COST_WITHOUT_CAP',
-        bidAmount: 0,
-        targeting: {
-            genders: [], // [] = All, [1] = Male, [2] = Female
-            publisher_platforms: ['facebook', 'instagram'], // Default to Manual (FB & IG)
-            geo_locations: {
-                countries: ['US'],
-                excluded_countries: [],
-                regions: [],
-                excluded_regions: [],
-                cities: [],
-                excluded_cities: [],
-                geo_markets: [],
-                excluded_geo_markets: []
-            },
-            ageMin: 18,
-            ageMax: 65
+    useEffect(() => {
+        if (!key) return;
+        let cancelled = false;
+        loadCampaignDraft(key)
+            .then((draft) => {
+                if (!cancelled && draft) {
+                    setState({ ...defaultWizardState(), ...draft });
+                    setDraftStatus('Draft restored');
+                }
+            })
+            .catch((error) => {
+                if (!cancelled) setDraftError(`Draft could not be restored: ${error.message}`);
+            })
+            .finally(() => {
+                if (!cancelled) setReady(true);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [key]);
+
+    useEffect(() => {
+        if (!key || !ready) return;
+        let cancelled = false;
+        saveQueue.current = saveQueue.current
+            .catch((error) => {
+                setDraftError(error.message);
+            })
+            .then(() => {
+                if (!cancelled) setDraftStatus('Saving draft…');
+                return saveCampaignDraft(key, state);
+            });
+        saveQueue.current
+            .then(() => {
+                if (!cancelled) {
+                    setDraftStatus('Draft saved on this browser');
+                    setDraftError('');
+                }
+            })
+            .catch((error) => {
+                if (!cancelled) {
+                    setDraftStatus('');
+                    setDraftError(`Draft could not be saved: ${error.message}`);
+                }
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [key, ready, state]);
+
+    const setField = useCallback(
+        (field, update) =>
+            setState((previous) => {
+                const value = typeof update === 'function' ? update(previous[field]) : update;
+                const next = { ...previous, [field]: value };
+                if (field === 'campaignData') {
+                    if (previous.campaignData.fbCampaignId !== value.fbCampaignId)
+                        next.adsetData = {
+                            ...previous.adsetData,
+                            id: null,
+                            fbAdsetId: null,
+                            isExisting: false,
+                        };
+                    if (
+                        previous.campaignData.objective !== value.objective &&
+                        !next.adsetData.isExisting
+                    )
+                        next.adsetData = normalizeObjective(value.objective, next.adsetData);
+                }
+                return next;
+            }),
+        [],
+    );
+    const setters = useMemo(
+        () =>
+            Object.fromEntries(
+                [
+                    'campaignData',
+                    'adsetData',
+                    'creativeData',
+                    'adsData',
+                    'currentStep',
+                    'publishProgress',
+                    'leadRouter',
+                ].map((field) => [
+                    `set${field[0].toUpperCase()}${field.slice(1)}`,
+                    (update) => setField(field, update),
+                ]),
+            ),
+        [setField],
+    );
+
+    const setSelectedAdAccount = useCallback(
+        (account) =>
+            setState((previous) => {
+                if (previous.selectedAdAccount?.id === account?.id)
+                    return { ...previous, selectedAdAccount: account };
+                const defaults = defaultWizardState();
+                let startTime = '';
+                if (account?.timezone) startTime = tomorrowInTimezone(account.timezone);
+                return {
+                    ...previous,
+                    selectedAdAccount: account,
+                    campaignData: defaults.campaignData,
+                    adsetData: { ...defaults.adsetData, startTime },
+                    creativeData: {
+                        ...previous.creativeData,
+                        pageId: '',
+                        instagramId: null,
+                        urlParameters: defaults.creativeData.urlParameters,
+                    },
+                    adsData: [],
+                    publishProgress: null,
+                };
+            }),
+        [],
+    );
+
+    const resetWizard = useCallback(async () => {
+        try {
+            await saveQueue.current;
+            if (key) await clearCampaignDraft(key);
+            for (const creative of latest.current.creativeData.creatives)
+                if (creative.previewUrl?.startsWith('blob:'))
+                    URL.revokeObjectURL(creative.previewUrl);
+            setState(defaultWizardState());
+            setDraftError('');
+        } catch (error) {
+            setDraftError(`Could not discard draft: ${error.message}`);
+        }
+    }, [key]);
+
+    const savePublishProgress = useCallback(
+        async (publishProgress) => {
+            const snapshot = { ...latest.current, publishProgress };
+            latest.current = snapshot;
+            setState(snapshot);
+            if (!key) return;
+            saveQueue.current = saveQueue.current
+                .catch((error) => {
+                    setDraftError(error.message);
+                })
+                .then(() => saveCampaignDraft(key, snapshot));
+            await saveQueue.current;
         },
-        advantageAudience: 0, // 0 = Off, 1 = On
-        startTime: (() => {
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            tomorrow.setHours(1, 0, 0, 0);
-            // Format to YYYY-MM-DDThh:mm for datetime-local input
-            const year = tomorrow.getFullYear();
-            const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
-            const day = String(tomorrow.getDate()).padStart(2, '0');
-            const hours = String(tomorrow.getHours()).padStart(2, '0');
-            const minutes = String(tomorrow.getMinutes()).padStart(2, '0');
-            return `${year}-${month}-${day}T${hours}:${minutes}`;
-        })(),
-        pixelId: '',
-        conversionEvent: 'PURCHASE',
-        attributionSetting: '7d_click', // Default to 7-day click attribution
-        status: 'PAUSED',
-        fbAdsetId: null,
-        isExisting: false
-    });
-
-    const [creativeData, setCreativeData] = useState({
-        creativeName: '',
-        creatives: [], // Array of { id, file, previewUrl, name }
-        bodies: [''], // Start with 1 field
-        headlines: [''], // Start with 1 field
-        description: '',
-        cta: 'LEARN_MORE',
-        websiteUrl: '',
-        pageId: '',
-        instagramId: null // Explicitly set to null when no IG account is connected
-    });
-
-    const [adsData, setAdsData] = useState([]);
-
-    const [selectedAdAccount, setSelectedAdAccount] = useState(null);
-
-    const resetWizard = () => {
-        setCampaignData({
-            id: null,
-            name: '',
-            objective: 'OUTCOME_SALES',
-            budgetType: 'ABO',
-            dailyBudget: 0,
-            bidStrategy: '',
-            status: 'PAUSED',
-            fbCampaignId: null,
-            isExisting: false
-        });
-        setAdsetData({
-            id: null,
-            name: '',
-            optimizationGoal: 'OFFSITE_CONVERSIONS',
-            dailyBudget: 0,
-            bidStrategy: 'LOWEST_COST_WITHOUT_CAP',
-            bidAmount: 0,
-            targeting: {
-                genders: [],
-                publisher_platforms: ['facebook', 'instagram'],
-                countries: ['US'],
-                ageMin: 18,
-                ageMax: 65
-            },
-            advantageAudience: 0,
-            startTime: (() => {
-                const tomorrow = new Date();
-                tomorrow.setDate(tomorrow.getDate() + 1);
-                tomorrow.setHours(1, 0, 0, 0);
-                const year = tomorrow.getFullYear();
-                const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
-                const day = String(tomorrow.getDate()).padStart(2, '0');
-                const hours = String(tomorrow.getHours()).padStart(2, '0');
-                const minutes = String(tomorrow.getMinutes()).padStart(2, '0');
-                return `${year}-${month}-${day}T${hours}:${minutes}`;
-            })(),
-            pixelId: '',
-            conversionEvent: 'PURCHASE',
-            status: 'PAUSED',
-            fbAdsetId: null,
-            isExisting: false
-        });
-        setCreativeData({
-            creativeName: '',
-            creatives: [],
-            bodies: ['', '', ''],
-            headlines: ['', '', ''],
-            description: '',
-            cta: 'LEARN_MORE',
-            websiteUrl: '',
-            pageId: ''
-        });
-        setAdsData([]);
-        setSelectedAdAccount(null);
-    };
-
-    const value = {
-        campaignData,
-        setCampaignData,
-        adsetData,
-        setAdsetData,
-        creativeData,
-        setCreativeData,
-        adsData,
-        setAdsData,
-        selectedAdAccount,
-        setSelectedAdAccount,
-        resetWizard
-    };
+        [key],
+    );
 
     return (
-        <CampaignContext.Provider value={value}>
+        <CampaignContext.Provider
+            value={{
+                ...state,
+                ...setters,
+                state,
+                setState,
+                setSelectedAdAccount,
+                resetWizard,
+                savePublishProgress,
+                ready: !key || ready,
+                draftStatus,
+                draftError,
+            }}
+        >
             {children}
         </CampaignContext.Provider>
     );

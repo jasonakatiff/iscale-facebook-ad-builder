@@ -10,7 +10,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const PLATFORM_COLORS = {
     meta: '#1877F2',
     google: '#F59E0B',
-    tiktok: '#111827',
+    tiktok: 'rgb(var(--studio-secondary))',
 };
 
 const PLATFORM_LABELS = {
@@ -84,18 +84,18 @@ export default function Overview() {
     return (
         <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
             <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2 flex items-center gap-3">
-                    <LayoutDashboard size={28} className="text-amber-600 sm:hidden" />
-                    <LayoutDashboard size={32} className="text-amber-600 hidden sm:block" />
+                <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1 sm:mb-2 flex items-center gap-3">
+                    <LayoutDashboard size={28} className="text-brand-ink sm:hidden" />
+                    <LayoutDashboard size={32} className="text-brand-ink hidden sm:block" />
                     Overview
                 </h1>
-                <p className="text-sm sm:text-base text-gray-600">Meta and Google Ads campaign performance, side by side</p>
+                <p className="text-sm sm:text-base text-secondary">Meta and Google Ads campaign performance, side by side</p>
             </div>
 
             {errorEntries.length > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-1">
+                <div className="bg-brand-soft border border-brand-line rounded-xl p-4 space-y-1">
                     {errorEntries.map(([platform, message]) => (
-                        <p key={platform} className="text-sm text-amber-800">
+                        <p key={platform} className="text-sm text-brand-ink">
                             <span className="font-semibold">{PLATFORM_LABELS[platform] || platform}:</span> {message}
                         </p>
                     ))}
@@ -103,14 +103,14 @@ export default function Overview() {
             )}
 
             {!loading && spendByPlatform.length > 0 && (
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-                    <h2 className="text-sm font-semibold text-gray-700 mb-4">Spend by platform</h2>
+                <div className="bg-panel rounded-xl border border-line shadow-sm p-6">
+                    <h2 className="text-sm font-semibold text-secondary mb-4">Spend by platform</h2>
                     <ResponsiveContainer width="100%" height={240}>
                         <BarChart data={spendByPlatform}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="platform" />
-                            <YAxis tickFormatter={(v) => `$${v}`} />
-                            <Tooltip formatter={(value) => [`$${value}`, 'Spend']} />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgb(var(--studio-line))" />
+                            <XAxis dataKey="platform" tick={{ fill: 'rgb(var(--studio-muted))' }} />
+                            <YAxis tick={{ fill: 'rgb(var(--studio-muted))' }} tickFormatter={(v) => `$${v}`} />
+                            <Tooltip contentStyle={{ background: 'rgb(var(--studio-elevated))', borderColor: 'rgb(var(--studio-line))', color: 'rgb(var(--studio-foreground))' }} formatter={(value) => [`$${value}`, 'Spend']} />
                             <Legend />
                             <Bar dataKey="spend" name="Spend" radius={[4, 4, 0, 0]}>
                                 {spendByPlatform.map((entry) => (

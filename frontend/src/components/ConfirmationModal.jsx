@@ -1,7 +1,8 @@
-import React from 'react';
-import { Trash2, AlertTriangle, X } from 'lucide-react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Trash2, X, Loader2 } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
-const ConfirmationModal = ({
+export default function ConfirmationModal({
     isOpen,
     onClose,
     onConfirm,
@@ -10,48 +11,116 @@ const ConfirmationModal = ({
     confirmText = 'Delete',
     cancelText = 'Cancel',
     isDestructive = true,
-    icon: Icon = Trash2
-}) => {
+    icon: iconComponent = Trash2,
+}) {
+    const Icon = iconComponent;
+    const dialog = useRef(null);
+    const cancelButton = useRef(null);
+    const label = useId();
+    const description = useId();
+    const [pending, setPending] = useState(false);
+    const { showError } = useToast();
+    useEffect(() => {
+        if (!isOpen) return;
+        const node = dialog.current;
+        const previousFocus = document.activeElement;
+        node.showModal();
+        cancelButton.current?.focus();
+        return () => {
+            if (node.open) node.close();
+            previousFocus?.focus();
+        };
+    }, [isOpen]);
     if (!isOpen) return null;
-
+    const confirm = async () => {
+        if (pending) return;
+        setPending(true);
+        try {
+            await onConfirm();
+            onClose();
+        } catch (error) {
+            showError(error.message || 'Unable to complete this action.');
+        } finally {
+            setPending(false);
+        }
+    };
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-            <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl transform transition-all" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center gap-4 mb-6">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${isDestructive ? 'bg-red-100' : 'bg-blue-100'}`}>
-                        <Icon className={isDestructive ? 'text-red-600' : 'text-blue-600'} size={24} />
-                    </div>
-                    <div className="flex-1">
-                        <h3 className="text-lg font-bold text-gray-900">{title}</h3>
-                        <p className="text-gray-500 text-sm mt-1">{message}</p>
-                    </div>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-500 self-start">
-                        <X size={20} />
-                    </button>
-                </div>
-                <div className="flex justify-end gap-3">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium"
-                    >
-                        {cancelText}
-                    </button>
-                    <button
-                        onClick={() => {
-                            onConfirm();
-                            onClose();
-                        }}
-                        className={`px-4 py-2 text-white rounded-lg transition-colors font-medium shadow-sm ${isDestructive
-                            ? 'bg-red-600 hover:bg-red-700'
-                            : 'bg-blue-600 hover:bg-blue-700'
-                            }`}
-                    >
-                        {confirmText}
-                    </button>
-                </div>
+        <dialog
+            ref={dialog}
+            className="studio-dialog"
+            aria-labelledby={label}
+            aria-describedby={description}
+            onKeyDown={(event) => {
+                if (event.key !== 'Tab') return;
+                const controls = [...event.currentTarget.querySelectorAll('button:not(:disabled)')];
+                const first = controls[0],
+                    last = controls.at(-1);
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last?.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first?.focus();
+                }
+            }}
+            onCancel={(event) => {
+                event.preventDefault();
+                if (!pending) onClose();
+            }}
+            onClick={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                if (
+                    !pending &&
+                    (event.clientX < rect.left ||
+                        event.clientX > rect.right ||
+                        event.clientY < rect.top ||
+                        event.clientY > rect.bottom)
+                )
+                    onClose();
+            }}
+        >
+            <div className="flex items-start justify-between mb-5">
+                <span
+                    className={`w-10 h-10 rounded-xl grid place-items-center ${isDestructive ? 'bg-danger-soft text-danger' : 'bg-brand-soft text-brand-ink'}`}
+                >
+                    <Icon size={20} />
+                </span>
+                <button
+                    type="button"
+                    onClick={onClose}
+                    disabled={pending}
+                    className="icon-button"
+                    aria-label="Close confirmation"
+                >
+                    <X size={18} />
+                </button>
             </div>
-        </div>
+            <h2 id={label} className="text-lg font-semibold">
+                {title}
+            </h2>
+            <p id={description} className="text-sm text-muted mt-3 leading-relaxed">
+                {message}
+            </p>
+            <div className="flex justify-end gap-3 mt-7">
+                <button
+                    type="button"
+                    ref={cancelButton}
+                    onClick={onClose}
+                    disabled={pending}
+                    className="studio-button"
+                >
+                    {cancelText}
+                </button>
+                <button
+                    type="button"
+                    disabled={pending}
+                    onClick={confirm}
+                    className={`studio-button ${isDestructive ? '!bg-red-700 hover:!bg-red-800 !border-transparent !text-white' : 'primary'}`}
+                >
+                    {pending && <Loader2 size={14} className="animate-spin" />}
+                    {pending ? 'Working…' : confirmText}
+                </button>
+            </div>
+        </dialog>
     );
-};
-
-export default ConfirmationModal;
+}

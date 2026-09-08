@@ -1,0 +1,218 @@
+{
+  "services": {
+    "daff208f-2751-45f4-ada2-61a3181faade": {
+      "name": "Postgres",
+      "source": {
+        "image": "postgres:15-bookworm"
+      },
+      "build": {},
+      "deploy": {
+        "numReplicas": 1,
+        "restartPolicyType": "ON_FAILURE",
+        "restartPolicyMaxRetries": 10
+      },
+      "networking": {},
+      "variables": {
+        "POSTGRES_DB": {
+          "defaultValue": "breadwinner",
+          "isOptional": false,
+          "description": "Configured automatically for your installation."
+        },
+        "POSTGRES_USER": {
+          "defaultValue": "postgres",
+          "isOptional": false,
+          "description": "Configured automatically for your installation."
+        },
+        "POSTGRES_PASSWORD": {
+          "defaultValue": "${{secret(48)}}",
+          "isOptional": false,
+          "description": "Configured automatically for your installation.",
+          "preserveExisting": true
+        },
+        "PGDATA": {
+          "defaultValue": "/var/lib/postgresql/data/pgdata",
+          "isOptional": false,
+          "description": "Configured automatically for your installation."
+        },
+        "DATABASE_URL": {
+          "defaultValue": "postgresql://postgres:${{Postgres.POSTGRES_PASSWORD}}@${{Postgres.RAILWAY_PRIVATE_DOMAIN}}:5432/breadwinner",
+          "isOptional": false,
+          "description": "Configured automatically for your installation."
+        }
+      },
+      "volumeMounts": {
+        "daff208f-2751-45f4-ada2-61a3181faade": {
+          "mountPath": "/var/lib/postgresql/data"
+        }
+      }
+    },
+    "f70dd9bc-b0bd-445f-8291-a0cb152d23ac": {
+      "name": "Backend",
+      "source": {
+        "repo": "jasonakatiff/iscale-facebook-ad-builder",
+        "branch": "main",
+        "rootDirectory": "/"
+      },
+      "build": {
+        "builder": "DOCKERFILE",
+        "dockerfilePath": "backend/Dockerfile"
+      },
+      "deploy": {
+        "numReplicas": 1,
+        "restartPolicyType": "ON_FAILURE",
+        "restartPolicyMaxRetries": 10,
+        "startCommand": "python startup.py",
+        "healthcheckPath": "/health/ready",
+        "healthcheckTimeout": 300
+      },
+      "networking": {
+        "serviceDomains": {
+          "<hasDomain>": {
+            "port": 8080
+          }
+        }
+      },
+      "variables": {
+        "PORT": {
+          "defaultValue": "8080",
+          "isOptional": false,
+          "description": "Configured automatically for your installation."
+        },
+        "DATABASE_URL": {
+          "defaultValue": "${{Postgres.DATABASE_URL}}",
+          "isOptional": false,
+          "description": "Configured automatically for your installation."
+        },
+        "ADMIN_EMAIL": {
+          "defaultValue": "",
+          "isOptional": false,
+          "description": "Owner email: sign in to your new Ad Builder & Manager workspace.",
+          "preserveExisting": true
+        },
+        "ADMIN_PASSWORD": {
+          "defaultValue": "",
+          "isOptional": false,
+          "description": "Owner password: choose at least 12 characters (maximum 72 UTF-8 bytes).",
+          "preserveExisting": true
+        },
+        "SECRET_KEY": {
+          "defaultValue": "${{secret(64)}}",
+          "isOptional": false,
+          "description": "Configured automatically for your installation.",
+          "preserveExisting": true
+        },
+        "OAUTH_TOKEN_ENCRYPTION_KEY": {
+          "defaultValue": "${{secret(43, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_\")}}=",
+          "isOptional": false,
+          "description": "Configured automatically for your installation.",
+          "preserveExisting": true
+        },
+        "MEDIA_STORAGE_PATH": {
+          "defaultValue": "/app/uploads",
+          "isOptional": false,
+          "description": "Configured automatically for your installation."
+        },
+        "REQUIRE_PERSISTENT_MEDIA": {
+          "defaultValue": "true",
+          "isOptional": false,
+          "description": "Configured automatically for your installation."
+        },
+        "FRONTEND_URL": {
+          "defaultValue": "https://${{Frontend.RAILWAY_PUBLIC_DOMAIN}}",
+          "isOptional": false,
+          "description": "Configured automatically for your installation."
+        },
+        "PUBLIC_API_URL": {
+          "defaultValue": "https://${{Backend.RAILWAY_PUBLIC_DOMAIN}}",
+          "isOptional": false,
+          "description": "Configured automatically for your installation."
+        },
+        "ALLOWED_ORIGINS": {
+          "defaultValue": "https://${{Frontend.RAILWAY_PUBLIC_DOMAIN}}",
+          "isOptional": false,
+          "description": "Configured automatically for your installation."
+        }
+      },
+      "volumeMounts": {
+        "f70dd9bc-b0bd-445f-8291-a0cb152d23ac": {
+          "mountPath": "/app/uploads"
+        }
+      }
+    },
+    "0926662b-61e0-4703-a465-59552bfddfb5": {
+      "name": "Frontend",
+      "source": {
+        "repo": "jasonakatiff/iscale-facebook-ad-builder",
+        "branch": "main",
+        "rootDirectory": "/frontend"
+      },
+      "build": {
+        "builder": "DOCKERFILE",
+        "dockerfilePath": "Dockerfile.railway"
+      },
+      "deploy": {
+        "numReplicas": 1,
+        "restartPolicyType": "ON_FAILURE",
+        "restartPolicyMaxRetries": 10,
+        "startCommand": "/docker-entrypoint.sh nginx -g \"daemon off;\"",
+        "healthcheckPath": "/",
+        "healthcheckTimeout": 60
+      },
+      "networking": {
+        "serviceDomains": {
+          "<hasDomain>": {
+            "port": 8080
+          }
+        }
+      },
+      "variables": {
+        "PORT": {
+          "defaultValue": "8080",
+          "isOptional": false,
+          "description": "Configured automatically for your installation."
+        },
+        "VITE_API_URL": {
+          "defaultValue": "https://${{Backend.RAILWAY_PUBLIC_DOMAIN}}/api/v1",
+          "isOptional": false,
+          "description": "Configured automatically for your installation."
+        }
+      }
+    },
+    "422b8f0c-4516-40aa-b732-4d5c15953808": {
+      "name": "Worker",
+      "source": {
+        "repo": "jasonakatiff/iscale-facebook-ad-builder",
+        "branch": "main",
+        "rootDirectory": "/"
+      },
+      "build": {
+        "builder": "DOCKERFILE",
+        "dockerfilePath": "backend/Dockerfile.sync-worker"
+      },
+      "deploy": {
+        "numReplicas": 1,
+        "restartPolicyType": "ON_FAILURE",
+        "restartPolicyMaxRetries": 10,
+        "startCommand": "python -m app.sync_worker"
+      },
+      "networking": {},
+      "variables": {
+        "DATABASE_URL": {
+          "defaultValue": "${{Postgres.DATABASE_URL}}",
+          "isOptional": false,
+          "description": "Configured automatically for your installation."
+        },
+        "SECRET_KEY": {
+          "defaultValue": "${{Backend.SECRET_KEY}}",
+          "isOptional": false,
+          "description": "Configured automatically for your installation."
+        },
+        "OAUTH_TOKEN_ENCRYPTION_KEY": {
+          "defaultValue": "${{Backend.OAUTH_TOKEN_ENCRYPTION_KEY}}",
+          "isOptional": false,
+          "description": "Configured automatically for your installation."
+        }
+      }
+    }
+  }
+}

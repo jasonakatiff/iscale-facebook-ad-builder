@@ -1,11 +1,13 @@
+from app.telemetry.runtime import capture_exception
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Header, Query
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 from app.services.facebook_service import FacebookService, FacebookConnectionError, resolve_facebook_service
 from app.models import FacebookAd, FacebookAdSet, FacebookCampaign, MetaAdsConnection, User
+from app.delivery.schemas import AdRequest
 from app.database import get_db
 from app.core.deps import get_current_active_user, require_permission
 from app.core.config import settings
@@ -13,9 +15,13 @@ from app.core.oauth_state import create_oauth_state, verify_oauth_state, set_oau
 from app.core.token_encryption import encrypt_token
 from app.services.meta_ads_oauth import build_oauth_url, exchange_code, list_ad_accounts, MetaOAuthError
 from sqlalchemy.orm import Session
+from app.services.campaign_validation import money_to_minor
+from app.services.meta_connection import resolve_meta_connection, personal_meta_connection
 
 router = APIRouter()
 PROVIDER = "meta-ads"
+from app.api.v1.campaign_settings import router as settings_router
+router.include_router(settings_router)
 
 
 class SelectMetaAccountRequest(BaseModel):
@@ -37,8 +43,10 @@ def get_facebook_service(
     try:
         return resolve_facebook_service(db, current_user.id)
     except FacebookConnectionError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        capture_exception(exc, "facebook.get_facebook_service")
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     except Exception as exc:
+        capture_exception(exc, "facebook.get_facebook_service")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
@@ -82,6 +90,7 @@ async def meta_oauth_callback(
         )
         accounts = await list_ad_accounts(token_data["access_token"])
     except (ValueError, MetaOAuthError) as exc:
+        capture_exception(exc, "facebook.meta_oauth_callback")
         raise HTTPException(status_code=400, detail=str(exc))
     if not accounts:
         raise HTTPException(status_code=400, detail="No Meta ad accounts are available for this login.")
@@ -121,25 +130,8 @@ def meta_connection_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    connection = db.query(MetaAdsConnection).filter(
-        MetaAdsConnection.user_id == current_user.id,
-        MetaAdsConnection.is_active.is_(True),
-    ).first()
-    if not connection:
-        return {"connected": False}
-    expires_at = connection.access_token_expires_at
-    if expires_at is not None and expires_at.tzinfo is None:
-        from datetime import timezone as _tz
-        expires_at = expires_at.replace(tzinfo=_tz.utc)
-    return {
-        "connected": True,
-        "ad_account_id": connection.ad_account_id,
-        "account_name": connection.account_name,
-        "connected_at": connection.created_at.isoformat() if connection.created_at else None,
-        # Sprint 8: lets the UI flag a soon/lapsed user token so the operator
-        # reconnects BEFORE campaigns start failing with raw Meta 401s.
-        "token_expires_at": expires_at.isoformat() if expires_at else None,
-    }
+    public, _token = resolve_meta_connection(db, current_user.id)
+    return {**public, "oauth_available": settings.facebook_ads_enabled}
 
 
 @router.get("/connections")
@@ -173,12 +165,18 @@ def select_meta_connection(
     ).first()
     if not connection:
         raise HTTPException(status_code=404, detail="Meta ad account is not available for this user.")
+    public, _token = personal_meta_connection(connection)
+    if not public["connected"]:
+        raise HTTPException(
+            status_code=409 if public["state"] == "expired" else 503,
+            detail=public["error"]["message"],
+        )
     db.query(MetaAdsConnection).filter(MetaAdsConnection.user_id == current_user.id).update(
         {MetaAdsConnection.is_active: False}, synchronize_session="fetch"
     )
     connection.is_active = True
     db.commit()
-    return {"connected": True, "ad_account_id": connection.ad_account_id, "account_name": connection.account_name}
+    return meta_connection_status(db, current_user)
 
 
 @router.delete("/connection")
@@ -194,12 +192,14 @@ def disconnect_meta_connection(
 
 @router.get("/accounts")
 def get_ad_accounts(
+    refresh: bool = False,
     service: FacebookService = Depends(get_facebook_service),
     current_user: User = Depends(get_current_active_user)
 ):
     try:
-        return service.get_ad_accounts()
+        return service.get_ad_accounts(force_refresh=refresh)
     except Exception as e:
+        capture_exception(e, "facebook.get_ad_accounts")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/campaigns")
@@ -213,6 +213,7 @@ def read_campaigns(
         # Convert FB objects to dicts
         return [dict(c) for c in campaigns]
     except Exception as e:
+        capture_exception(e, "facebook.read_campaigns")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/campaigns")
@@ -227,7 +228,11 @@ def create_campaign(
         # For POST, usually better to have it in the body or query. Let's support query for consistency with GET
         result = service.create_campaign(campaign, ad_account_id)
         return dict(result)
+    except ValueError as e:
+        capture_exception(e, "facebook.create_campaign")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        capture_exception(e, "facebook.create_campaign")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/pixels")
@@ -241,17 +246,20 @@ def read_pixels(
         # Convert FB objects to dicts
         return [dict(p) for p in pixels]
     except Exception as e:
+        capture_exception(e, "facebook.read_pixels")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/pages")
 def read_pages(
+    ad_account_id: Optional[str] = None,
     service: FacebookService = Depends(get_facebook_service),
     current_user: User = Depends(get_current_active_user)
 ):
     try:
-        pages = service.get_pages()
+        pages = service.get_pages(ad_account_id)
         return pages
     except Exception as e:
+        capture_exception(e, "facebook.read_pages")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -266,6 +274,7 @@ def read_adsets(
         adsets = service.get_adsets(ad_account_id, campaign_id)
         return [dict(a) for a in adsets]
     except Exception as e:
+        capture_exception(e, "facebook.read_adsets")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/adsets")
@@ -278,7 +287,11 @@ def create_adset(
     try:
         result = service.create_adset(adset, ad_account_id)
         return dict(result)
+    except ValueError as e:
+        capture_exception(e, "facebook.create_adset")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        capture_exception(e, "facebook.create_adset")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/creatives")
@@ -291,21 +304,30 @@ def create_creative(
     try:
         result = service.create_creative(creative, ad_account_id)
         return dict(result)
+    except ValueError as e:
+        capture_exception(e, "facebook.create_creative")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        capture_exception(e, "facebook.create_creative")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/ads")
+@router.post("/ads", status_code=202)
 def create_ad(
-    ad: Dict[str, Any],
-    ad_account_id: Optional[str] = None,
-    service: FacebookService = Depends(get_facebook_service),
+    ad: "AdRequest",
+    ad_account_id: str = Query(..., pattern=r"^(act_)?[0-9]+$"),
+    idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=1, max_length=160),
+    db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("campaigns:write"))
 ):
+    from app.delivery.queue import enqueue
+    from app.delivery.api import job_json, problem
+    account_id = ad_account_id if ad_account_id.startswith('act_') else 'act_' + ad_account_id
     try:
-        result = service.create_ad(ad, ad_account_id)
-        return dict(result)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return job_json(enqueue(db, current_user.id, idempotency_key, account_id, 'ad', ad.model_dump()))
+    except ValueError as error:
+        db.rollback()
+        problem(409, 'SUBMISSION_CONFLICT', str(error))
+
 
 @router.get("/ads")
 def read_ads(
@@ -317,6 +339,7 @@ def read_ads(
         ads = service.get_ads(adset_id)
         return [dict(a) for a in ads]
     except Exception as e:
+        capture_exception(e, "facebook.read_ads")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -349,6 +372,7 @@ def read_insights(
         )
         return rows
     except Exception as e:
+        capture_exception(e, "facebook.read_insights")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/campaigns/save")
@@ -365,8 +389,8 @@ def save_campaign_locally(
 
         # Handle daily_budget casting
         daily_budget = campaign_data.get('dailyBudget')
-        if daily_budget is not None:
-            daily_budget = int(float(daily_budget))
+        daily_budget_minor = money_to_minor(daily_budget) if daily_budget not in (None, '') else None
+        daily_budget = daily_budget_minor // 100 if daily_budget_minor is not None else None
 
         new_campaign = FacebookCampaign(
             id=campaign_data.get('id'),
@@ -374,6 +398,7 @@ def save_campaign_locally(
             objective=campaign_data.get('objective'),
             budget_type=campaign_data.get('budgetType', 'ABO'),
             daily_budget=daily_budget,
+            daily_budget_minor=daily_budget_minor,
             bid_strategy=campaign_data.get('bidStrategy'),
             status=campaign_data.get('status'),
             fb_campaign_id=campaign_data.get('fbCampaignId')
@@ -383,6 +408,7 @@ def save_campaign_locally(
         db.refresh(new_campaign)
         return {"message": "Campaign saved locally", "id": new_campaign.id}
     except Exception as e:
+        capture_exception(e, "facebook.save_campaign_locally")
         db.rollback()
         print(f"Error saving campaign locally: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -408,12 +434,12 @@ def save_adset_locally(
 
         # Handle numeric fields casting
         daily_budget = adset_data.get('dailyBudget')
-        if daily_budget is not None:
-            daily_budget = int(float(daily_budget))
+        daily_budget_minor = money_to_minor(daily_budget) if daily_budget not in (None, '') else None
+        daily_budget = daily_budget_minor // 100 if daily_budget_minor is not None else None
             
         bid_amount = adset_data.get('bidAmount')
-        if bid_amount is not None:
-            bid_amount = int(float(bid_amount))
+        bid_amount_minor = money_to_minor(bid_amount) if bid_amount not in (None, '') else None
+        bid_amount = bid_amount_minor // 100 if bid_amount_minor is not None else None
 
         new_adset = FacebookAdSet(
             id=adset_data.get('id'),
@@ -421,8 +447,10 @@ def save_adset_locally(
             name=adset_data.get('name'),
             optimization_goal=adset_data.get('optimizationGoal'),
             daily_budget=daily_budget,
+            daily_budget_minor=daily_budget_minor,
             bid_strategy=adset_data.get('bidStrategy'),
             bid_amount=bid_amount,
+            bid_amount_minor=bid_amount_minor,
             targeting=adset_data.get('targeting'),
             pixel_id=adset_data.get('pixelId'),
             conversion_event=adset_data.get('conversionEvent'),
@@ -434,6 +462,7 @@ def save_adset_locally(
         db.refresh(new_adset)
         return {"message": "AdSet saved locally", "id": new_adset.id}
     except Exception as e:
+        capture_exception(e, "facebook.save_adset_locally")
         db.rollback()
         print(f"Error saving adset locally: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -445,8 +474,19 @@ def save_ad_locally(
     current_user: User = Depends(require_permission("campaigns:write"))
 ):
     try:
-        # Check if adset exists locally, if not we might need to create it or handle error
-        # For now, assuming adset exists or we just save the ID
+        from sqlalchemy import text
+        from app.delivery.models import ManagedAd
+        fb_ad_id = ad_data.get('fbAdId')
+        identity = fb_ad_id or ad_data.get('id')
+        if not identity:
+            raise HTTPException(status_code=422, detail="An ad identity is required")
+        db.execute(text('SELECT pg_advisory_xact_lock(hashtextextended(:identity, 195558004))'), {'identity': identity})
+        managed = db.query(ManagedAd).filter(ManagedAd.fb_ad_id == fb_ad_id).first() if fb_ad_id else None
+        if managed and managed.owner_id != current_user.id and not current_user.has_role('admin'):
+            raise HTTPException(status_code=403, detail="Ad belongs to another buyer")
+        existing = db.query(FacebookAd).filter(FacebookAd.fb_ad_id == fb_ad_id).first() if fb_ad_id else db.get(FacebookAd, ad_data.get('id'))
+        if existing:
+            return {"message": "Ad already saved locally", "id": existing.id}
 
         new_ad = FacebookAd(
             id=ad_data.get('id'),
@@ -469,13 +509,21 @@ def save_ad_locally(
             fb_creative_id=ad_data.get('fbCreativeId')
         )
         db.add(new_ad)
+        db.flush()
+        if managed:
+            managed.local_ad_id = new_ad.id
         db.commit()
         db.refresh(new_ad)
         return {"message": "Ad saved locally", "id": new_ad.id}
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
+        capture_exception(e, "facebook.save_ad_locally")
         db.rollback()
         print(f"Error saving ad locally: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/upload-image")
 def upload_image(
@@ -491,6 +539,7 @@ def upload_image(
         image_hash = service.upload_image(image_url, ad_account_id)
         return {"image_hash": image_hash}
     except Exception as e:
+        capture_exception(e, "facebook.upload_image")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/upload-video")
@@ -530,6 +579,7 @@ def upload_video(
     except HTTPException:
         raise
     except Exception as e:
+        capture_exception(e, "facebook.upload_video")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/video-status/{video_id}")
@@ -548,6 +598,7 @@ def get_video_status(
     try:
         return service.get_video_status(video_id)
     except Exception as e:
+        capture_exception(e, "facebook.get_video_status")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/video-thumbnails/{video_id}")
@@ -565,6 +616,7 @@ def get_video_thumbnails(
         thumbnails = service.get_video_thumbnails(video_id)
         return {"thumbnails": thumbnails}
     except Exception as e:
+        capture_exception(e, "facebook.get_video_thumbnails")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/locations/search")
@@ -580,5 +632,23 @@ def search_locations(
         locations = service.search_locations(q, type, limit, ad_account_id)
         return [dict(loc) for loc in locations]
     except Exception as e:
+        capture_exception(e, "facebook.search_locations")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.get('/custom-audiences')
+def read_custom_audiences(ad_account_id: str, service: FacebookService = Depends(get_facebook_service), current_user: User = Depends(get_current_active_user)):
+    try:
+        return service.get_custom_audiences(ad_account_id)
+    except Exception as error:
+        capture_exception(error, "facebook.read_custom_audiences")
+        raise HTTPException(status_code=502, detail=str(error))
+
+
+@router.get('/instagram-accounts')
+def read_instagram_accounts(ad_account_id: str, service: FacebookService = Depends(get_facebook_service), current_user: User = Depends(get_current_active_user)):
+    try:
+        return service.get_instagram_accounts(ad_account_id)
+    except Exception as error:
+        capture_exception(error, "facebook.read_instagram_accounts")
+        raise HTTPException(status_code=502, detail=str(error))

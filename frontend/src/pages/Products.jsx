@@ -63,40 +63,40 @@ const Products = () => {
         <div className="max-w-6xl mx-auto">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                        <Package size={32} className="text-amber-600" />
+                    <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
+                        <Package size={32} className="text-brand-ink" />
                         Products
                     </h1>
-                    <p className="text-gray-600 mt-2">Manage your product catalog across all brands.</p>
+                    <p className="text-secondary mt-2">Manage your product catalog across all brands.</p>
                 </div>
-                <div className="flex items-center gap-4 w-full md:w-auto">
-                    <div className="relative flex-1 md:w-64">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
+                    <div className="relative w-full md:flex-1 md:w-64">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-faint" size={20} />
                         <input
                             type="text"
                             placeholder="Search products..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                            className="w-full pl-10 pr-4 py-2 border border-line-strong rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                         />
                     </div>
-                    <div className="flex bg-gray-100 p-1 rounded-lg shrink-0">
+                    <div className="flex bg-inset p-1 rounded-lg shrink-0">
                         <button
                             onClick={() => setViewMode('list')}
-                            className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-amber-600' : 'text-gray-500 hover:text-gray-700'}`}
+                            className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-panel shadow-sm text-brand-ink' : 'text-muted hover:text-secondary'}`}
                         >
                             <List size={20} />
                         </button>
                         <button
                             onClick={() => setViewMode('grid')}
-                            className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-amber-600' : 'text-gray-500 hover:text-gray-700'}`}
+                            className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-panel shadow-sm text-brand-ink' : 'text-muted hover:text-secondary'}`}
                         >
                             <LayoutGrid size={20} />
                         </button>
                     </div>
                     <button
                         onClick={() => { setEditingProduct(null); setIsFormOpen(true); }}
-                        className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors shrink-0 font-medium shadow-sm"
+                        className="flex items-center gap-2 px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand-hover transition-colors shrink-0 font-medium shadow-sm"
                     >
                         <Plus size={20} />
                         Add Product
@@ -105,15 +105,15 @@ const Products = () => {
             </div>
 
             {allProducts.length === 0 ? (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-                    <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Package className="text-amber-600" size={32} />
+                <div className="bg-panel rounded-xl shadow-sm border border-line p-12 text-center">
+                    <div className="w-16 h-16 bg-brand-soft rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Package className="text-brand-ink" size={32} />
                     </div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No products yet</h3>
-                    <p className="text-gray-500 mb-6">Add products to your brands to start creating ads.</p>
+                    <h3 className="text-lg font-medium text-foreground mb-2">No products yet</h3>
+                    <p className="text-muted mb-6">Add products to your brands to start creating ads.</p>
                     <button
                         onClick={() => setIsFormOpen(true)}
-                        className="text-amber-600 font-medium hover:underline"
+                        className="text-brand-ink font-medium hover:underline"
                     >
                         Add a Product
                     </button>
@@ -126,10 +126,10 @@ const Products = () => {
                                 <div
                                     key={product.id}
                                     onClick={() => handleEdit(product)}
-                                    className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden group hover:shadow-md transition-shadow cursor-pointer"
+                                    className="bg-panel rounded-xl shadow-sm border border-line overflow-hidden group hover:shadow-md transition-shadow cursor-pointer"
                                 >
-                                    <div className="h-24 bg-gray-50 relative flex items-center justify-center">
-                                        <Package className="text-gray-300" size={48} />
+                                    <div className="h-24 bg-subtle relative flex items-center justify-center">
+                                        <Package className="text-faint" size={48} />
                                         <div className="absolute top-4 right-4">
                                             <span
                                                 className="text-xs font-medium px-2 py-1 rounded-full text-white"
@@ -141,51 +141,51 @@ const Products = () => {
                                     </div>
                                     <div className="p-6">
                                         <div className="flex justify-between items-start mb-2">
-                                            <h3 className="text-lg font-bold text-gray-900">{product.name}</h3>
+                                            <h3 className="text-lg font-bold text-foreground">{product.name}</h3>
                                             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); handleEdit(product); }}
-                                                    className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg"
+                                                    className="p-1.5 text-muted hover:bg-inset rounded-lg"
                                                 >
                                                     <Edit2 size={16} />
                                                 </button>
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); handleDelete(product.brandId, product.id); }}
-                                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
+                                                    className="p-1.5 text-danger hover:bg-danger-soft rounded-lg"
                                                 >
                                                     <Trash2 size={16} />
                                                 </button>
                                             </div>
                                         </div>
-                                        <p className="text-sm text-gray-500 line-clamp-2">{product.description || 'No description'}</p>
+                                        <p className="text-sm text-muted line-clamp-2">{product.description || 'No description'}</p>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="bg-panel rounded-xl shadow-sm border border-line overflow-hidden">
                             <table className="w-full text-left">
-                                <thead className="bg-gray-50 border-b border-gray-200">
+                                <thead className="bg-subtle border-b border-line">
                                     <tr>
-                                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Product</th>
-                                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Brand</th>
-                                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Description</th>
-                                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                                        <th className="px-6 py-4 text-xs font-semibold text-muted uppercase tracking-wider">Product</th>
+                                        <th className="px-6 py-4 text-xs font-semibold text-muted uppercase tracking-wider">Brand</th>
+                                        <th className="px-6 py-4 text-xs font-semibold text-muted uppercase tracking-wider">Description</th>
+                                        <th className="px-6 py-4 text-xs font-semibold text-muted uppercase tracking-wider text-right">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-200">
+                                <tbody className="divide-y divide-line">
                                     {filteredProducts.map(product => (
                                         <tr
                                             key={product.id}
                                             onClick={() => handleEdit(product)}
-                                            className="hover:bg-amber-50 transition-colors cursor-pointer"
+                                            className="hover:bg-brand-soft transition-colors cursor-pointer"
                                         >
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500">
+                                                    <div className="w-8 h-8 bg-inset rounded-lg flex items-center justify-center text-muted">
                                                         <Package size={16} />
                                                     </div>
-                                                    <span className="font-medium text-gray-900">{product.name}</span>
+                                                    <span className="font-medium text-foreground">{product.name}</span>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
@@ -196,21 +196,21 @@ const Products = () => {
                                                     {product.brandName}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
-                                                {product.description || <span className="text-gray-400 italic">No description</span>}
+                                            <td className="px-6 py-4 text-sm text-secondary max-w-xs truncate">
+                                                {product.description || <span className="text-faint italic">No description</span>}
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex justify-end gap-2">
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleEdit(product); }}
-                                                        className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                                                        className="p-1.5 text-muted hover:bg-inset rounded-lg transition-colors"
                                                         title="Edit"
                                                     >
                                                         <Edit2 size={16} />
                                                     </button>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleDelete(product.brandId, product.id); }}
-                                                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                        className="p-1.5 text-danger hover:bg-danger-soft rounded-lg transition-colors"
                                                         title="Delete"
                                                     >
                                                         <Trash2 size={16} />

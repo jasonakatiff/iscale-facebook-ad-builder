@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Brand, Product, GeneratedAd, WinningAd, FacebookCampaign, User
 from app.core.deps import get_current_active_user
+from datetime import timezone
 
 router = APIRouter()
 
@@ -25,6 +26,10 @@ def get_dashboard_stats(
         "products_count": products_count,
         "generated_ads_count": generated_ads_count,
         "templates_count": templates_count,
-        "campaigns_count": campaigns_count
+        "campaigns_count": campaigns_count,
+        "recent_activity": [
+            {"id": campaign.id, "name": campaign.name, "type": "campaign", "status": campaign.status,
+             "created_at": campaign.created_at.astimezone(timezone.utc).isoformat()}
+            for campaign in db.query(FacebookCampaign).order_by(FacebookCampaign.created_at.desc(), FacebookCampaign.id).limit(10).all()
+        ],
     }
-

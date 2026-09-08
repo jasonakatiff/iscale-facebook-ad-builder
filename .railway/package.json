@@ -1,0 +1,1 @@
+{"name":"breadwinner-installation-infrastructure","private":true,"type":"module","scripts":{"check":"tsc --noEmit && tsx verify.ts"},"devDependencies":{"railway":"3.11.0","typescript":"5.9.3","tsx":"4.20.6","@types/node":"22.18.6"}}

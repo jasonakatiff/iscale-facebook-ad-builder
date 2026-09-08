@@ -1,6 +1,6 @@
 """Run from backend with the supplied test env; creates/drops only local codex_ DBs.
 
-Uses origin/main models to reproduce the owner's stamped production schema.
+Uses pre-PR3 public models to reproduce the owner's stamped production schema.
 This standalone acceptance check is separate from pytest because CI checkouts
 need not contain origin/main and ordinary tests need no CREATEDB privilege.
 """
@@ -12,13 +12,23 @@ import uuid
 
 import psycopg2
 from psycopg2 import sql
+from sqlalchemy.engine import make_url
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 
 BACKEND = Path(__file__).resolve().parents[2]
-HEAD = "a1d2e3f4b5c6"
+HEAD = ScriptDirectory.from_config(Config(str(BACKEND / "alembic.ini"))).get_current_head()
+TEST_URL = make_url(os.environ["DATABASE_URL"])
+if TEST_URL.host not in ("localhost", "127.0.0.1") or not TEST_URL.database.startswith("test_"):
+    raise RuntimeError("Migration verification requires a localhost test database URL.")
+
+
+def database_url(name):
+    return TEST_URL.set(database=name).render_as_string(hide_password=False)
 
 
 def run(database, code):
-    env = dict(os.environ, DATABASE_URL=f"postgresql://localhost:5432/{database}", PYTHONDONTWRITEBYTECODE="1")
+    env = dict(os.environ, DATABASE_URL=database_url(database), PYTHONDONTWRITEBYTECODE="1")
     result = subprocess.run([sys.executable, "-c", code], cwd=BACKEND, env=env, text=True, capture_output=True)
     if result.returncode:
         raise RuntimeError(result.stdout + result.stderr)
@@ -28,7 +38,7 @@ def run(database, code):
 def main():
     suffix = uuid.uuid4().hex[:10]
     empty_db, prod_db = f"codex_pr3_empty_{suffix}", f"codex_pr3_prod_{suffix}"
-    admin = psycopg2.connect("postgresql://localhost:5432/postgres")
+    admin = psycopg2.connect(database_url("postgres"))
     admin.autocommit = True
     created = []
     try:
@@ -53,7 +63,7 @@ from app.database import Base, engine, SessionLocal
 from app.core.security import get_password_hash
 upstream = types.ModuleType("test_upstream_models")
 sys.modules[upstream.__name__] = upstream
-exec(subprocess.check_output(["git", "show", "origin/main:backend/app/models.py"], text=True), upstream.__dict__)
+exec(subprocess.check_output(["git", "show", "8d9db59:backend/app/models.py"], text=True), upstream.__dict__)
 Base.metadata.create_all(engine)
 with SessionLocal() as db:
     user = upstream.User(id="test-migration-user", email="test-migration@example.com", name="test-migration", hashed_password=get_password_hash("test-password"), is_active=True)
@@ -72,7 +82,7 @@ config = Config("alembic.ini")
 command.stamp(config, "add_page_fields_001")
 command.upgrade(config, "head")
 inspector = inspect(engine)
-required = {{"api_keys", "google_ads_connections", "meta_ads_connections", "tiktok_ads_connections"}}
+required = {{"api_keys", "google_ads_connections", "meta_ads_connections", "tiktok_ads_connections", "campaign_presets", "campaign_preferences"}}
 assert required <= set(inspector.get_table_names())
 columns = {{c["name"]: c for c in inspector.get_columns("refresh_tokens")}}
 assert columns["token_hash"]["nullable"] and columns["token"]["nullable"]
@@ -98,11 +108,12 @@ for model in (ApiKey, GoogleAdsConnection):
 with engine.connect() as conn:
     assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == {HEAD!r}
     assert conn.execute(text("SELECT token FROM refresh_tokens WHERE id='test-legacy-row'")).scalar_one() == "test-legacy-refresh"
-# Re-run every additive migration over already-created tables/columns.
-command.stamp(config, "add_page_fields_001")
+# Verify repeated normal upgrades and the new feedback columns.
 command.upgrade(config, "head")
-print("(b) PASS: origin/main create_all + stamp add_page_fields_001 + upgrade head=" + {HEAD!r})
-print("    api_keys, google_ads_connections, meta_ads_connections, tiktok_ads_connections present; model schemas match; token/token_hash nullable; unique hash index; additive upgrades idempotent")
+for table, field in [("facebook_campaigns", "daily_budget_minor"), ("facebook_adsets", "daily_budget_minor"), ("facebook_adsets", "bid_amount_minor")]:
+    assert field in {{column["name"] for column in inspector.get_columns(table)}}
+print("(b) PASS: pre-PR3 create_all + stamp add_page_fields_001 + upgrade head=" + {HEAD!r})
+print("    api_keys, google_ads_connections, meta_ads_connections, tiktok_ads_connections present; model schemas match; token/token_hash nullable; unique hash index; repeated upgrade head succeeds")
 '''))
         print(run(prod_db, '''
 from fastapi.testclient import TestClient

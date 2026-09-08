@@ -1,48 +1,24 @@
-import React from 'react';
-import { CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, Info, X } from 'lucide-react';
 
-const Toast = ({ id, type = 'info', message, onClose }) => {
-    const config = {
-        success: {
-            bgColor: 'bg-green-500',
-            icon: CheckCircle,
-            iconColor: 'text-white'
-        },
-        error: {
-            bgColor: 'bg-red-500',
-            icon: XCircle,
-            iconColor: 'text-white'
-        },
-        warning: {
-            bgColor: 'bg-amber-500',
-            icon: AlertTriangle,
-            iconColor: 'text-white'
-        },
-        info: {
-            bgColor: 'bg-blue-500',
-            icon: Info,
-            iconColor: 'text-white'
-        }
-    };
-
-    const { bgColor, icon: Icon, iconColor } = config[type] || config.info;
-
+const icons = { success: CheckCircle2, error: XCircle, warning: AlertTriangle, info: Info };
+export default function Toast({ id, type = 'info', message, onClose }) {
+    const Icon = icons[type] || Info;
     return (
         <div
-            className={`${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-start gap-3 max-w-sm animate-slide-in`}
-            role="alert"
+            className="studio-toast animate-slide-in"
+            data-type={type}
+            role={type === 'error' ? 'alert' : 'status'}
         >
-            <Icon className={`${iconColor} flex-shrink-0 mt-0.5`} size={20} />
-            <p className="flex-1 text-sm font-medium">{message}</p>
+            <Icon className="shrink-0 mt-0.5" size={17} />
+            <p className="flex-1 min-w-0 break-words leading-relaxed">{message}</p>
             <button
+                type="button"
                 onClick={() => onClose(id)}
-                className="flex-shrink-0 hover:opacity-80 transition-opacity"
-                aria-label="Close"
+                className="shrink-0 text-muted hover:text-foreground"
+                aria-label="Close notification"
             >
-                <X size={18} />
+                <X size={15} />
             </button>
         </div>
     );
-};
-
-export default Toast;
+}

@@ -1,269 +1,434 @@
-import React, { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, BarChart3, Package, Users, Video, Wand2, Settings, LogOut, Image, ShoppingBag, Target, ChevronLeft, ChevronRight, FileImage, Search, ChevronDown, UserCog, TrendingUp, Music2, Menu, X } from 'lucide-react';
+import {
+    BarChart3,
+    Wand2,
+    Settings,
+    Link2,
+    LogOut,
+    PanelLeftClose,
+    PanelLeftOpen,
+    Search,
+    ChevronDown,
+    ChevronRight,
+    UserCog,
+    Menu,
+    X,
+    BookOpen,
+    KeyRound,
+    Palette,
+    Puzzle,
+    GitBranch,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { APP_NAME, APP_LOGO, APP_TAGLINE } from '../lib/branding';
+import { ThemeSwitch } from './ThemeSwitch';
+import { BrandMark } from './BrandMark';
+import { PoweredBy } from './PoweredBy';
+import { APP_NAME } from '../lib/branding';
+import { TelemetryFeedback } from './TelemetryFeedback';
 
-export default function Layout() {
-    const location = useLocation();
-    const navigate = useNavigate();
-    const { user, logout, hasRole } = useAuth();
-    const { showSuccess } = useToast();
-    const [expandedMenus, setExpandedMenus] = useState({ Brands: false, Research: false });
-    const [isCollapsed, setIsCollapsed] = useState(false);
-    // Mobile off-canvas nav. md+ always shows the desktop sidebar; the
-    // mobile drawer shares the exact same markup (className toggles only).
-    const [mobileOpen, setMobileOpen] = useState(false);
-
-    const [previousPath, setPreviousPath] = useState(location.pathname);
-    if (previousPath !== location.pathname) {
-        setPreviousPath(location.pathname);
-        setMobileOpen(false);
+const sections = [
+    {
+        label: 'Workspace',
+        items: [
+            {
+                icon: Search,
+                label: 'Research',
+                path: '/research',
+                children: [
+                    {
+                        label: 'Scrape Brand Ads',
+                        path: '/research/brand-scrapes',
+                    },
+                    { label: 'Research Settings', path: '/research/settings' },
+                ],
+            },
+            {
+                icon: Wand2,
+                label: 'Creative Building',
+                path: '/build-creatives',
+                children: [
+                    { label: 'Image Ads', path: '/image-ads' },
+                    { label: 'Video Ads', path: '/video-ads' },
+                    { label: 'Ad Remix', path: '/ad-remix' },
+                    { label: 'Winning Ads', path: '/winning-ads' },
+                    { label: 'Generated Ads', path: '/generated-ads' },
+                    { label: 'Brands', path: '/brands' },
+                    { label: 'Products', path: '/products' },
+                    { label: 'Customer Profiles', path: '/profiles' },
+                ],
+            },
+            {
+                icon: GitBranch,
+                label: 'Ad Deployment',
+                path: '/facebook-campaigns',
+                children: [
+                    {
+                        label: 'Facebook Campaigns',
+                        path: '/facebook-campaigns',
+                    },
+                    { label: 'Posting queue', path: '/posting-queue' },
+                    { label: 'Google Ads', path: '/google-ads' },
+                    { label: 'TikTok Ads', path: '/tiktok-ads' },
+                ],
+            },
+            {
+                icon: BarChart3,
+                label: 'Performance Reports',
+                path: '/overview',
+                children: [
+                    { label: 'Overview', path: '/overview' },
+                    { label: 'Dashboard', path: '/' },
+                    { label: 'Reporting', path: '/reporting' },
+                ],
+            },
+        ],
+    },
+];
+const routeLabels = {
+    '/image-ads': 'Image Ads',
+    '/video-ads': 'Video Ads',
+    '/ad-remix': 'Ad Remix',
+    '/reporting': 'Reporting',
+    '/settings': 'Settings',
+    '/connections': 'Connections',
+    '/settings/leadrouter': 'LeadRouter',
+    '/settings/api-keys': 'API Keys',
+    '/help': 'Help & API Docs',
+    '/telemetry': 'Telemetry',
+    '/themes': 'Themes',
+    '/plugins': 'Plugins',
+    '/users': 'User Management',
+};
+for (const section of sections)
+    for (const item of section.items) {
+        routeLabels[item.path] = item.label;
+        for (const child of item.children || [])
+            routeLabels[child.path] = child.label;
     }
 
+export default function Layout() {
+    const { pathname } = useLocation();
+    const navigate = useNavigate();
+    const { user, logout, hasRole } = useAuth();
+    const { showSuccess, showError } = useToast();
+    const [expandedMenus, setExpandedMenus] = useState({});
+    const [isCollapsed, setIsCollapsed] = useState(false);
+    const [mobileOpen, setMobileOpen] = useState(false);
+    const sidebar = useRef(null);
+    const mobileTrigger = useRef(null);
+    const collapsed = isCollapsed && !mobileOpen;
+
+    useEffect(() => {
+        if (!mobileOpen) return;
+        const trigger = mobileTrigger.current;
+        sidebar.current?.querySelector('button, a')?.focus();
+        const viewport = window.matchMedia('(min-width: 768px)');
+        const resize = (event) => {
+            if (event.matches) setMobileOpen(false);
+        };
+        viewport.addEventListener('change', resize);
+        return () => {
+            viewport.removeEventListener('change', resize);
+            requestAnimationFrame(() => trigger?.focus());
+        };
+    }, [mobileOpen]);
+
     const handleLogout = async () => {
-        await logout();
-        showSuccess('Logged out successfully');
-        navigate('/login');
+        try {
+            await logout();
+            showSuccess('Logged out successfully');
+            navigate('/login');
+        } catch (error) {
+            showError(error.message || 'Unable to log out.');
+        }
     };
-
-    const menuItems = [
-        { icon: LayoutDashboard, label: 'Overview', path: '/overview' },
-        { icon: BarChart3, label: 'Dashboard', path: '/' },
-        {
-            icon: Search,
-            label: 'Research',
-            subItems: [
-                { label: 'Research', path: '/research' },
-                { label: 'Scrape Brand Ads', path: '/research/brand-scrapes' },
-                { label: 'Settings', path: '/research/settings' }
-            ]
-        },
-        { icon: Wand2, label: 'Build Creatives', path: '/build-creatives' },
-        {
-            icon: ShoppingBag,
-            label: 'Brands',
-            subItems: [
-                { label: 'Brands', path: '/brands' },
-                { label: 'Products', path: '/products' },
-                { label: 'Customer Profiles', path: '/profiles' }
-            ]
-        },
-        { icon: Image, label: 'Winning Ads', path: '/winning-ads' },
-        { icon: FileImage, label: 'Generated Ads', path: '/generated-ads' },
-        { icon: Target, label: 'Facebook Campaigns', path: '/facebook-campaigns' },
-        { icon: TrendingUp, label: 'Google Ads', path: '/google-ads' },
-        { icon: Music2, label: 'TikTok Ads', path: '/tiktok-ads' },
-    ];
-
-    const toggleMenu = (label) => {
-        setExpandedMenus(prev => ({
-            ...prev,
-            [label]: !prev[label]
-        }));
+    const drawerKeys = (event) => {
+        if (!mobileOpen) return;
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            setMobileOpen(false);
+        }
+        if (event.key !== 'Tab') return;
+        const focusable = [
+            ...sidebar.current.querySelectorAll('a, button'),
+        ].filter(
+            (element) => element.getClientRects().length && !element.disabled,
+        );
+        const first = focusable[0],
+            last = focusable.at(-1);
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first?.focus();
+        }
     };
+    const navLink = (item, child = false) => {
+        const Icon = item.icon;
+        const active =
+            pathname === item.path ||
+            (!child &&
+                item.children?.some((entry) => entry.path === pathname)) ||
+            (!child &&
+                item.path === '/build-creatives' &&
+                ['/image-ads', '/video-ads', '/ad-remix'].includes(pathname));
+        return (
+            <Link
+                to={item.path}
+                onClick={() => {
+                    setMobileOpen(false);
+                    if (item.children)
+                        setExpandedMenus((previous) => ({
+                            ...previous,
+                            [item.label]: true,
+                        }));
+                }}
+                aria-current={active ? 'page' : undefined}
+                aria-label={item.label}
+                title={collapsed ? item.label : undefined}
+                className={`nav-link ${active ? 'is-active' : ''}`}
+            >
+                {Icon && (
+                    <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
+                )}
+                {!collapsed && <span>{item.label}</span>}
+            </Link>
+        );
+    };
+    const initials = (user?.name || user?.email || 'BW')
+        .split(/[\s@]/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0])
+        .join('')
+        .toUpperCase();
 
     return (
-        <div className="flex h-screen bg-[#FFFAF0]">
-            {/* Mobile top bar */}
-            <header className="md:hidden fixed top-0 inset-x-0 z-40 bg-white border-b border-amber-200 flex items-center justify-between px-4 h-14 shadow-sm">
-                <button
-                    onClick={() => setMobileOpen(true)}
-                    aria-label="Open navigation menu"
-                    className="p-2 -ml-2 rounded-lg text-amber-800 hover:bg-amber-50"
-                >
-                    <Menu size={22} />
-                </button>
-                <div className="flex items-center gap-2 min-w-0">
-                    <img src={APP_LOGO} alt={APP_NAME} className="w-7 h-7 rounded-lg object-cover flex-shrink-0" />
-                    <span className="font-bold text-amber-900 truncate text-sm">{APP_NAME}</span>
-                </div>
-                <span className="w-8" aria-hidden="true" />
-            </header>
-
-            {/* Mobile drawer backdrop */}
+        <div className="studio-shell">
+            <a href="#workspace-content" className="studio-skip-link">
+                Skip to content
+            </a>
             {mobileOpen && (
-                <div
-                    className="md:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+                <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-label="Close navigation backdrop"
                     onClick={() => setMobileOpen(false)}
-                    aria-hidden="true"
+                    className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden"
                 />
             )}
-
-            {/* Sidebar — desktop: static; mobile: off-canvas drawer */}
-            <aside className={`${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-amber-200 flex-col shadow-sm transition-all duration-300 ease-in-out relative
-                fixed md:static inset-y-0 left-0 z-50 -translate-x-full md:translate-x-0
-                ${mobileOpen ? 'translate-x-0 flex' : 'md:flex'}`}>
-                {/* Toggle Button (desktop collapse / mobile close) */}
-                <button
-                    onClick={() => (window.matchMedia('(min-width: 768px)').matches ? setIsCollapsed(!isCollapsed) : setMobileOpen(false))}
-                    className={`absolute -right-3 top-9 bg-white border border-amber-200 rounded-full p-1 shadow-sm hover:bg-amber-50 text-amber-600 z-10 hidden md:block`}
-                    title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                >
-                    {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-                </button>
-                <button
-                    onClick={() => setMobileOpen(false)}
-                    className="absolute right-3 top-4 p-1 rounded-lg text-gray-400 hover:text-amber-700 hover:bg-amber-50 md:hidden"
-                    aria-label="Close navigation menu"
-                >
-                    <X size={20} />
-                </button>
-
-                <div className={`p-6 border-b border-amber-100 ${isCollapsed ? 'px-4' : ''}`}>
-                    <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
-                        <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center overflow-hidden border border-amber-200 flex-shrink-0">
-                            <img src={APP_LOGO} alt={APP_NAME} className="w-full h-full object-cover" />
-                        </div>
-                        {!isCollapsed && (
-                            <div className="overflow-hidden whitespace-nowrap">
-                                <h1 className="text-xl font-bold text-amber-900">{APP_NAME}</h1>
-                                <p className="text-xs text-amber-600">{APP_TAGLINE}</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                <nav className="flex-1 p-4 space-y-1 overflow-y-auto overflow-x-hidden">
-                    {menuItems.map((item) => {
-                        const Icon = item.icon;
-
-                        // Handle items with submenus
-                        if (item.subItems) {
-                            const isExpanded = expandedMenus[item.label];
-                            const isActive = item.subItems.some(sub => location.pathname === sub.path);
-
-                            return (
-                                <div key={item.label} className="space-y-1">
-                                    <button
-                                        onClick={() => {
-                                            if (!isCollapsed) toggleMenu(item.label);
-                                            // Navigate to first subitem
-                                            if (item.subItems?.[0]?.path) {
-                                                navigate(item.subItems[0].path);
-                                            }
-                                        }}
-                                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive
-                                            ? 'bg-amber-50 text-amber-900 font-medium'
-                                            : 'text-gray-600 hover:bg-amber-50 hover:text-amber-800'
-                                            } ${isCollapsed ? 'justify-center px-2' : ''}`}
-                                        title={isCollapsed ? item.label : ''}
-                                    >
-                                        <Icon size={20} className={`transition-colors flex-shrink-0 ${isActive ? 'text-amber-600' : 'text-gray-400 group-hover:text-amber-600'}`} />
-                                        {!isCollapsed && (
-                                            <>
-                                                <span className="flex-1 text-left whitespace-nowrap overflow-hidden">{item.label}</span>
-                                                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                                            </>
-                                        )}
-                                    </button>
-
-                                    {/* Submenu Items */}
-                                    {!isCollapsed && isExpanded && (
-                                        <div className="pl-11 space-y-1">
-                                            {item.subItems.map(subItem => {
-                                                const isSubActive = location.pathname === subItem.path;
-                                                return (
-                                                    <Link
-                                                        key={subItem.path}
-                                                        to={subItem.path}
-                                                        className={`block px-3 py-2 rounded-lg text-sm transition-colors ${isSubActive
-                                                            ? 'text-amber-700 bg-amber-50 font-medium'
-                                                            : 'text-gray-500 hover:text-amber-700 hover:bg-amber-50'
-                                                            }`}
-                                                    >
-                                                        {subItem.label}
-                                                    </Link>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        }
-
-                        // Regular menu items
-                        const isActive = location.pathname === item.path;
-                        return (
-                            <Link
-                                key={item.path}
-                                to={item.path}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive
-                                    ? 'bg-amber-100 text-amber-900 font-medium shadow-sm'
-                                    : 'text-gray-600 hover:bg-amber-50 hover:text-amber-800'
-                                    } ${isCollapsed ? 'justify-center px-2' : ''}`}
-                                title={isCollapsed ? item.label : ''}
-                            >
-                                <Icon size={20} className={`transition-colors flex-shrink-0 ${isActive ? 'text-amber-600' : 'text-gray-400 group-hover:text-amber-600'}`} />
-                                {!isCollapsed && <span className="whitespace-nowrap overflow-hidden">{item.label}</span>}
-                            </Link>
-                        );
-                    })}
-                </nav>
-
-                <div className="p-4 border-t border-amber-100">
-                    {/* User Management - Admin Only */}
-                    {hasRole('admin') && (
-                        <Link
-                            to="/users"
-                            className={`flex items-center gap-3 px-4 py-3 w-full rounded-xl transition-colors group ${
-                                location.pathname === '/users'
-                                    ? 'bg-amber-100 text-amber-900 font-medium shadow-sm'
-                                    : 'text-gray-600 hover:bg-amber-50 hover:text-amber-800'
-                            } ${isCollapsed ? 'justify-center px-2' : ''}`}
-                            title={isCollapsed ? 'User Management' : ''}
-                        >
-                            <UserCog size={20} className={`flex-shrink-0 ${
-                                location.pathname === '/users'
-                                    ? 'text-amber-600'
-                                    : 'text-gray-400 group-hover:text-amber-600'
-                            }`} />
-                            {!isCollapsed && <span className="whitespace-nowrap overflow-hidden">User Management</span>}
-                        </Link>
-                    )}
+            <aside
+                ref={sidebar}
+                onKeyDown={drawerKeys}
+                className={`studio-sidebar ${collapsed ? 'is-collapsed' : ''} ${mobileOpen ? 'is-mobile-open' : ''}`}
+                role={mobileOpen ? 'dialog' : undefined}
+                aria-modal={mobileOpen || undefined}
+                aria-label="Workspace navigation"
+            >
+                <div className="sidebar-brand justify-between">
                     <Link
-                        to="/settings"
-                        className={`flex items-center gap-3 px-4 py-3 w-full rounded-xl transition-colors group ${
-                            location.pathname === '/settings'
-                                ? 'bg-amber-100 text-amber-900 font-medium shadow-sm'
-                                : 'text-gray-600 hover:bg-amber-50 hover:text-amber-800'
-                        } ${isCollapsed ? 'justify-center px-2' : ''}`}
-                        title={isCollapsed ? 'Settings' : ''}
+                        to="/"
+                        onClick={() => setMobileOpen(false)}
+                        aria-label={`${APP_NAME} home`}
                     >
-                        <Settings size={20} className={`flex-shrink-0 ${
-                            location.pathname === '/settings'
-                                ? 'text-amber-600'
-                                : 'text-gray-400 group-hover:text-amber-600'
-                        }`} />
-                        {!isCollapsed && <span className="whitespace-nowrap overflow-hidden">Settings</span>}
+                        <BrandMark compact={collapsed} />
                     </Link>
-
-                    {/* User Info */}
-                    {!isCollapsed && user && (
-                        <div className="px-4 py-3 mt-2 bg-amber-50 rounded-xl">
-                            <div className="text-sm font-medium text-amber-900 truncate">
-                                {user.name || user.email}
-                            </div>
-                            <div className="text-xs text-amber-600 truncate">{user.email}</div>
-                        </div>
-                    )}
-
                     <button
-                        onClick={handleLogout}
-                        className={`flex items-center gap-3 px-4 py-3 w-full text-red-600 hover:bg-red-50 rounded-xl transition-colors mt-1 ${isCollapsed ? 'justify-center px-2' : ''}`}
-                        title={isCollapsed ? 'Logout' : ''}
+                        type="button"
+                        className="icon-button md:hidden"
+                        onClick={() => setMobileOpen(false)}
+                        aria-label="Close navigation"
                     >
-                        <LogOut size={20} className="flex-shrink-0" />
-                        {!isCollapsed && <span className="whitespace-nowrap overflow-hidden">Logout</span>}
+                        <X size={18} />
                     </button>
                 </div>
+                <nav className="sidebar-nav" aria-label="Main navigation">
+                    {sections.map((section) => (
+                        <div key={section.label} className="nav-section">
+                            <p className="nav-label">{section.label}</p>
+                            {section.items.map((item) => {
+                                const activeChild = item.children?.some(
+                                    (child) => child.path === pathname,
+                                );
+                                const expanded =
+                                    expandedMenus[item.label] ?? activeChild;
+                                return (
+                                    <div key={item.path}>
+                                        <div className="nav-group-row">
+                                            {navLink(item)}
+                                            {item.children && !collapsed && (
+                                                <button
+                                                    type="button"
+                                                    className="nav-expand"
+                                                    aria-label={`${expanded ? 'Collapse' : 'Expand'} ${item.label}`}
+                                                    aria-expanded={!!expanded}
+                                                    onClick={() =>
+                                                        setExpandedMenus(
+                                                            (previous) => ({
+                                                                ...previous,
+                                                                [item.label]:
+                                                                    !expanded,
+                                                            }),
+                                                        )
+                                                    }
+                                                >
+                                                    {expanded ? (
+                                                        <ChevronDown
+                                                            size={14}
+                                                        />
+                                                    ) : (
+                                                        <ChevronRight
+                                                            size={14}
+                                                        />
+                                                    )}
+                                                </button>
+                                            )}
+                                        </div>
+                                        {item.children &&
+                                            !collapsed &&
+                                            expanded && (
+                                                <div className="nav-submenu">
+                                                    {item.children.map(
+                                                        (child) => (
+                                                            <div
+                                                                key={child.path}
+                                                            >
+                                                                {navLink(
+                                                                    child,
+                                                                    true,
+                                                                )}
+                                                            </div>
+                                                        ),
+                                                    )}
+                                                </div>
+                                            )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ))}
+                </nav>
+                <div className="sidebar-footer">
+                    {navLink({ icon: Puzzle, label: 'Plugins', path: '/plugins' })}
+                    {hasRole('admin') && navLink({ icon: BarChart3, label: 'Telemetry', path: '/telemetry' })}
+                    {hasRole('admin') &&
+                        navLink({
+                            icon: UserCog,
+                            label: 'User Management',
+                            path: '/users',
+                        })}
+                    {navLink({
+                        icon: Settings,
+                        label: 'Settings',
+                        path: '/settings',
+                    })}
+                    {navLink({
+                        icon: Link2,
+                        label: 'Connections',
+                        path: '/connections',
+                    })}
+                    {navLink({
+                        icon: KeyRound,
+                        label: 'API Keys',
+                        path: '/settings/api-keys',
+                    })}
+                    {navLink({
+                        icon: Palette,
+                        label: 'Themes',
+                        path: '/themes',
+                    })}
+                    {navLink({
+                        icon: BookOpen,
+                        label: 'Help & API Docs',
+                        path: '/help',
+                    })}
+                    <div className="user-summary">
+                        <span className="user-avatar" aria-hidden="true">
+                            {initials}
+                        </span>
+                        {!collapsed && (
+                            <>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-xs font-semibold text-foreground truncate">
+                                        {user?.name || 'Your workspace'}
+                                    </p>
+                                    <p className="text-[10px] text-muted truncate mt-1">
+                                        {user?.email}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="icon-button"
+                                    aria-label="Logout"
+                                    title="Logout"
+                                    onClick={handleLogout}
+                                >
+                                    <LogOut size={16} />
+                                </button>
+                            </>
+                        )}
+                    </div>
+                    {collapsed && (
+                        <button
+                            type="button"
+                            className="nav-link mt-2"
+                            aria-label="Logout"
+                            title="Logout"
+                            onClick={handleLogout}
+                        >
+                            <LogOut size={17} />
+                        </button>
+                    )}
+                </div>
             </aside>
-
-            {/* Main Content */}
-            <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
-                <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
+            <main className="studio-main" inert={mobileOpen || undefined}>
+                <header className="workspace-bar">
+                    <div className="workspace-breadcrumb">
+                        <button
+                            type="button"
+                            ref={mobileTrigger}
+                            className="icon-button md:hidden"
+                            aria-label="Open navigation"
+                            aria-expanded={mobileOpen}
+                            onClick={() => setMobileOpen(true)}
+                        >
+                            <Menu size={19} />
+                        </button>
+                        <button
+                            type="button"
+                            className="icon-button hidden md:inline-flex"
+                            aria-label={
+                                isCollapsed
+                                    ? 'Expand navigation'
+                                    : 'Collapse navigation'
+                            }
+                            onClick={() => setIsCollapsed((value) => !value)}
+                        >
+                            {isCollapsed ? (
+                                <PanelLeftOpen size={18} />
+                            ) : (
+                                <PanelLeftClose size={18} />
+                            )}
+                        </button>
+                        <span>Workspace</span>
+                        <span aria-hidden="true">/</span>
+                        <strong>{routeLabels[pathname] || APP_NAME}</strong>
+                    </div>
+                    <ThemeSwitch />
+                </header>
+                <div
+                    id="workspace-content"
+                    tabIndex={-1}
+                    className="workspace-content"
+                >
                     <Outlet />
+                    <TelemetryFeedback />
+                    <footer className="workspace-footer">
+                        <PoweredBy />
+                    </footer>
                 </div>
             </main>
         </div>

@@ -1,0 +1,12 @@
+"""Bounds for the initial Meta metadata synchronization worker."""
+
+SYNC_ROLES = frozenset({"buyer", "publisher", "admin"})
+SYNC_LEASE_SECONDS = 60
+SYNC_MAX_ATTEMPTS = 3
+SYNC_PAGE_SIZE = 100
+SYNC_MAX_PAGES = 100
+SYNC_MAX_ITEMS = 10000
+SYNC_FRESH_SECONDS = 3600
+SYNC_REQUEST_TIMEOUT_SECONDS = 30
+SYNC_POLL_SECONDS = 5
+SYNC_FIELDS = ("id", "name", "status", "effective_status", "objective")

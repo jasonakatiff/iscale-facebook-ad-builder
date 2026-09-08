@@ -1,3 +1,5 @@
+from app.telemetry.runtime import redact_values
+from app.telemetry.runtime import capture_exception
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -8,7 +10,7 @@ from fastapi.responses import StreamingResponse
 import io
 import csv
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Dict, Any
 
 class ImageGenerationRequest(BaseModel):
@@ -16,8 +18,8 @@ class ImageGenerationRequest(BaseModel):
     brand: Optional[Dict[str, Any]] = None
     product: Optional[Dict[str, Any]] = None
     copy: Optional[Dict[str, Any]] = None
-    count: int = 1
-    imageSizes: List[Dict[str, Any]] = []
+    count: int = Field(default=1, ge=1, le=10)
+    imageSizes: List[Dict[str, Any]] = Field(min_length=1, max_length=6)
     resolution: str = "1K"
     productShots: List[str] = []
     model: str = "nano-banana-pro"
@@ -107,8 +109,6 @@ class BatchSaveRequest(BaseModel):
 
 router = APIRouter()
 
-import os
-import asyncio
 import uuid
 import httpx
 from app.core.config import settings
@@ -118,7 +118,9 @@ try:
 except ImportError:
     fal_client = None
 
-# Images are uploaded to R2 storage (no local filesystem)
+from app.services.provider_settings import require_provider_key
+from app.services.generation_provider import generation_failure, record_result
+from app.core.installation import InstallationError
 
 def get_fal_aspect_ratio(width: int, height: int) -> str:
     """Map width/height to closest fal.ai aspect ratio string."""
@@ -136,129 +138,67 @@ def get_fal_aspect_ratio(width: int, height: int) -> str:
     return closest[1]
 
 async def download_and_save_image(image_url: str, prefix: str = "generated") -> str:
-    """
-    Download image from external URL and upload to R2 storage.
-    Falls back to returning original URL if R2 is not configured.
-    """
-    for attempt in range(2):
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(image_url, timeout=30.0)
-                response.raise_for_status()
+    from app.api.v1.uploads import upload_to_local, upload_to_r2
+    try:
+        async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
+            response = await client.get(image_url)
+            response.raise_for_status()
+        filename = f"{prefix}_{uuid.uuid4()}.png"
+        if settings.r2_enabled:
+            return await upload_to_r2(response.content, filename, "image/png")
+        return await upload_to_local(response.content, filename)
+    except Exception:
+        raise InstallationError(
+            "media_save_failed",
+            "Your image was generated, but could not be saved. Download the generated image below before retrying storage; do not generate it again.",
+            503, {"recovery_url": image_url},
+        ) from None
 
-                unique_id = str(uuid.uuid4())
-                filename = f"{prefix}_{unique_id}.png"
-
-                if settings.r2_enabled:
-                    from app.api.v1.uploads import get_s3_client
-                    s3 = get_s3_client()
-                    if s3:
-                        s3.put_object(
-                            Bucket=settings.R2_BUCKET_NAME,
-                            Key=filename,
-                            Body=response.content,
-                            ContentType="image/png"
-                        )
-                        return f"{settings.R2_PUBLIC_URL}/{filename}"
-
-                # R2 not available — return original fal.ai URL (not local path)
-                return image_url
-        except Exception as e:
-            print(f"Error downloading image (attempt {attempt + 1}): {e}")
-            if attempt == 1:
-                return image_url
-    return image_url
 
 @router.post("/generate-image")
 async def generate_image(
     request: ImageGenerationRequest,
-    current_user: User = Depends(require_permission("ads:write"))
+    current_user: User = Depends(require_permission("ads:write")),
+    db: Session = Depends(get_db),
 ):
-    """Generate ad images using Fal.ai (with mock fallback)"""
-    
+    key = require_provider_key("fal", db)
+    if fal_client is None:
+        raise InstallationError("provider_unavailable", "The image generation service is not installed. Contact your installation owner.", 503)
+    provider_client = fal_client.AsyncClient(key=key)
+    for size in request.imageSizes:
+        width, height = size.get("width", 1080), size.get("height", 1080)
+        if type(width) is not int or type(height) is not int or width <= 0 or height <= 0:
+            raise InstallationError("invalid_image_size", "Select a valid image size.", 422)
     images = []
-    use_fal = settings.FAL_AI_API_KEY and fal_client
-    
-    if use_fal:
-        os.environ["FAL_KEY"] = settings.FAL_AI_API_KEY
-        print(f"Generating images with Fal.ai using key: {settings.FAL_AI_API_KEY[:5]}...")
-    
-    for i in range(request.count):
+    for _ in range(request.count):
         for size in request.imageSizes:
-            width = size.get('width', 1080)
-            height = size.get('height', 1080)
-            size_name = size.get('name', 'Square')
-            
-            # Build comprehensive prompt using old system logic
+            width, height = size.get("width", 1080), size.get("height", 1080)
+            size_name = size.get("name", "Square")
             prompt = build_comprehensive_prompt(request)
-            
-            print(f"\n{'='*80}")
-            print(f"🎨 IMAGE GENERATION REQUEST")
-            print(f"{'='*80}")
-            print(f"📦 Brand: {request.brand.get('name') if request.brand else 'None'}")
-            print(f"📦 Product: {request.product.get('name') if request.product else 'None'}")
-            print(f"📦 Product Desc: {request.product.get('description') if request.product else 'None'}")
-            print(f"📦 Template Type: {request.template.get('type') if request.template else 'None'}")
-            print(f"📦 Copy Headline: {request.copy.get('headline') if request.copy else 'None'}")
-            print(f"\n📝 FULL GENERATED PROMPT:")
-            print(f"{prompt}")
-            print(f"{'='*80}\n")
-            
-            if use_fal:
-                try:
-                    # Determine model and endpoint
-                    if request.useProductImage and request.productShots:
-                        # Use edit endpoint for image-to-image with product photo
-                        model_id = "fal-ai/nano-banana-pro/edit"
-                        print(f"Using product image: {request.productShots[0][:50]}...")
-                        
-                        arguments = {
-                            "prompt": prompt,
-                            "image_urls": request.productShots,
-                            "aspect_ratio": f"{width}:{height}",
-                            "output_format": "png"
-                        }
-                    else:
-                        # Standard text-to-image
-                        if request.model == "imagen4":
-                            model_id = "fal-ai/imagen4/preview"
-                            print(f"Using Imagen 4 model: {model_id}")
-                        else:
-                            model_id = "fal-ai/nano-banana-pro"
-                            print(f"Using Nano Banana Pro model: {model_id}")
-                        
-                        arguments = {
-                            "prompt": prompt,
-                            "aspect_ratio": get_fal_aspect_ratio(width, height),
-                        }
-                    
-                    # Submit to Fal.ai
-                    handler = await fal_client.submit_async(model_id, arguments=arguments)
+            arguments = {"prompt": prompt, "aspect_ratio": get_fal_aspect_ratio(width, height)}
+            model_id = "fal-ai/imagen4/preview" if request.model == "imagen4" else "fal-ai/nano-banana-pro"
+            if request.useProductImage and request.productShots:
+                model_id = "fal-ai/nano-banana-pro/edit"
+                arguments.update(image_urls=request.productShots, output_format="png")
+            try:
+                with redact_values(key):
+                    handler = await provider_client.submit(model_id, arguments=arguments)
                     result = await handler.get()
-                    external_url = result['images'][0]['url']
-
-                    # Download and save image locally
-                    print(f"Downloading image from Fal.ai: {external_url[:50]}...")
-                    image_url = await download_and_save_image(external_url, prefix="generated")
-                    print(f"Saved image: {image_url}")
-
-                except Exception as e:
-                    print(f"Fal.ai generation failed: {e}")
-                    # Fallback to mock on error
-                    product_name = request.product.get('name', 'Product') if request.product else 'Product'
-                    image_url = f"https://placehold.co/{width}x{height}/png?text={product_name}+Error"
-            else:
-                # Mock generation
-                product_name = request.product.get('name', 'Product') if request.product else 'Product'
-                image_url = f"https://placehold.co/{width}x{height}/png?text={product_name}+{i+1}"
-            
-            images.append({
-                "url": image_url,
-                "size": size_name,
-                "dimensions": f"{width}x{height}",
-                "prompt": prompt
-            })
-            
+                    external_url = result["images"][0]["url"]
+            except Exception as exc:
+                code = getattr(getattr(exc, "response", None), "status_code", None)
+                failure = generation_failure("fal", key, code)
+                if images:
+                    failure.details["completed_images"] = images
+                raise failure from None
+            record_result("fal", key, "connected")
+            try:
+                image_url = await download_and_save_image(external_url)
+            except InstallationError as exc:
+                exc.details["completed_images"] = images
+                raise
+            images.append({"url": image_url, "size": size_name,
+                           "dimensions": f"{width}x{height}", "prompt": prompt})
     return {"images": images}
 
 @router.get("/")
@@ -413,6 +353,7 @@ def batch_save_ads(
         db.commit()
         return {"message": f"Saved {len(saved_ads)} ads", "count": len(saved_ads)}
     except Exception as e:
+        capture_exception(e, "generated_ads.batch_save_ads")
         db.rollback()
         import traceback
         print(f"Batch save error: {e}")

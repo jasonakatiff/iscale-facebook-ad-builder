@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "slug": "creative-brief",
+  "name": "Creative Brief",
+  "version": "1.0.0",
+  "description": "Build a repeatable creative brief from your product, audience and brand voice. Runs inside your ad workspace without an external service.",
+  "category": "prompts",
+  "execution": "template",
+  "inputs": [
+    { "name": "product", "label": "Product", "required": true },
+    { "name": "audience", "label": "Audience", "required": true },
+    { "name": "offer", "label": "Offer", "required": false }
+  ],
+  "configFields": [
+    { "name": "voice", "label": "Brand voice", "default": "Clear and direct" }
+  ],
+  "template": {
+    "product": "{{product}}",
+    "audience": "{{audience}}",
+    "offer": "{{offer}}",
+    "prompt": "Write three distinct ad hooks for {{product}}, aimed at {{audience}}. Voice: {{voice}}. Use only supplied product facts. Offer: {{offer}}."
+  }
+}

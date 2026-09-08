@@ -1,3 +1,4 @@
+from app.delivery import models as delivery_models  # noqa: F401
 from app.database import engine, Base, SessionLocal
 from app.models import *
 from app.core.security import get_password_hash

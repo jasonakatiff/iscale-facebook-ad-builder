@@ -1,3 +1,5 @@
+import { deliveryRequest, DELIVERY_POLL_MS } from './delivery';
+import { MEDIA_EXTENSIONS } from './campaignWizard';
 // Facebook Marketing API Integration Service
 // Now proxies through our backend with authentication
 
@@ -24,9 +26,20 @@ const authFetch = async (url, options = {}) => {
 /**
  * Get all ad accounts accessible by the access token
  */
-export async function getAdAccounts() {
+const accountCache = new Map();
+let accountCacheVersion = 0;
+export function clearAdAccountCache() {
+    accountCacheVersion += 1;
+    accountCache.clear();
+}
+const ACCOUNT_CACHE_MS = 60 * 60 * 1000;
+export async function getAdAccounts(forceRefresh = false) {
+    const identity = localStorage.getItem('accessToken');
+    const cached = accountCache.get(identity);
+    if (!forceRefresh && cached && Date.now() - cached.time < ACCOUNT_CACHE_MS) return cached.accounts;
+    const version = ++accountCacheVersion;
     try {
-        const response = await authFetch(`${API_BASE_URL}/accounts`);
+        const response = await authFetch(`${API_BASE_URL}/accounts?refresh=${forceRefresh}`);
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.detail || 'Failed to fetch ad accounts');
@@ -35,7 +48,7 @@ export async function getAdAccounts() {
 
         // Map backend response to frontend expected format if necessary
         // Backend returns raw FB data list
-        return accounts.map(account => ({
+        const mapped = accounts.map(account => ({
             id: account.id,
             accountId: account.account_id,
             name: account.name,
@@ -51,6 +64,11 @@ export async function getAdAccounts() {
             age: account.age,
             disableReason: account.disable_reason
         }));
+        if (version === accountCacheVersion) {
+            accountCache.clear();
+            accountCache.set(identity, { time: Date.now(), accounts: mapped });
+        }
+        return mapped;
     } catch (error) {
         console.error('Error fetching ad accounts:', error);
         throw error;
@@ -80,6 +98,9 @@ export async function getCampaigns(adAccountId) {
             dailyBudget: campaign.daily_budget,
             lifetimeBudget: campaign.lifetime_budget,
             budgetRemaining: campaign.budget_remaining,
+            bid_strategy: campaign.bid_strategy,
+            specialAdCategories: campaign.special_ad_categories || [],
+            specialAdCategoryCountries: campaign.special_ad_category_country || [],
             createdTime: campaign.created_time,
             updatedTime: campaign.updated_time,
             isCBO: campaign.is_adset_budget_sharing_enabled
@@ -120,7 +141,7 @@ export async function getPixels(adAccountId) {
  */
 export async function getPages(adAccountId) {
     try {
-        const response = await authFetch(`${API_BASE_URL}/pages`);
+        const response = await authFetch(`${API_BASE_URL}/pages?ad_account_id=${encodeURIComponent(adAccountId)}`);
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.detail || 'Failed to fetch pages');
@@ -170,10 +191,10 @@ export const searchGeoLocations = async (query, adAccountId) => {
         // Facebook API 'location_types' can take multiple.
 
         // Let's use the searchLocations function we just added
-        return await searchLocations(query, 'city', adAccountId);
+        return await searchLocations(query, 'country,region,city,geo_market', adAccountId);
     } catch (error) {
         console.error('Error searching geo locations:', error);
-        return [];
+        throw error;
     }
 };
 
@@ -193,10 +214,11 @@ export async function uploadVideoToFacebook(videoUrl, adAccountId, waitForReady 
         // If it's a blob URL, upload to our server first
         if (videoUrl.startsWith('blob:')) {
             const blobResponse = await fetch(videoUrl);
+            if (!blobResponse.ok) throw new Error('Unable to read uploaded media.');
             const blob = await blobResponse.blob();
 
             const formData = new FormData();
-            const extension = blob.type.split('/')[1] || 'mp4';
+            const extension = MEDIA_EXTENSIONS[blob.type] || 'mp4';
             formData.append('file', blob, `upload.${extension}`);
 
             const uploadResponse = await authFetch((import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1') + '/uploads/', {
@@ -285,12 +307,13 @@ export async function uploadImageToFacebook(imageUrl, adAccountId) {
         if (imageUrl.startsWith('blob:')) {
             // 1. Fetch the blob
             const blobResponse = await fetch(imageUrl);
+            if (!blobResponse.ok) throw new Error('Unable to read uploaded media.');
             const blob = await blobResponse.blob();
 
             // 2. Create FormData
             const formData = new FormData();
             // Use a default filename or try to guess extension
-            const filename = 'upload.jpg';
+            const filename = `upload.${MEDIA_EXTENSIONS[blob.type] || 'jpg'}`;
             formData.append('file', blob, filename);
 
             // 3. Upload to our backend
@@ -373,7 +396,7 @@ export async function createFacebookAdSet(adsetData, campaignId, adAccountId, bu
             optimization_goal: adsetData.optimizationGoal,
             bid_strategy: adsetData.bidStrategy,
             bid_amount: adsetData.bidAmount,
-            start_time: adsetData.startTime ? new Date(adsetData.startTime).toISOString() : null,
+            start_time: adsetData.startTime || null,
             targeting: adsetData.targeting
         };
 
@@ -451,31 +474,20 @@ export async function createFacebookCreative(creativeData, imageHash, pageId, ad
  * Create Facebook Ad
  */
 export async function createFacebookAd(adData, adsetId, creativeId, adAccountId) {
-    try {
-        const payload = {
-            ...adData,
-            adset_id: adsetId,
-            creative_id: creativeId
-        };
-
-        const response = await authFetch(`${API_BASE_URL}/ads?ad_account_id=${adAccountId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Failed to create ad');
-        }
-
-        const data = await response.json();
-        return data.id;
-    } catch (error) {
-        console.error('Error creating ad:', error);
-        throw error;
+    if (!adData.id) throw new Error('A stable ad ID is required for queue submission');
+    const job = await facebookRequest(`/ads?ad_account_id=${encodeURIComponent(adAccountId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': adData.id },
+        body: JSON.stringify({name: adData.name, status: adData.status || 'PAUSED', adset_id: adsetId, creative_id: creativeId}),
+    });
+    const deadline = Date.now() + 15 * 60 * 1000;
+    let current = job;
+    while (true) {
+        if (current.status === 'succeeded') return current.results.ad_id;
+        if (['failed', 'needs_reconciliation', 'cancelled'].includes(current.status)) throw new Error(current.error_message || `Posting ${current.status}`);
+        if (Date.now() >= deadline) throw new Error('Ad remains in the posting queue. Check its status before submitting again.');
+        await new Promise(resolve => setTimeout(resolve, DELIVERY_POLL_MS));
+        current = await deliveryRequest(`/jobs/${job.id}`);
     }
 }
 
@@ -507,7 +519,7 @@ export async function searchLocations(query, type = 'city', adAccountId) {
  * @param {string} adAccountId - Facebook ad account ID
  * @param {string} budgetType - Budget type (CBO or ABO)
  */
-export async function createCompleteAd(campaignId, adsetData, creativeData, adData, pageId, adAccountId, budgetType) {
+export async function createCompleteAd(campaignId, adsetData, creativeData, adData, pageId, adAccountId) {
     try {
         let imageHash = null;
         let videoData = null;
@@ -557,3 +569,17 @@ export async function createCompleteAd(campaignId, adsetData, creativeData, adDa
         throw error;
     }
 }
+
+export async function facebookRequest(path, options = {}) {
+    const response = await authFetch(`${API_BASE_URL}${path}`, options);
+    if (!response.ok) {
+        let message = `Request failed (${response.status})`;
+        try { const data = await response.json(); message = data.error?.message || (typeof data.detail === 'string' ? data.detail : data.detail?.map?.(item => item.msg).join('; ')) || message; }
+        catch { message = `Request failed (${response.status}). Please retry.`; }
+        throw new Error(message);
+    }
+    return response.status === 204 ? null : response.json();
+}
+export const getCustomAudiences = account => facebookRequest(`/custom-audiences?ad_account_id=${encodeURIComponent(account)}`);
+export const getInstagramAccounts = account => facebookRequest(`/instagram-accounts?ad_account_id=${encodeURIComponent(account)}`);
+export const preflightCampaign = state => facebookRequest('/preflight', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ad_account_id: state.selectedAdAccount.id, campaignData: state.campaignData, adsetData: state.adsetData, creativeData: { ...state.creativeData, creatives: state.creativeData.creatives.map(media => { const { file: _file, previewUrl: _preview, ...creative } = media; return creative; }) }, adsData: state.adsData }) });

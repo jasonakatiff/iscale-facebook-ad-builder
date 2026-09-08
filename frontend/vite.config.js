@@ -10,7 +10,7 @@ import react from '@vitejs/plugin-react'
 // means something different inside a Docker container (the container itself,
 // not the sibling backend container) than it does when both processes run
 // directly on the host. docker-compose.yml sets this to http://backend:8000.
-const backendProxyTarget = process.env.VITE_BACKEND_PROXY_TARGET || 'http://localhost:8000'
+const backendProxyTarget = process.env.DEV_API_PROXY_TARGET || process.env.VITE_BACKEND_PROXY_TARGET || 'http://localhost:8000'
 
 export default defineConfig({
   plugins: [react()],
@@ -19,6 +19,7 @@ export default defineConfig({
     // PREVIEW_ALLOWED_HOSTS (comma-separated, e.g. ".example.com,app.example.com").
     allowedHosts: [
       '.up.railway.app',
+      'healthcheck.railway.app',
       ...(process.env.PREVIEW_ALLOWED_HOSTS || '').split(',').map(h => h.trim()).filter(Boolean),
     ],
   },
@@ -26,12 +27,12 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: backendProxyTarget,
-        changeOrigin: true,
+        changeOrigin: false,
         secure: false,
       },
       '/uploads': {
         target: backendProxyTarget,
-        changeOrigin: true,
+        changeOrigin: false,
         secure: false,
       }
     }

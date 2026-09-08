@@ -1,3 +1,4 @@
+import process from 'node:process';
 import { defineConfig, devices } from '@playwright/test';
 
 // Support testing against production via BASE_URL env var
@@ -5,6 +6,7 @@ const baseURL = process.env.BASE_URL || 'http://localhost:5173';
 
 export default defineConfig({
   testDir: './tests',
+  testIgnore: '**/prototype/**',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -21,6 +23,7 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
+        ...(process.env.TEST_BROWSER_CHANNEL ? { channel: process.env.TEST_BROWSER_CHANNEL } : {}),
         // Use fresh browser context (like Guest Profile) - no saved data
         storageState: undefined,
       },

@@ -2,6 +2,7 @@
 refresh, mirroring apps/optima/lib/google-ads-client.ts) and GAQL queries for
 campaign/ad performance.
 """
+from app.telemetry.runtime import capture_exception
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -52,6 +53,7 @@ async def get_valid_access_token(db: Session, connection: GoogleAdsConnection) -
             refresh_token, settings.GOOGLE_ADS_CLIENT_ID, settings.GOOGLE_ADS_CLIENT_SECRET
         )
     except GoogleOAuthError as exc:
+        capture_exception(exc, "google_ads_service.get_valid_access_token")
         connection.is_active = False
         db.commit()
         raise GoogleAdsConnectionError(str(exc)) from exc
@@ -334,4 +336,3 @@ async def add_negative_keywords(refresh_token: str, customer_id: str, campaign_i
     if operations:
         criterion_service.mutate_campaign_criteria(customer_id=customer_id, operations=operations)
     return {"campaign_id": campaign_id, "negative_keywords_added": len(keywords)}
-

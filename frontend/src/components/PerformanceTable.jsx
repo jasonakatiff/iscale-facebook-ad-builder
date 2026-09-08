@@ -59,13 +59,13 @@ export default function PerformanceTable({
     };
 
     return (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="bg-panel rounded-xl border border-line shadow-sm overflow-hidden">
             {onDatePresetChange && (
-                <div className="flex justify-end p-3 sm:p-4 border-b border-gray-100">
+                <div className="flex justify-end p-3 sm:p-4 border-b border-line-soft">
                     <select
                         value={datePreset}
                         onChange={(e) => onDatePresetChange(e.target.value)}
-                        className="border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm bg-white focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                        className="border border-line-strong rounded-lg px-3 sm:px-4 py-2 text-sm bg-panel focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     >
                         {DATE_PRESETS.map((preset) => (
                             <option key={preset.value} value={preset.value}>
@@ -80,27 +80,27 @@ export default function PerformanceTable({
                 without squeezing columns into unreadability. */}
             <div className="overflow-x-auto">
                 <table className="w-full text-sm min-w-[560px]">
-                <thead className="bg-gray-50 text-gray-600">
+                <thead className="bg-subtle text-secondary">
                     <tr>
                         {columns.map((col) => (
                             <th
                                 key={col.key}
-                                className={`px-4 py-3 font-medium select-none cursor-pointer hover:text-amber-600 ${col.numeric ? 'text-right' : 'text-left'}`}
+                                className={`px-4 py-3 font-medium select-none cursor-pointer hover:text-brand-ink ${col.numeric ? 'text-right' : 'text-left'}`}
                                 onClick={() => handleSort(col.key)}
                             >
                                 <span className={`inline-flex items-center gap-1 ${col.numeric ? 'flex-row-reverse' : ''}`}>
                                     {col.label}
-                                    <ArrowUpDown size={12} className={sortKey === col.key ? 'text-amber-600' : 'text-gray-300'} />
+                                    <ArrowUpDown size={12} className={sortKey === col.key ? 'text-brand-ink' : 'text-faint'} />
                                 </span>
                             </th>
                         ))}
                         {renderActions && <th className="px-4 py-3 font-medium text-right">Actions</th>}
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-line-soft">
                     {loading && (
                         <tr>
-                            <td colSpan={columns.length + (renderActions ? 1 : 0)} className="px-4 py-10 text-center text-gray-400">
+                            <td colSpan={columns.length + (renderActions ? 1 : 0)} className="px-4 py-10 text-center text-faint">
                                 <Loader2 size={20} className="animate-spin inline-block mr-2" />
                                 Loading…
                             </td>
@@ -108,7 +108,7 @@ export default function PerformanceTable({
                     )}
                     {!loading && sortedRows.length === 0 && (
                         <tr>
-                            <td colSpan={columns.length + (renderActions ? 1 : 0)} className="px-4 py-10 text-center text-gray-400">
+                            <td colSpan={columns.length + (renderActions ? 1 : 0)} className="px-4 py-10 text-center text-faint">
                                 <Inbox size={24} className="inline-block mb-2" />
                                 <p>{emptyMessage}</p>
                             </td>
@@ -116,9 +116,9 @@ export default function PerformanceTable({
                     )}
                     {!loading &&
                         sortedRows.map((row) => (
-                            <tr key={row.id} className="hover:bg-amber-50/50">
+                            <tr key={row.id} className="hover:bg-brand-soft/50">
                                 {columns.map((col) => (
-                                    <td key={col.key} className={`px-4 py-3 ${col.numeric ? 'text-right tabular-nums' : 'text-left text-gray-800'}`}>
+                                    <td key={col.key} className={`px-4 py-3 ${col.numeric ? 'text-right tabular-nums' : 'text-left text-foreground'}`}>
                                         {col.format ? col.format(row[col.key]) : row[col.key]}
                                     </td>
                                 ))}

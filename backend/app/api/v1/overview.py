@@ -5,6 +5,7 @@ configured, it's silently omitted (reported in `errors`) rather than failing
 the whole response, so a user connected to only one platform still gets a
 useful page.
 """
+from app.telemetry.runtime import capture_exception
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends
@@ -139,6 +140,7 @@ async def build_overview(
         # A bare "NoneType ... encode" means no token at all (env fallback empty
         # and no per-user connection) — translate to a user-actionable message
         # instead of surfacing the raw SDK/NoneType traceback text.
+        capture_exception(exc, "overview.build_overview")
         message = str(exc)
         if "NoneType" in message or ("encode" in message and "None" in message):
             message = "No connected Meta Ads account. Connect Meta Ads in Facebook Campaigns first."
@@ -147,22 +149,28 @@ async def build_overview(
     try:
         rows.extend(await _fetch_google_rows(db, user_id, date_preset))
     except GoogleAdsConnectionError as exc:
+        capture_exception(exc, "overview.build_overview")
         errors["google"] = str(exc)
     except GoogleAdsNotConfigured as exc:
+        capture_exception(exc, "overview.build_overview")
         errors["google"] = str(exc)
     except GoogleAdsException as exc:
+        capture_exception(exc, "overview.build_overview")
         try:
             errors["google"] = "; ".join(e.message for e in exc.failure.errors)
         except Exception:
             errors["google"] = "Google Ads API error."
     except Exception as exc:
+        capture_exception(exc, "overview.build_overview")
         errors["google"] = str(exc)
 
     try:
         rows.extend(await _fetch_tiktok_rows(db, user_id, date_preset))
     except (TikTokAdsApiError, TikTokAdsNotConfigured) as exc:
+        capture_exception(exc, "overview.build_overview")
         errors["tiktok"] = str(exc)
     except Exception as exc:
+        capture_exception(exc, "overview.build_overview")
         errors["tiktok"] = str(exc)
 
     rows.sort(key=lambda row: row["spend"], reverse=True)

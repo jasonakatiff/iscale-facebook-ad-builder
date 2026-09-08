@@ -79,11 +79,12 @@ export const BrandProvider = ({ children }) => {
                 id: crypto.randomUUID()
             };
 
-            await authFetch(`${API_URL}/brands`, {
+            const response = await authFetch(`${API_URL}/brands`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newBrand)
             });
+            if (!response.ok) throw new Error("Unable to save the brand. Check its fields and try again.");
 
             await loadData();
         } catch (error) {
@@ -94,11 +95,12 @@ export const BrandProvider = ({ children }) => {
 
     const updateBrand = async (id, updatedBrand) => {
         try {
-            await authFetch(`${API_URL}/brands/${id}`, {
+            const response = await authFetch(`${API_URL}/brands/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updatedBrand)
             });
+            if (!response.ok) throw new Error("Unable to save the brand or product. Check its fields and try again.");
 
             await loadData();
         } catch (error) {

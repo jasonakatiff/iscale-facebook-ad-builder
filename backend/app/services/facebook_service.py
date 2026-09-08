@@ -1,3 +1,4 @@
+from app.telemetry.runtime import capture_exception
 import os
 from facebook_business.api import FacebookAdsApi
 from facebook_business.adobjects.adaccount import AdAccount
@@ -11,12 +12,19 @@ from dotenv import load_dotenv
 from pathlib import Path
 from facebook_business.adobjects.user import User
 import time
+import threading
+import hashlib
+from copy import deepcopy
+from app.services.campaign_validation import campaign_params, adset_params
 
 # Load .env from project root (parent of backend)
 env_path = Path(__file__).resolve().parent.parent.parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
 class FacebookService:
+    _accounts_cache = {}
+    _accounts_lock = threading.Lock()
+    ACCOUNT_CACHE_SECONDS = 3600
     def __init__(self, access_token=None, ad_account_id=None, app_id=None, app_secret=None):
         # Try standard names first, then VITE_ prefixed names (common in this project)
         self.access_token = access_token or os.getenv("FACEBOOK_ACCESS_TOKEN") or os.getenv("VITE_FACEBOOK_ACCESS_TOKEN")
@@ -49,29 +57,37 @@ class FacebookService:
             return True
         except Exception as e:
             # Re-raise the exception so the caller knows what went wrong
+            capture_exception(e, "facebook_service.initialize")
             raise Exception(f"Facebook API Init Error: {str(e)}")
 
 
-    def get_ad_accounts(self):
-        """Fetch all ad accounts for the current user."""
+    def get_ad_accounts(self, force_refresh=False):
         if not self.api:
-            # Try to initialize if not already done
             self.initialize()
-        
-        # Use the SDK's User object to fetch ad accounts
-        print("Fetching ad accounts for user 'me'...")
-        try:
+        selected_id = self.ad_account_id
+        if selected_id and not selected_id.startswith('act_'):
+            selected_id = f'act_{selected_id}'
+        key = (hashlib.sha256((self.access_token or '').encode()).hexdigest(), selected_id)
+        with self._accounts_lock:
+            cached = self._accounts_cache.get(key)
+            if cached and not force_refresh and time.monotonic() - cached[0] < self.ACCOUNT_CACHE_SECONDS:
+                return deepcopy(cached[1])
             me = User(fbid='me', api=self.api)
-            my_accounts = me.get_ad_accounts(fields=['id', 'name', 'account_id', 'account_status', 'currency', 'balance', 'amount_spent'])
-            accounts = [dict(account) for account in my_accounts]
-            if self.ad_account_id:
-                selected_id = self.ad_account_id if self.ad_account_id.startswith('act_') else f'act_{self.ad_account_id}'
+            fields = ['id', 'name', 'account_id', 'account_status', 'currency', 'timezone_name', 'min_daily_budget', 'business_name', 'balance', 'amount_spent']
+            accounts = sorted([dict(acc) for acc in me.get_ad_accounts(fields=fields, params={'limit': 200})], key=lambda acc: acc.get('name', '').casefold())
+            if selected_id:
                 accounts = [account for account in accounts if account.get('id') == selected_id]
-            print(f"Found {len(accounts)} accounts.")
-            return accounts
-        except Exception as e:
-            print(f"Error fetching ad accounts: {e}")
-            raise e
+            self._accounts_cache[key] = (time.monotonic(), accounts)
+            return deepcopy(accounts)
+
+    def get_account_details(self, ad_account_id):
+        return dict(self._get_account(ad_account_id).api_get(fields=['id', 'name', 'currency', 'timezone_name', 'min_daily_budget']))
+
+    def get_custom_audiences(self, ad_account_id):
+        return [dict(item) for item in self._get_account(ad_account_id).get_custom_audiences(fields=['id', 'name', 'subtype'], params={'limit': 200})]
+
+    def get_instagram_accounts(self, ad_account_id):
+        return [dict(item) for item in self._get_account(ad_account_id).get_instagram_accounts(fields=['id', 'username'], params={'limit': 200})]
 
     def _get_account(self, ad_account_id=None):
         """Helper to get AdAccount object."""
@@ -137,6 +153,7 @@ class FacebookService:
                 results.append(d)
             return results
         except Exception as e:
+            capture_exception(e, "facebook_service.get_insights")
             print(f"Error fetching insights: {e}")
             raise
 
@@ -153,6 +170,8 @@ class FacebookService:
             Campaign.Field.lifetime_budget,
             Campaign.Field.budget_remaining,
             Campaign.Field.bid_strategy,
+            'special_ad_categories',
+            'special_ad_category_country',
             'is_adset_budget_sharing_enabled',
         ]
 
@@ -160,38 +179,7 @@ class FacebookService:
         return account.get_campaigns(fields=fields)
 
     def create_campaign(self, campaign_data, ad_account_id=None):
-        """Create a new campaign."""
-        account = self._get_account(ad_account_id)
-
-        params = {
-            Campaign.Field.name: campaign_data.get('name'),
-            Campaign.Field.objective: campaign_data.get('objective'),
-            Campaign.Field.status: campaign_data.get('status', 'PAUSED'),
-            Campaign.Field.special_ad_categories: [],
-        }
-
-        # Handle budget based on budget type
-        budget_type = campaign_data.get('budget_type') or campaign_data.get('budgetType')
-        daily_budget = campaign_data.get('daily_budget') or campaign_data.get('dailyBudget')
-        
-        if budget_type == 'CBO' and daily_budget:
-            # Campaign Budget Optimization
-            # Set budget at campaign level, do NOT set is_adset_budget_sharing_enabled
-            params[Campaign.Field.daily_budget] = int(float(daily_budget) * 100)
-        else:
-            # Ad Set Budget Optimization (ABO)
-            # Budget is set at ad set level, not campaign level
-            # Starting with API v24.0+, is_adset_budget_sharing_enabled is REQUIRED for ABO
-            # Set to False to enforce strict ad set budgets
-            params['is_adset_budget_sharing_enabled'] = False
-
-            
-        bid_strategy = campaign_data.get('bid_strategy') or campaign_data.get('bidStrategy')
-        if bid_strategy:
-            params[Campaign.Field.bid_strategy] = bid_strategy
-
-        return account.create_campaign(params=params)
-
+        return self._get_account(ad_account_id).create_campaign(params=campaign_params(campaign_data))
 
     def get_pixels(self, ad_account_id=None):
         """Fetch all pixels for the ad account."""
@@ -208,21 +196,12 @@ class FacebookService:
         return [dict(pixel) for pixel in pixels]
 
     def get_pages(self, ad_account_id=None):
-        """Fetch all Facebook Pages accessible to the user."""
-        from facebook_business.adobjects.page import Page
-        from facebook_business.adobjects.user import User
-        
-        # Fetch pages for the current user (not ad account specific)
-        me = User(fbid='me', api=self.api)
-        
-        fields = [
-            Page.Field.id,
-            Page.Field.name,
-            Page.Field.category,
-        ]
-        
-        pages = me.get_accounts(fields=fields)
-        return [dict(page) for page in pages]
+        fields = ['id', 'name', 'category']
+        if ad_account_id:
+            pages = self._get_account(ad_account_id).get_promote_pages(fields=fields, params={'limit': 200})
+        else:
+            pages = User(fbid='me', api=self.api).get_accounts(fields=fields, params={'limit': 200})
+        return sorted([dict(page) for page in pages], key=lambda page: page.get('name', '').casefold())
 
     def get_adsets(self, ad_account_id=None, campaign_id=None):
         """Fetch all ad sets."""
@@ -259,105 +238,22 @@ class FacebookService:
         return adset.get_ads(fields=fields)
 
     def create_adset(self, adset_data, ad_account_id=None):
-        """Create a new ad set."""
         account = self._get_account(ad_account_id)
-
-        # Transform targeting from camelCase to snake_case
-        targeting = adset_data.get('targeting', {})
-        transformed_targeting = {}
-        
-        # Handle age fields
-        if 'ageMin' in targeting:
-            transformed_targeting['age_min'] = targeting['ageMin']
-        if 'ageMax' in targeting:
-            transformed_targeting['age_max'] = targeting['ageMax']
-        
-        # Handle genders
-        if 'genders' in targeting:
-            transformed_targeting['genders'] = targeting['genders']
-        
-        # Handle geo_locations - clean up empty arrays
-        if 'geo_locations' in targeting:
-            geo_locs = targeting['geo_locations']
-            cleaned_geo_locs = {}
-            
-            # Only include non-empty arrays
-            for key, value in geo_locs.items():
-                if isinstance(value, list) and len(value) > 0:
-                    cleaned_geo_locs[key] = value
-                elif not isinstance(value, list):
-                    # Include non-list values as-is
-                    cleaned_geo_locs[key] = value
-            
-            if cleaned_geo_locs:
-                transformed_targeting['geo_locations'] = cleaned_geo_locs
-        
-        # Handle publisher_platforms
-        if 'publisher_platforms' in targeting:
-            transformed_targeting['publisher_platforms'] = targeting['publisher_platforms']
-
-        # Fix for Advantage Audience Flag Required error
-        # Facebook now requires explicit opt-in/out for Advantage+ Audience
-        # Default to 0 (Off) if not provided, unless user explicitly sets it
-        advantage_audience = adset_data.get('advantage_audience', 0)
-        transformed_targeting['targeting_automation'] = {
-            'advantage_audience': advantage_audience
-        }
-
-        params = {
-            AdSet.Field.name: adset_data.get('name'),
-            AdSet.Field.campaign_id: adset_data.get('campaign_id'),
-            AdSet.Field.billing_event: 'IMPRESSIONS',
-            AdSet.Field.optimization_goal: adset_data.get('optimization_goal') or adset_data.get('optimizationGoal'),
-            AdSet.Field.is_dynamic_creative: False,
-            AdSet.Field.status: adset_data.get('status', 'PAUSED'),
-            AdSet.Field.targeting: transformed_targeting,
-        }
-
-        # Handle promoted_object for conversion optimization
-        if adset_data.get('optimization_goal') == 'OFFSITE_CONVERSIONS' or adset_data.get('optimizationGoal') == 'OFFSITE_CONVERSIONS':
-            pixel_id = adset_data.get('pixelId') or adset_data.get('pixel_id')
-            conversion_event = adset_data.get('conversionEvent') or adset_data.get('conversion_event')
-            
-            if pixel_id and conversion_event:
-                params[AdSet.Field.promoted_object] = {
-                    'pixel_id': pixel_id,
-                    'custom_event_type': conversion_event
-                }
-
-
-        # Handle budget - only set for ABO campaigns (not CBO)
-        # CBO = Campaign Budget Optimization (budget at campaign level)
-        # ABO = Ad Set Budget Optimization (budget at ad set level)
-        budget_type = adset_data.get('budget_type') or adset_data.get('budgetType')
-
-        if budget_type != 'CBO':
-            # For ABO campaigns, budget is required at ad set level
-            budget = adset_data.get('daily_budget') or adset_data.get('dailyBudget')
-            if budget:
-                params[AdSet.Field.daily_budget] = int(float(budget) * 100)
-        # For CBO campaigns, don't set daily_budget - it's managed at campaign level
-
-        # Handle start time
-        if adset_data.get('start_time') or adset_data.get('startTime'):
-            start_time = adset_data.get('start_time') or adset_data.get('startTime')
-            params[AdSet.Field.start_time] = start_time
-
-        # Handle bid strategy and bid amount
-        # For CBO campaigns, bid_strategy is set at campaign level - don't set at ad set level
-        # For ABO campaigns, we can set bid_strategy at ad set level
-        bid_amount = adset_data.get('bid_amount') or adset_data.get('bidAmount')
-        bid_strategy = adset_data.get('bid_strategy') or adset_data.get('bidStrategy')
-
-        if bid_amount:
-            params[AdSet.Field.bid_amount] = int(float(bid_amount) * 100)
-            if bid_strategy:
-                params[AdSet.Field.bid_strategy] = bid_strategy
-        elif budget_type != 'CBO':
-            # Only set default bid_strategy for ABO campaigns
-            # CBO campaigns inherit bid_strategy from campaign level
-            params[AdSet.Field.bid_strategy] = 'LOWEST_COST_WITHOUT_CAP'
-
+        data = dict(adset_data)
+        campaign_id = data.get('campaign_id')
+        if campaign_id:
+            campaign = Campaign(campaign_id, api=self.api).api_get(fields=['objective', 'daily_budget', 'lifetime_budget', 'bid_strategy'])
+            data['objective'] = campaign['objective']
+            data['budgetType'] = 'CBO' if campaign.get('daily_budget') or campaign.get('lifetime_budget') else 'ABO'
+            if data['budgetType'] == 'CBO':
+                data['bidStrategy'] = campaign.get('bid_strategy') or 'LOWEST_COST_WITHOUT_CAP'
+        details = self.get_account_details(ad_account_id)
+        params = adset_params(data, details.get('timezone_name'))
+        if 'daily_budget' in params and details.get('min_daily_budget') is None:
+            raise ValueError('Ad account minimum daily budget is unavailable. Sync the ad account.')
+        minimum = int(details.get('min_daily_budget') or 1)
+        if 'daily_budget' in params and params['daily_budget'] < minimum:
+            raise ValueError('Daily budget is below the ad account minimum.')
         return account.create_ad_set(params=params)
 
     def upload_image(self, image_path_or_url, ad_account_id=None):
@@ -461,6 +357,7 @@ class FacebookService:
                 try:
                     thumbnails = self.get_video_thumbnails(video_id)
                 except Exception as e:
+                    capture_exception(e, "facebook_service.upload_video")
                     print(f"Warning: Could not fetch thumbnails: {e}")
 
             return {
@@ -612,11 +509,13 @@ class FacebookService:
                 }
             }
 
-        if creative_data.get('instagram_actor_id'):
-            object_story_spec['instagram_actor_id'] = creative_data['instagram_actor_id']
+        instagram_id = creative_data.get('instagramId') or creative_data.get('instagram_user_id') or creative_data.get('instagram_actor_id')
+        if instagram_id:
+            object_story_spec['instagram_user_id'] = instagram_id
 
         params = {
-            AdCreative.Field.name: creative_data.get('name'),
+            AdCreative.Field.name: creative_data.get('creativeName') or creative_data.get('name'),
+            'url_tags': creative_data.get('urlParameters') or creative_data.get('url_tags') or '',
             AdCreative.Field.object_story_spec: object_story_spec,
         }
 
@@ -630,11 +529,7 @@ class FacebookService:
             Ad.Field.name: ad_data.get('name'),
             Ad.Field.adset_id: ad_data.get('adset_id'),
             Ad.Field.creative: {'creative_id': ad_data.get('creative_id')},
-            # PAUSED by default (deliberate deviation from upstream, which had
-            # this defaulting to ACTIVE) — matches the safety convention used for
-            # Google Ads and TikTok Ads: new ads must never auto-spend without an
-            # explicit human decision to activate them.
-            Ad.Field.status: ad_data.get('status', 'PAUSED'),
+            Ad.Field.status: ad_data.get('status') or 'PAUSED',
         }
 
         return account.create_ad(params=params)
@@ -695,7 +590,7 @@ class FacebookService:
         params = {
             'q': query,
             'type': 'adgeolocation',
-            'location_types': [location_type],
+            'location_types': location_type.split(','),
             'limit': limit,
         }
         
@@ -704,32 +599,34 @@ class FacebookService:
 
 
 class FacebookConnectionError(Exception):
-    """No user OAuth connection or legacy system token is available."""
+    """The effective Meta connection is unavailable for provider operations."""
+
+    def __init__(self, message, status_code=404):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 def resolve_facebook_service(db, user_id: str) -> FacebookService:
-    """Use the user's active Meta account, falling back to the env system token."""
+    """Use the same credential and expiry decision exposed by connection status."""
     from app.core.config import settings
-    from app.core.token_encryption import decrypt_token
-    from app.models import MetaAdsConnection
+    from app.services.meta_connection import resolve_meta_connection
 
-    connection = db.query(MetaAdsConnection).filter(
-        MetaAdsConnection.user_id == user_id,
-        MetaAdsConnection.is_active.is_(True),
-    ).first()
-    if connection:
-        service = FacebookService(
-            access_token=decrypt_token(connection.encrypted_access_token),
-            ad_account_id=connection.ad_account_id,
-            app_id=settings.FACEBOOK_APP_ID,
-            app_secret=settings.FACEBOOK_APP_SECRET,
-        )
-    else:
-        service = FacebookService()
-    if not service.access_token:
+    connection, access_token = resolve_meta_connection(db, user_id)
+    if not connection["connected"]:
+        if connection["error"]:
+            raise FacebookConnectionError(
+                connection["error"]["message"],
+                status_code=409 if connection["state"] == "expired" else 503,
+            )
         raise FacebookConnectionError(
             "No connected Meta Ads account. Connect and select one or configure a Facebook system token."
         )
+    service = FacebookService(
+        access_token=access_token,
+        ad_account_id=connection["ad_account_id"],
+        app_id=settings.FACEBOOK_APP_ID,
+        app_secret=settings.FACEBOOK_APP_SECRET,
+    )
     if not service.api:
         service.initialize()
     return service

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "slug": "service-starter",
+  "name": "Service Starter",
+  "version": "1.0.0",
+  "description": "Connect a company-hosted or local worker. The downloadable example echoes your input so you can verify the connection; it does not generate ads or make optimization decisions.",
+  "category": "other",
+  "execution": "service",
+  "inputs": [
+    { "name": "brief", "label": "Brief", "kind": "multiline", "required": true }
+  ],
+  "configFields": [],
+  "template": null
+}
