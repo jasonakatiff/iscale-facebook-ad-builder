@@ -45,9 +45,11 @@ other projects or authorize archiving/deleting the private repository.
 - Configure child-process environments. Never write user-owned `.env`, `.env.local`
   or other secret files, expose credentials in logs, or commit secrets. A missing
   credential is not a reason to fall back to a private installation.
-- Fresh v2 setup uses `backend/startup.py` and `python -m app.sync_worker` with the
-  configuration described in README. The legacy setup wizard, Compose startup and
-  `init_db.py` alone are not supported v2 installation paths.
+- Fresh v2 setup uses the shared bootstrap in `backend/startup.py`. The repaired
+  `setup.sh` validates process settings and initializes it; Docker Compose starts
+  the backend, worker, frontend and database in readiness order. Follow the
+  [local development guide](docs/deployment/local-development.md). `init_db.py`
+  alone does not complete v2 installation setup.
 - Publishing public source does not verify a customer deployment. Identify the
   actual installation and scope before deployment or runtime checks. Use isolated
   tests and mocked providers unless live operations are explicitly in scope.
