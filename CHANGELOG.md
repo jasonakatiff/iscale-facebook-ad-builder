@@ -1,5 +1,14 @@
 # Changelog
 
+## Creative analytics and public production alignment — 2026-09-08
+
+Bring creative provenance, external uploads, Google/TikTok analytics, metadata patterns, request-volume settings, and posting recovery into the public release. Preserve installer setup, encrypted provider settings, current branding, and the public security fixes. Join both released database histories with an additive merge and retain existing users, credentials, and ads.
+
+Remove deployment-specific URLs and tracked upload artifacts from published source. Add a redacted secret scan and a public-content hygiene gate. The private repository history is excluded.
+
+[Cutover plan and acceptance status](docs/plans/public-production-cutover.md). Local verification: 613 backend tests and both upgrade baselines passed, 98 frontend unit tests and build passed. Secret and content scans passed. Hosted cutover and container CI remain pending until release verification.
+
+
 ## Security: critical dependencies and exception privacy — 2026-09-08
 
 - Patch python-jose, Vitest/coverage and the transitive shell-quote dependency.
@@ -145,7 +154,7 @@ Plan: none (external contribution review). Tests: backend pytest 99 passing, 1 x
 ## [2026-09-03]
 
 ### Changed
-- This repo is now the canonical codebase. The private `A4DLLC/breadWinner.com` repo is retired; production deploys from `main` here.
+- This repo is now the canonical codebase. Hosted service migration and archival are tracked separately from the canonical repository designation.
 
 ### Fixed
 - Generated images now upload to Cloudflare R2 instead of local disk, so they survive redeploys (ported from breadWinner `cc921a1`).

@@ -1,26 +1,28 @@
 import React, { useState } from 'react';
 import { ChevronRight, Wand2, RefreshCw, Check, Image as ImageIcon } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
-const NanoBananaGenerationStep = ({ copyData, selectedTemplate, onImagesGenerated, onNext, onBack }) => {
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+
+const NanoBananaGenerationStep = ({ copyData, selectedTemplate, brand, product, onImagesGenerated, onNext, onBack }) => {
+    const { authFetch } = useAuth();
+    const { showError } = useToast();
     const [generating, setGenerating] = useState(false);
     const [generatedImages, setGeneratedImages] = useState([]);
     const [selectedImages, setSelectedImages] = useState([]);
 
-    const handleGenerate = () => {
+    const handleGenerate = async () => {
         setGenerating(true);
-
-        // Mock API call to Nano Banana Pro
-        setTimeout(() => {
-            const newImages = Array.from({ length: 4 }).map((_, i) => ({
-                id: `nb_${Date.now()}_${i}`,
-                url: `https://picsum.photos/seed/${Date.now() + i}/1080/1080`, // Placeholder images
-                previewUrl: `https://picsum.photos/seed/${Date.now() + i}/400/400`,
-                name: `Generated Image ${i + 1}`
-            }));
-
+        try {
+            const response = await authFetch(`${API_URL}/generated-ads/generate-image`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ brand, product, template: selectedTemplate, copy: copyData, count: 4, imageSizes: [{ name: 'Square', width: 1080, height: 1080 }] }) });
+            if (!response.ok) throw new Error('Image generation failed. Check the generation service configuration.');
+            const data = await response.json();
+            const newImages = data.images.map((image, index) => ({ ...image, previewUrl: image.url, name: `Generated Image ${index + 1}` }));
             setGeneratedImages(newImages);
-            setGenerating(false);
-        }, 3000);
+            setSelectedImages([]);
+        } catch (failure) { showError(failure.message); }
+        finally { setGenerating(false); }
     };
 
     const toggleImageSelection = (image) => {

@@ -3,13 +3,23 @@ import json
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, select, text
+from sqlalchemy import delete, func, select, text, union_all, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.delivery import config
-from app.delivery.models import DeliveryJob, DeliverySettings, ManagedAd, DeliverySync
+from app.delivery.models import (
+    DeliveryJob,
+    DeliverySettings,
+    ManagedAd,
+    DeliverySync,
+    DeliveryPostAttempt,
+    new_id,
+)
+from app.delivery.errors import classify_write_error
+from app.delivery.recovery import notify_failure
 from app.delivery.provider import DeliveryProvider, ProviderError
+from app.delivery.budget import RequestDeferred
 from app.models import FacebookAd, User
 
 
@@ -48,7 +58,17 @@ def worker_session(engine, lane):
 def enqueue(db, owner_id, request_key, account_id, kind, payload):
     fingerprint = hashlib.sha256(
         json.dumps(
-            [account_id, kind, payload], sort_keys=True, separators=(",", ":")
+            [
+                account_id,
+                kind,
+                {
+                    key: value
+                    for key, value in payload.items()
+                    if key != "creative_snapshot"
+                },
+            ],
+            sort_keys=True,
+            separators=(",", ":"),
         ).encode()
     ).hexdigest()
     # Serializes a buyer's quota and submission key, including concurrent requests.
@@ -90,6 +110,8 @@ def enqueue(db, owner_id, request_key, account_id, kind, payload):
             else {}
         ),
         generated_ad_id=payload.get("generated_ad_id"),
+        creative_asset_id=payload.get("creative_asset_id"),
+        creative_snapshot=payload.get("creative_snapshot"),
         stage=(
             ("video_upload" if payload.get("media_type") == "video" else "image")
             if kind == "launch" and not payload.get("resume_creative_id")
@@ -97,6 +119,21 @@ def enqueue(db, owner_id, request_key, account_id, kind, payload):
         ),
     )
     db.add(job)
+    db.flush()
+    if job.creative_asset_id:
+        from app.creatives.models import CreativeAsset
+        from app.creatives.service import event
+
+        event(
+            db,
+            db.get(CreativeAsset, job.creative_asset_id),
+            owner_id,
+            "launched",
+            {
+                "job_id": job.id,
+                "metadata_revision": job.creative_snapshot["metadata_revision"],
+            },
+        )
     get_settings(db)
     db.commit()
     return job
@@ -105,24 +142,44 @@ def enqueue(db, owner_id, request_key, account_id, kind, payload):
 def posting_allowed(db, settings, now):
     if settings.paused:
         return False
-    latest = db.scalar(select(func.max(DeliveryJob.post_started_at)))
-    finished = db.scalar(
-        select(func.max(DeliveryJob.finished_at)).where(
-            DeliveryJob.post_started_at.is_not(None)
+    # Include old workers' reservations during a rolling deployment.
+    legacy = select(
+        DeliveryJob.post_started_at.label("started_at"), DeliveryJob.finished_at
+    ).where(
+        DeliveryJob.post_started_at.is_not(None),
+        ~select(DeliveryPostAttempt.id)
+        .where(
+            DeliveryPostAttempt.job_id == DeliveryJob.id,
+            DeliveryPostAttempt.started_at == DeliveryJob.post_started_at,
         )
+        .exists(),
     )
+    attempts = union_all(
+        select(DeliveryPostAttempt.started_at, DeliveryPostAttempt.finished_at), legacy
+    ).subquery()
+    latest, finished = db.execute(
+        select(func.max(attempts.c.started_at), func.max(attempts.c.finished_at))
+    ).one()
     gate = max([date for date in [latest, finished] if date is not None], default=None)
     if gate and now < gate + timedelta(seconds=settings.min_interval_seconds):
         return False
     count = db.scalar(
         select(func.count())
-        .select_from(DeliveryJob)
-        .where(
-            DeliveryJob.post_started_at
-            > now - timedelta(seconds=settings.window_seconds)
-        )
+        .select_from(attempts)
+        .where(attempts.c.started_at > now - timedelta(seconds=settings.window_seconds))
     )
     return count < settings.max_posts
+
+
+def finish_attempt(db, job):
+    db.execute(
+        update(DeliveryPostAttempt)
+        .where(
+            DeliveryPostAttempt.job_id == job.id,
+            DeliveryPostAttempt.finished_at.is_(None),
+        )
+        .values(finished_at=utcnow())
+    )
 
 
 def persist_ad(db, job, fb_ad_id):
@@ -136,6 +193,7 @@ def persist_ad(db, job, fb_ad_id):
             db.add(
                 FacebookAd(
                     id=local_id,
+                    created_by_id=job.owner_id,
                     adset_id=p["local_adset_id"],
                     name=job.name,
                     creative_name=job.name,
@@ -160,6 +218,8 @@ def persist_ad(db, job, fb_ad_id):
         .values(
             job_id=job.id,
             owner_id=job.owner_id,
+            creative_asset_id=job.creative_asset_id,
+            creative_snapshot=job.creative_snapshot,
             account_id=job.account_id,
             fb_ad_id=fb_ad_id,
             fb_adset_id=adset_id,
@@ -180,6 +240,10 @@ def persist_ad(db, job, fb_ad_id):
     job.results = {**result, "ad_id": fb_ad_id}
     job.status, job.stage, job.error_message = "succeeded", "complete", None
     job.finished_at = utcnow()
+    job.error_code = None
+    job.provider_error_code = job.provider_error_subcode = None
+    job.retry_allowed = False
+    finish_attempt(db, job)
     db.commit()
 
 
@@ -188,13 +252,54 @@ def advance(db, job, stage, results):
     job.stage, job.status = stage, "queued"
     job.stage_started_at = None
     job.read_failures = 0
+    job.error_code = job.error_message = None
+    job.provider_error_code = job.provider_error_subcode = None
     db.commit()
 
 
-def fail_job(db, job, message, uncertain=False):
+def fail_job(db, job, message, uncertain=False, code=None, retry_allowed=False):
     job.status = "needs_reconciliation" if uncertain else "failed"
     job.error_message, job.finished_at = message, utcnow()
+    job.error_code = code or ("META_WRITE_UNKNOWN" if uncertain else "POSTING_FAILED")
+    job.retry_allowed = retry_allowed and not uncertain and not job.results.get("ad_id")
+    job.failure_id = new_id()
+    finish_attempt(db, job)
+    notify_failure(db, job)
     db.commit()
+
+
+def write_failed(db, job, settings, error):
+    from app.delivery.sync import retry_delay
+
+    failure = classify_write_error(error, job.stage)
+    job.error_code, job.error_message = failure.code, str(failure)
+    job.provider_error_code = failure.provider_code
+    job.provider_error_subcode = failure.provider_subcode
+    if not failure.safe_to_retry:
+        fail_job(db, job, str(failure), True, failure.code)
+        return
+    job.write_failures += 1
+    now = utcnow()
+    job.retry_started_at = job.retry_started_at or now
+    delay = retry_delay(job.write_failures, failure.retry_after)
+    deadline = job.retry_started_at + timedelta(
+        seconds=config.POST_RETRY_DEADLINE_SECONDS
+    )
+    finish_attempt(db, job)
+    if (
+        failure.automatic
+        and job.write_failures <= settings.max_post_retries
+        and now + timedelta(seconds=delay) < deadline
+    ):
+        job.status = "queued"
+        job.available_at = now + timedelta(seconds=delay)
+        job.error_message += " A retry is scheduled."
+        db.commit()
+        return
+    message = str(failure)
+    if failure.automatic:
+        message += " Automatic retries stopped at the retry or time limit. Retry when the issue is resolved."
+    fail_job(db, job, message, code=failure.code, retry_allowed=failure.retry_allowed)
 
 
 def video_read_failed(db, job, settings, error):
@@ -216,7 +321,12 @@ def video_read_failed(db, job, settings, error):
         job.available_at = now + timedelta(seconds=delay)
         db.commit()
     else:
-        fail_job(db, job, "Video status read failed or exhausted its retry/time limit")
+        fail_job(
+            db,
+            job,
+            "Video status could not be read within its retry/time limit. Check the video in Meta before using a new draft.",
+            code="VIDEO_READ_FAILED",
+        )
 
 
 def posting_tick(engine, provider_factory=None):
@@ -231,7 +341,22 @@ def posting_tick(engine, provider_factory=None):
             select(DeliveryJob).where(DeliveryJob.status == "working")
         ).all():
             if stale.results.get("ad_id"):
-                persist_ad(db, stale, stale.results["ad_id"])
+                try:
+                    persist_ad(db, stale, stale.results["ad_id"])
+                except Exception as error:
+                    if db.get_bind().invalidated or getattr(
+                        error, "connection_invalidated", False
+                    ):
+                        raise
+                    db.rollback()
+                    db.refresh(stale)
+                    fail_job(
+                        db,
+                        stale,
+                        "Meta ad exists; local saving needs reconciliation.",
+                        True,
+                        "LOCAL_SAVE_FAILED",
+                    )
             elif stale.stage == "video_ready":
                 video_read_failed(
                     db,
@@ -266,6 +391,21 @@ def posting_tick(engine, provider_factory=None):
         )
         if job is None:
             return
+        if (
+            job.write_failures
+            and job.retry_started_at
+            and now
+            >= job.retry_started_at
+            + timedelta(seconds=config.POST_RETRY_DEADLINE_SECONDS)
+        ):
+            fail_job(
+                db,
+                job,
+                "The posting retry window expired. Retry when the issue is resolved.",
+                code="POST_RETRY_EXHAUSTED",
+                retry_allowed=True,
+            )
+            return
         owner = db.get(User, job.owner_id) if job.owner_id else None
         if (
             not owner
@@ -273,7 +413,11 @@ def posting_tick(engine, provider_factory=None):
             or not owner.has_permission("campaigns:write")
         ):
             fail_job(
-                db, job, "Posting permission is no longer available for this buyer"
+                db,
+                job,
+                "Restore this buyer’s posting permission, then retry this ad.",
+                code="BUYER_PERMISSION",
+                retry_allowed=True,
             )
             return
         try:
@@ -282,8 +426,16 @@ def posting_tick(engine, provider_factory=None):
                 if provider_factory
                 else DeliveryProvider.for_user(db, job.owner_id)
             )
+            if hasattr(provider, "configure_budget"):
+                provider.configure_budget(engine, job.account_id, "interactive")
         except Exception:
-            fail_job(db, job, "Facebook configuration is unavailable")
+            fail_job(
+                db,
+                job,
+                "Reconnect the buyer’s Meta account or restore its configuration, then retry this ad.",
+                code="META_CONNECTION",
+                retry_allowed=True,
+            )
             return
         p = job.payload
         if not job.stage_started_at:
@@ -291,6 +443,7 @@ def posting_tick(engine, provider_factory=None):
         job.status = "working"
         if job.stage == "ad":
             job.post_started_at = now
+            db.add(DeliveryPostAttempt(job_id=job.id, started_at=now))
         db.commit()
         try:
             if job.stage == "image":
@@ -305,7 +458,12 @@ def posting_tick(engine, provider_factory=None):
                 if now >= job.stage_started_at + timedelta(
                     seconds=config.VIDEO_TIMEOUT_SECONDS
                 ):
-                    fail_job(db, job, "Video processing exceeded 10 minutes")
+                    fail_job(
+                        db,
+                        job,
+                        "Video processing exceeded 10 minutes. Check the video in Meta before using a new draft.",
+                        code="VIDEO_TIMEOUT",
+                    )
                     return
                 response = provider.video_status(job.results["video_id"])
                 status = response.get("status", {}).get("video_status", "").lower()
@@ -325,7 +483,12 @@ def posting_tick(engine, provider_factory=None):
                         },
                     )
                 elif status == "error":
-                    fail_job(db, job, "Facebook could not process the video")
+                    fail_job(
+                        db,
+                        job,
+                        "Meta could not process the video. Replace the video in a new draft.",
+                        code="VIDEO_PROCESSING",
+                    )
                 else:
                     job.status = "queued"
                     job.available_at = now + timedelta(
@@ -349,9 +512,38 @@ def posting_tick(engine, provider_factory=None):
                     job.account_id,
                 )
                 # Commit remote identity before any local bookkeeping that can fail.
+                if not str(result["id"]).isdigit():
+                    raise ValueError("Invalid ad identity")
                 job.results = {**job.results, "ad_id": str(result["id"])}
                 db.commit()
                 persist_ad(db, job, str(result["id"]))
+        except RequestDeferred as error:
+            db.rollback()
+            db.refresh(job)
+            if error.may_have_written:
+                fail_job(
+                    db,
+                    job,
+                    "Facebook preparation paused after a write; reconcile before retrying",
+                    True,
+                )
+            else:
+                job.status, job.available_at = "queued", error.until
+                if job.stage == "ad":
+                    db.execute(
+                        delete(DeliveryPostAttempt).where(
+                            DeliveryPostAttempt.job_id == job.id,
+                            DeliveryPostAttempt.started_at == job.post_started_at,
+                            DeliveryPostAttempt.finished_at.is_(None),
+                        )
+                    )
+                    job.post_started_at = None
+                if job.stage == "video_ready":
+                    job.stage_started_at += max(timedelta(0), error.until - utcnow())
+                else:
+                    job.stage_started_at = None
+                job.error_message = "Waiting for shared Facebook request capacity"
+                db.commit()
         except Exception as error:
             if db.get_bind().invalidated or getattr(
                 error, "connection_invalidated", False
@@ -369,9 +561,4 @@ def posting_tick(engine, provider_factory=None):
             elif job.stage == "video_ready":
                 video_read_failed(db, job, settings, error)
             else:
-                fail_job(
-                    db,
-                    job,
-                    "Facebook write did not return a confirmed result. Reconcile before posting again.",
-                    True,
-                )
+                write_failed(db, job, settings, error)

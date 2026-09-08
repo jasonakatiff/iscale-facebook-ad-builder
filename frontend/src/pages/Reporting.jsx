@@ -36,6 +36,7 @@ export default function Reporting() {
                     Configure LeadRouter
                 </Link>
             </header>
+            <Link className="text-brand underline text-sm" to="/creative-analytics">Explore creative patterns across Facebook, Google and TikTok</Link>
             <DeliveryReporting />
             <section className="studio-panel p-5 space-y-4" aria-label="LeadRouter reporting">
                 <div className="flex flex-wrap justify-between gap-3">

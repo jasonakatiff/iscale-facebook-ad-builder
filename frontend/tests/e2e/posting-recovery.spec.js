@@ -1,0 +1,50 @@
+import { test, expect } from '@playwright/test';
+import process from 'node:process';
+
+test('posting failure notifies across pages, retries confirmed rejection and preserves uncertain-write protection', async ({ page, request }) => {
+    test.skip(process.env.DELIVERY_DEMO !== '1', 'Requires isolated PostgreSQL and simulated Meta; no live publication');
+    test.setTimeout(90000);
+    const api = process.env.TEST_API_URL;
+    const auth = await request.post(`${api}/auth/login/json`, { data: { email: process.env.TEST_EMAIL, password: process.env.TEST_PASSWORD } });
+    expect(auth.ok()).toBeTruthy();
+    const token = (await auth.json()).access_token;
+    const headers = { Authorization: `Bearer ${token}` };
+    await page.addInitScript(value => localStorage.setItem('accessToken', value), token);
+    const name = `test-retry-${Date.now()}`;
+    const submission = { request_key: name, name, account_id: 'act_929999', local_adset_id: 'test-delivery-adset', page_id: '919888', media_url: 'https://example.com/test.png', media_type: 'image', primary_text: 'test-copy', headline: 'test-headline', website_url: 'https://example.com', status: 'PAUSED' };
+    const response = await request.post(`${api}/delivery/launches`, { headers, data: submission });
+    expect(response.status()).toBe(202);
+    const job = await response.json();
+    const readJob = async () => {
+        const result = await request.get(`${api}/delivery/jobs/${job.id}`, { headers });
+        expect(result.ok()).toBeTruthy();
+        return result.json();
+    };
+    await expect.poll(async () => (await readJob()).status).toBe('failed');
+    const failed = await readJob();
+    expect(failed.error_code).toBe('META_CONNECTION');
+    expect(failed.retry_allowed).toBe(true);
+    expect(failed.results.creative_id).toBeTruthy();
+    await page.goto('/reporting');
+    await page.getByRole('button', { name: /Posting notifications, [1-9]/ }).click();
+    await expect(page.getByRole('region', { name: 'Posting notifications' }).getByText(/Reconnect the buyer/)).toBeVisible();
+    await page.getByRole('link', { name: `View ${name}`, exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`posting-queue\\?job=${job.id}`));
+    await page.getByRole('button', { name: `Retry ${name}`, exact: true }).click();
+    await page.getByRole('button', { name: 'Retry posting', exact: true }).click();
+    await expect.poll(async () => (await readJob()).status).toBe('succeeded');
+    expect((await readJob()).results.creative_id).toBe(failed.results.creative_id);
+    const stale = await request.post(`${api}/delivery/jobs/${job.id}/retry`, { headers, data: { failure_id: failed.failure_id } });
+    expect(stale.status()).toBe(409);
+    const replay = await request.post(`${api}/delivery/launches`, { headers, data: submission });
+    expect((await replay.json()).id).toBe(job.id);
+
+    const rateName = `test-rate-retry-${Date.now()}`;
+    const automatic = await request.post(`${api}/delivery/launches`, { headers, data: { ...submission, request_key: rateName, name: rateName } });
+    const rateJob = await automatic.json();
+    await expect.poll(async () => (await (await request.get(`${api}/delivery/jobs/${rateJob.id}`, { headers })).json()).status, { timeout: 20000 }).toBe('succeeded');
+    const final = await (await request.get(`${api}/delivery/jobs/${rateJob.id}`, { headers })).json();
+    expect(final.write_failures).toBe(1);
+    const pending = await (await request.get(`${api}/delivery/notifications`, { headers })).json();
+    expect(pending.data.some(item => item.job_id === job.id || item.job_id === rateJob.id)).toBe(false);
+});

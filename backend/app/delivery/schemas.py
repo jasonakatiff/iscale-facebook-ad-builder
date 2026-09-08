@@ -1,5 +1,14 @@
 from typing import Literal, Optional
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+from uuid import UUID
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    field_validator,
+    model_validator,
+)
+from app.delivery.config import DEFAULTS
 
 
 class DeliveryConfig(BaseModel):
@@ -7,11 +16,56 @@ class DeliveryConfig(BaseModel):
     min_interval_seconds: int = Field(default=2, ge=1, le=3600)
     max_posts: int = Field(default=30, ge=1, le=10000)
     window_seconds: int = Field(default=60, ge=1, le=86400)
+    max_post_retries: int = Field(default=3, ge=0, le=10)
     max_read_retries: int = Field(default=3, ge=0, le=10)
     status_interval_seconds: int = Field(default=300, ge=60, le=86400)
-    performance_interval_seconds: int = Field(default=900, ge=60, le=86400)
+    performance_interval_seconds: int = Field(
+        default=DEFAULTS["performance_interval_seconds"], ge=60, le=86400
+    )
+    stable_status_interval_seconds: int = Field(
+        default=DEFAULTS["stable_status_interval_seconds"], ge=60, le=86400
+    )
+    lookback_days: int = Field(default=DEFAULTS["lookback_days"], ge=1, le=90)
+    reconcile_days: int = Field(default=DEFAULTS["reconcile_days"], ge=1, le=90)
+    reconcile_interval_hours: int = Field(
+        default=DEFAULTS["reconcile_interval_hours"], ge=1, le=168
+    )
+    metadata_cache_hours: int = Field(
+        default=DEFAULTS["metadata_cache_hours"], ge=1, le=168
+    )
+    api_requests_per_minute: int = Field(
+        default=DEFAULTS["api_requests_per_minute"], ge=1, le=10000
+    )
+    import_requests_per_minute: int = Field(
+        default=DEFAULTS["import_requests_per_minute"], ge=1, le=10000
+    )
+    account_requests_per_minute: int = Field(
+        default=DEFAULTS["account_requests_per_minute"], ge=1, le=10000
+    )
+    api_daily_request_limit: int = Field(
+        default=DEFAULTS["api_daily_request_limit"], ge=1, le=1000000
+    )
+    api_max_concurrency: int = Field(
+        default=DEFAULTS["api_max_concurrency"], ge=1, le=10
+    )
+    api_usage_pause_percent: int = Field(
+        default=DEFAULTS["api_usage_pause_percent"], ge=10, le=95
+    )
+    async_poll_seconds: int = Field(
+        default=DEFAULTS["async_poll_seconds"], ge=15, le=300
+    )
     paused: bool = False
     imports_enabled: bool = True
+
+    @model_validator(mode="after")
+    def consistent_limits(self):
+        if self.import_requests_per_minute > self.api_requests_per_minute:
+            raise ValueError("Import allowance cannot exceed the shared request limit")
+        if self.reconcile_days < self.lookback_days:
+            raise ValueError("Correction window must cover the recent reporting window")
+        if self.stable_status_interval_seconds < self.status_interval_seconds:
+            raise ValueError("Stable ads cannot refresh more frequently than new ads")
+        return self
 
 
 class LaunchRequest(BaseModel):
@@ -31,9 +85,10 @@ class LaunchRequest(BaseModel):
     cta: str = Field(default="LEARN_MORE", pattern=r"^[A-Z_]{1,50}$")
     status: Literal["ACTIVE", "PAUSED"] = "PAUSED"
     resume_creative_id: Optional[str] = Field(default=None, pattern=r"^[0-9]+$")
-    generated_ad_id: Optional[str] = None
     instagram_user_id: Optional[str] = Field(default=None, pattern=r"^[0-9]+$")
     url_tags: str = Field(default="", max_length=2000)
+    generated_ad_id: Optional[str] = None
+    creative_asset_id: Optional[str] = Field(default=None, min_length=1, max_length=160)
 
     @field_validator("media_url", "thumbnail_url", "website_url")
     @classmethod
@@ -59,3 +114,8 @@ class AdRequest(BaseModel):
 class ReconcileRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     fb_ad_id: str = Field(pattern=r"^[0-9]+$")
+
+
+class RetryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    failure_id: UUID

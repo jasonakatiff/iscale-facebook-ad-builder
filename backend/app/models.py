@@ -155,7 +155,7 @@ class Brand(Base):
             "secondary": self.secondary_color,
             "highlight": self.highlight_color
         }
-    
+
     @property
     def profileIds(self):
         return [p.id for p in self.profiles]
@@ -239,6 +239,7 @@ class FacebookCampaign(Base):
     __tablename__ = "facebook_campaigns"
 
     id = Column(String, primary_key=True, default=generate_uuid)
+    created_by_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"))
     name = Column(String, nullable=False)
     objective = Column(String, nullable=False)
     budget_type = Column(String, nullable=False)
@@ -256,6 +257,7 @@ class FacebookAdSet(Base):
     __tablename__ = "facebook_adsets"
 
     id = Column(String, primary_key=True, default=generate_uuid)
+    created_by_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"))
     campaign_id = Column(String, ForeignKey("facebook_campaigns.id", ondelete="CASCADE"), nullable=False)
     name = Column(String, nullable=False)
     optimization_goal = Column(String, nullable=False)
@@ -278,6 +280,7 @@ class FacebookAd(Base):
     __tablename__ = "facebook_ads"
 
     id = Column(String, primary_key=True, default=generate_uuid)
+    created_by_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"))
     adset_id = Column(String, ForeignKey("facebook_adsets.id", ondelete="CASCADE"), nullable=False)
     name = Column(String, nullable=False)
     creative_name = Column(String, nullable=True)
@@ -325,11 +328,11 @@ class WinningAd(Base):
     copy_patterns = Column(JSON, nullable=True)
     visual_elements = Column(JSON, nullable=True)
     template_category = Column(String, nullable=True)
-    
+
     # Ad Remix Engine fields
     blueprint_json = Column(JSON, nullable=True)  # Stores the deconstructed blueprint
     blueprint_analyzed_at = Column(DateTime(timezone=True), nullable=True)  # When blueprint was created
-    
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     generated_ads = relationship("GeneratedAd", back_populates="template")
@@ -338,6 +341,8 @@ class GeneratedAd(Base):
     __tablename__ = "generated_ads"
 
     id = Column(String, primary_key=True, default=generate_uuid)
+    generation_context = Column(JSON, nullable=True)
+    created_by_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"))
     brand_id = Column(String, ForeignKey("brands.id", ondelete="SET NULL"), nullable=True)
     product_id = Column(String, ForeignKey("products.id", ondelete="SET NULL"), nullable=True) # Assuming product_id is also FK, though not explicit in original schema it makes sense
     template_id = Column(String, ForeignKey("winning_ads.id", ondelete="SET NULL"), nullable=True)
@@ -787,6 +792,7 @@ class AccountSyncJob(Base):
         nullable=True,
     )
     credential_owner_version = Column(Integer, nullable=False)
+    available_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     status = Column(String(20), nullable=False, server_default="queued")
     attempts = Column(Integer, nullable=False, server_default="0")
     pages_fetched = Column(Integer, nullable=False, server_default="0")

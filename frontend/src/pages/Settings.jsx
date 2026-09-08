@@ -1,3 +1,5 @@
+import { AnalyticsSettings } from '../components/AnalyticsSettings';
+import { DeliverySettings } from '../components/DeliverySettings';
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ProviderConnections } from '../components/ProviderConnections';
@@ -64,7 +66,8 @@ export default function Settings() {
         { id: 'styles', label: 'Ad Styles', count: styles.length },
         { id: 'prompts', label: 'Prompts', count: prompts.length },
         { id: 'general', label: 'General', count: null },
-        { id: 'integrations', label: 'Integrations', count: null }
+        { id: 'integrations', label: 'Integrations', count: null },
+        { id: 'traffic', label: 'Traffic source sync', icon: SettingsIcon },
     ];
 
     const handleDeleteStyle = (styleId) => {
@@ -177,6 +180,7 @@ export default function Settings() {
                             onUpdate={(updatedPrompt) => setEditingPrompt(updatedPrompt)}
                         />
                     )}
+                    {activeTab === 'traffic' && <div className="space-y-8"><DeliverySettings /><AnalyticsSettings /></div>}
                     {activeTab === 'general' && (
                         <GeneralSettings />
                     )}

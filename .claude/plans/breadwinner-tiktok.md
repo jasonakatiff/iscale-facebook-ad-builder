@@ -13,7 +13,7 @@ Updated: 2026-09-04
 - [x] Load TikTok campaigns after connection discovery, date changes, and advertiser changes; display request errors.
 - [x] Preserve Railway preview hosts and backend proxy configuration.
 - [x] Build passes; added/edited frontend files have no lint errors; regression tests pass.
-- [x] Commit as Jason Akatiff <jasona@iscale.com>; no push; clean worktree.
+- [x] Commit as Jason Akatiff <test-owner@example.com>; no push; clean worktree.
 
 ## Implementation Steps
 - [x] Phase 0: Write Tests — TikTok component regression scenarios and baseline lint.

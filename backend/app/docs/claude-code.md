@@ -17,7 +17,7 @@ Use exact paths, methods, schemas, and pagination from OpenAPI.
 Read existing resources before making changes; preserve account and workspace IDs.
 Explain the concrete effects before campaign publication, spend changes, deletions, or bulk writes.
 After a timeout, reconcile results before retrying a write.
-Do not treat prototype or legacy Reporting sample values as live performance.
+Do not treat workflow prototype sample values as live performance. Campaign Reporting now exposes committed managed-ad snapshots; use the [Delivery API reference](/api/v1/help/docs/delivery-api) to check coverage, account currency and import freshness.
 ```
 
 Start with: “Read the docs, verify my identity, and list the brands I can access.” Then use specific requests such as listing workspace accounts, creating a brand, generating draft creative, or inspecting campaign insights. Only the actual API operations are automatable; a visual prototype does not imply a backend endpoint exists.

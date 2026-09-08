@@ -20,7 +20,7 @@ curl --fail-with-body "$BREADWINNER_API_URL/api/v2/workspaces?limit=20&offset=0"
 ```
 
 ## Contract rules
-Use the downloaded OpenAPI file as the authority for each method, path, schema, required field, and response. Existing APIs contain both snake_case and camelCase contracts; do not invent a global transformation. Legacy endpoints often return arrays or `{detail: ...}` errors. Workspace, theme, and user-key endpoints use `{data, pagination}` for lists and structured `{error:{code,message,details}}` errors. Pagination parameters differ by endpoint; inspect the operation.
+Use the downloaded OpenAPI file as the authority for each method, path, schema, required field, and response. Existing APIs contain both snake_case and camelCase contracts; do not invent a global transformation. Legacy endpoints often return arrays or `{detail: ...}` errors. Delivery, workspace, theme, and user-key endpoints use `{data, pagination}` for lists and structured `{error:{code,message,details}}` errors. Pagination parameters differ by endpoint; inspect the operation.
 
 Read-only keys allow GET/HEAD/OPTIONS on protected data endpoints. All other methods require platform:write, including POST-based exports. Provider OAuth and browser account-security endpoints require a session. Legacy bot operations require legacy bot scopes. Public documentation and health endpoints need no key.
 
@@ -28,3 +28,7 @@ Read-only keys allow GET/HEAD/OPTIONS on protected data endpoints. All other met
 Read the current resource before updating it. Follow the endpoint's documented required fields. Do not reuse IDs from another account or workspace. A read/write key can invoke operations that incur provider usage or publish campaigns; it is not restricted to browser draft mode. Network timeouts do not prove a write failed. Reconcile provider IDs or application records before resubmitting.
 
 401 means invalid/revoked/expired credentials; replace the key through the browser. 403 means insufficient scope, role, inactive account, or resource access; do not retry with guessed IDs. 422 indicates invalid input. 429 indicates a rate limit. Provider errors can be reported per service rather than as one global failure.
+
+## Queued Facebook ads
+
+Final ad submissions return HTTP 202 with a durable job. Use a stable request key, poll for completion, and reconcile uncertain writes before any new submission. See the [Delivery API reference](/api/v1/help/docs/delivery-api) for shared settings, all 14 delivery operations, legacy `/facebook/ads` compatibility, retries, notifications, import schedules and duplicate-free snapshots. The [buyer/admin guide](/api/v1/help/docs/posting-queue) explains the visible workflow.

@@ -20,7 +20,7 @@ test('shared queue posts once, reconciles a lost response and reimports unchange
     const jobIds = [];
     const stamp = Date.now();
     for (const name of [`test-queue-${stamp}-one`, `test-queue-${stamp}-two`, `test-timeout-${stamp}`]) {
-        const payload = { request_key: name, account_id: 'act_919999', name, local_adset_id: 'test-delivery-adset', page_id: '919888', media_url: 'https://example.com/test.png', media_type: 'image', primary_text: 'test-copy', headline: 'test-headline', website_url: 'https://example.com', cta: 'LEARN_MORE', status: 'PAUSED' };
+        const payload = { request_key: name, creative_asset_id: 'test-delivery-legacy-asset', account_id: 'act_919999', name, local_adset_id: 'test-delivery-adset', page_id: '919888', media_url: 'https://example.com/test.png', media_type: 'image', primary_text: 'test-copy', headline: 'test-headline', website_url: 'https://example.com', cta: 'LEARN_MORE', status: 'PAUSED' };
         const posted = await request.post(`${api}/delivery/launches`, { headers, data: payload });
         expect(posted.status()).toBe(202);
         const job = await posted.json();

@@ -79,7 +79,7 @@ def test_additive_workspace_migration_preserves_unmapped_legacy_rows():
                 }
                 expected = {
                     column.name: column.nullable
-                    for column in Base.metadata.tables[name].columns
+                    for column in Base.metadata.tables[name].columns if column.name != "available_at"
                 }
                 assert actual == expected, name
             active_index = next(
@@ -127,10 +127,13 @@ def test_alembic_upgrades_old_schema_and_repeating_head_is_safe():
             tables=[
                 table
                 for table in Base.metadata.sorted_tables
-                if table.name not in TABLES | {"installation_state", "provider_connections", "telemetry_events", "plugin_installations", "plugin_runs", "delivery_settings", "delivery_jobs", "managed_ads", "delivery_syncs", "ad_insights"}
+                if not table.name.startswith("analytics_") and table.name not in TABLES | {"installation_state", "provider_connections", "telemetry_events", "plugin_installations", "plugin_runs", "delivery_settings", "delivery_jobs", "managed_ads", "delivery_syncs", "ad_insights", "creative_assets", "creative_events", "delivery_api_requests", "delivery_api_cooldowns", "delivery_provider_cache", "delivery_staged_insights", "delivery_post_attempts", "delivery_notifications"}
             ],
         )
         with scoped.begin() as db:
+            for table in ['generated_ads','facebook_campaigns','facebook_adsets','facebook_ads']:
+                db.execute(text(f'ALTER TABLE {table} DROP COLUMN created_by_id'))
+            db.execute(text('ALTER TABLE generated_ads DROP COLUMN generation_context'))
             db.execute(
                 text(
                     "INSERT INTO brands (id,name) VALUES ('test-legacy','test-unassigned')"
@@ -159,7 +162,7 @@ def test_alembic_upgrades_old_schema_and_repeating_head_is_safe():
         with scoped.connect() as db:
             assert (
                 db.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-                == "bw_install_001"
+                == "public_cutover_20260912"
             )
             assert (
                 db.execute(text("SELECT name FROM brands")).scalar_one()

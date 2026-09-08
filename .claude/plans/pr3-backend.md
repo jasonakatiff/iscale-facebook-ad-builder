@@ -7,7 +7,7 @@ Updated: 2026-09-04
 - All 12 specification fixes implemented, with existing assertions preserved.
 - Full backend pytest suite passes using the supplied environment.
 - Empty bootstrap, upstream schema upgrade, and legacy/new refresh flows pass on disposable local PostgreSQL databases.
-- Small commits authored by Jason Akatiff <jasona@iscale.com>; no push; clean worktree.
+- Small commits authored by Jason Akatiff <test-owner@example.com>; no push; clean worktree.
 - Changes confined to this worktree, excluding the paths reserved by the specification.
 
 ## Implementation steps

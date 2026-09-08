@@ -9,14 +9,30 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
-EXPECTED_REVISION = "bw_install_001"
+EXPECTED_REVISION = "public_cutover_20260912"
 REQUIRED_TABLES = frozenset(
     {
         "users",
+        'analytics_audit',
+        'analytics_settings',
+        'analytics_sources',
+        'analytics_accounts',
+        'analytics_ads',
+        'analytics_staged_rows',
+        'analytics_insights',
+
         "api_keys",
         "telemetry_events",
+        "creative_assets",
+        "creative_events",
+        "delivery_api_requests",
+        "delivery_api_cooldowns",
+        "delivery_provider_cache",
+        "delivery_staged_insights",
         "delivery_settings",
         "delivery_jobs",
+        "delivery_post_attempts",
+        "delivery_notifications",
         "managed_ads",
         "delivery_syncs",
         "ad_insights",
@@ -38,8 +54,16 @@ REQUIRED_TABLES = frozenset(
     }
 )
 REQUIRED_API = {
+    "/api/v1/analytics/settings": {"get"},
+    "/api/v1/analytics/patterns": {"get"},
+    "/api/v1/analytics/report": {"get"},
+    "/api/v1/analytics/sources": {"get", "post"},
+    "/api/v1/creatives": {"get"},
+    "/api/v1/creatives/uploads": {"post"},
     "/api/v1/delivery/settings": {"get", "put"},
     "/api/v1/delivery/jobs": {"get"},
+    "/api/v1/delivery/jobs/{job_id}/retry": {"post"},
+    "/api/v1/delivery/notifications": {"get"},
     "/api/v1/delivery/launches": {"post"},
     "/api/v1/delivery/syncs": {"get"},
     "/api/v1/delivery/report": {"get"},

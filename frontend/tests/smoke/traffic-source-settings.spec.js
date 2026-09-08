@@ -1,0 +1,34 @@
+import { test, expect } from '@playwright/test';
+import process from 'node:process';
+
+test('traffic source settings load, validate and persist', async ({ page }) => {
+    test.skip(process.env.DELIVERY_DEMO !== '1', 'Requires isolated demo; settings must not change live systems');
+    await page.goto('/login');
+    await page.getByLabel('Email Address').fill(process.env.TEST_EMAIL);
+    await page.getByLabel('Password', { exact: true }).fill(process.env.TEST_PASSWORD);
+    await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+    await page.getByRole('link', { name: 'Settings', exact: true }).last().click();
+    await page.getByRole('button', { name: 'Traffic source sync', exact: true }).click();
+    const metaSettings = page.getByRole('region', { name: 'Traffic source sync settings', exact: true });
+    const interval = metaSettings.getByLabel('Performance refresh (hours)');
+    await expect(interval).toHaveValue('4');
+    await expect(metaSettings.getByLabel('Historical correction window (days)')).toHaveValue('35');
+    const allowance = metaSettings.getByLabel('Import requests per minute');
+    await allowance.fill('121');
+    await page.getByRole('button', { name: 'Save delivery settings' }).click();
+    await expect(page.getByRole('alert').first()).toContainText('Import allowance');
+    await allowance.fill('40');
+    await interval.fill('1');
+    await metaSettings.getByLabel('Shared requests per minute').fill('80');
+    await page.getByRole('button', { name: 'Save delivery settings' }).click();
+    await expect(page.getByText('Delivery settings saved', { exact: true })).toBeVisible();
+    await page.reload();
+    await expect(interval).toHaveValue('1');
+    await expect(allowance).toHaveValue('40');
+    await expect(metaSettings.getByLabel('Shared requests per minute')).toHaveValue('80');
+    await interval.fill('4');
+    await allowance.fill('60');
+    await metaSettings.getByLabel('Shared requests per minute').fill('120');
+    await page.getByRole('button', { name: 'Save delivery settings' }).click();
+    await expect(page.getByText('Delivery settings saved', { exact: true })).toBeVisible();
+});

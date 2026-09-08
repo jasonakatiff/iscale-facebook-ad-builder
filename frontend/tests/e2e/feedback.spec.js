@@ -107,7 +107,7 @@ for (const interrupted of [false, true]) {
             .getByRole('combobox', { name: 'Instagram account', exact: true })
             .fill('test_brand');
         await page.getByRole('option', { name: 'test_brand', exact: true }).click();
-        await page.getByLabel('Upload images or videos').setInputFiles({
+        await page.getByLabel('Upload external creative').setInputFiles({
             name: 'test creative.png',
             mimeType: 'image/png',
             buffer: Buffer.from(
@@ -115,6 +115,7 @@ for (const interrupted of [false, true]) {
                 'base64',
             ),
         });
+        await expect(page.getByRole('button', {name: 'Metadata for test creative.png'})).toBeVisible();
         await page.getByRole('button', { name: 'Add headline', exact: true }).click();
         await page.getByLabel('Headline 2', { exact: true }).fill('test-second-headline');
         await page.getByRole('radio', { name: 'Dark theme' }).check();

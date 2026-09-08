@@ -1,11 +1,11 @@
 """Durable, fenced Meta metadata refreshes; provider I/O never holds a DB lock."""
+
 from app.telemetry.runtime import capture_exception
 
 from datetime import timedelta, timezone
 from uuid import uuid4
 
-from facebook_business.api import FacebookAdsApi
-from facebook_business.session import FacebookSession
+from app.delivery.budget import create_api, RequestDeferred
 from fastapi import HTTPException
 from sqlalchemy import and_, or_, func
 from sqlalchemy.dialects.postgresql import insert
@@ -176,7 +176,10 @@ def claim_sync_job(db, worker_id):
             db.query(AccountSyncJob)
             .filter(
                 or_(
-                    AccountSyncJob.status == "queued",
+                    and_(
+                        AccountSyncJob.status == "queued",
+                        AccountSyncJob.available_at <= now,
+                    ),
                     and_(
                         AccountSyncJob.status == "running",
                         AccountSyncJob.lease_expires_at <= now,
@@ -233,13 +236,13 @@ def checked_lease(db, lease):
 
 
 def fetch_campaign_page(account_id, token, after):
-    session = FacebookSession(
+    api = create_api(
+        access_token=token,
         app_id=settings.FACEBOOK_APP_ID,
         app_secret=settings.FACEBOOK_APP_SECRET,
-        access_token=token,
-        timeout=config.SYNC_REQUEST_TIMEOUT_SECONDS,
+        lane="import",
     )
-    api = FacebookAdsApi(session)
+    api._budget_account_id = account_id
     params = {"fields": ",".join(config.SYNC_FIELDS), "limit": config.SYNC_PAGE_SIZE}
     if after is not None:
         params["after"] = after
@@ -335,6 +338,20 @@ def run_sync_job(factory, lease):
         return "succeeded"
     except LeaseLost:
         return "lease_lost"
+    except RequestDeferred as error:
+        try:
+            with factory() as db:
+                job = checked_lease(db, lease)
+                job.status = "queued"
+                job.attempts = max(0, job.attempts - 1)
+                job.available_at = error.until
+                job.lease_expires_at = None
+                job.lease_token = None
+                job.worker_id = None
+                db.commit()
+        except LeaseLost:
+            return "lease_lost"
+        return "deferred"
     except Exception as error:
         capture_exception(error, "account_sync.run_sync_job")
         state, code = (

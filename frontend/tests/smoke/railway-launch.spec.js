@@ -8,7 +8,8 @@ test('Railway login, managed Meta access and workspace controls work with person
     test.setTimeout(90000);
     expect(process.env.TEST_EMAIL).toBeTruthy();
     expect(process.env.TEST_PASSWORD).toBeTruthy();
-    const api = process.env.BACKEND_URL || 'https://ad-builder-backend-production.up.railway.app';
+    expect(process.env.BACKEND_URL).toBeTruthy();
+    const api = process.env.BACKEND_URL;
     let auth = null;
     try {
         await page.goto('/login');

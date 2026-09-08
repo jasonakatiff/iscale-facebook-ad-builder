@@ -1,3 +1,4 @@
+from zoneinfo import ZoneInfo
 from datetime import date
 from decimal import Decimal
 
@@ -47,6 +48,45 @@ def test_admin_settings_validate_and_persist(api):
         client.get("/api/v1/delivery/settings").json()["config"]["max_read_retries"]
         == 0
     )
+
+
+def test_low_traffic_settings_defaults_and_validation(api):
+    client, _ = api
+    config = client.get("/api/v1/delivery/settings").json()["config"]
+    assert config["performance_interval_seconds"] == 14400
+    assert config["lookback_days"] == 2
+    assert config["reconcile_days"] == 35
+    response = client.put(
+        "/api/v1/delivery/settings",
+        json={
+            **config,
+            "api_requests_per_minute": 10,
+            "import_requests_per_minute": 11,
+        },
+    )
+    assert response.status_code == 422
+    response = client.put(
+        "/api/v1/delivery/settings",
+        json={
+            **config,
+            "lookback_days": 7,
+            "reconcile_days": 2,
+        },
+    )
+    assert response.status_code == 422
+    response = client.put(
+        "/api/v1/delivery/settings",
+        json={
+            **config,
+            "performance_interval_seconds": 3600,
+            "api_requests_per_minute": 20,
+            "import_requests_per_minute": 10,
+        },
+    )
+    assert response.status_code == 200
+    saved = client.get("/api/v1/delivery/settings").json()["config"]
+    assert saved["api_requests_per_minute"] == 20
+    assert saved["performance_interval_seconds"] == 3600
 
 
 def test_buyer_cannot_change_settings_or_read_another_buyers_jobs(api, sessions, buyer):
@@ -167,9 +207,108 @@ def test_launch_rejects_missing_adset_before_enqueuing(api):
         "headline": "test",
         "website_url": "https://example.com",
     }
+    payload["creative_asset_id"] = "test-asset"
     response = client.post("/api/v1/delivery/launches", json=payload)
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "ADSET_REQUIRED"
+
+
+def test_settings_reschedule_idle_imports_without_resetting_failures(
+    api, sessions, buyer
+):
+    from datetime import timedelta
+    from app.delivery.models import DeliverySync
+
+    client, _ = api
+    config = client.get("/api/v1/delivery/settings").json()["config"]
+    now = utcnow()
+    with sessions() as db:
+        db.add_all(
+            [
+                DeliverySync(
+                    owner_id=buyer.id,
+                    account_id="act_123",
+                    kind="performance",
+                    last_success_at=now,
+                    last_reconciled_at=now,
+                    next_run_at=now + timedelta(hours=4),
+                ),
+                DeliverySync(
+                    owner_id=buyer.id,
+                    account_id="act_456",
+                    kind="performance",
+                    status="failed",
+                    failures=4,
+                    next_run_at=now,
+                ),
+            ]
+        )
+        db.commit()
+    assert (
+        client.put(
+            "/api/v1/delivery/settings",
+            json={**config, "performance_interval_seconds": 3600},
+        ).status_code
+        == 200
+    )
+    with sessions() as db:
+        assert db.query(DeliverySync).filter_by(
+            account_id="act_123"
+        ).one().next_run_at == now + timedelta(hours=1)
+        failed = db.query(DeliverySync).filter_by(account_id="act_456").one()
+        assert failed.status == "failed" and failed.failures == 4
+
+
+def test_manual_refresh_coalesces_fresh_and_pending_work(api, sessions, buyer):
+    from datetime import timedelta
+    from app.delivery.models import DeliverySync
+
+    client, _ = api
+    now = utcnow()
+    with sessions() as db:
+        sync = DeliverySync(
+            owner_id=buyer.id,
+            account_id="act_123",
+            kind="performance",
+            last_success_at=now,
+            next_run_at=now + timedelta(hours=4),
+        )
+        db.add(sync)
+        db.commit()
+        identity = sync.id
+    for _ in range(3):
+        response = client.post(f"/api/v1/delivery/syncs/{identity}/restart")
+        assert response.status_code == 200 and response.json()["coalesced"]
+    with sessions() as db:
+        assert db.get(DeliverySync, identity).next_run_at == now + timedelta(hours=4)
+
+
+def test_dashboard_reads_do_not_construct_a_provider(api, monkeypatch):
+    from unittest.mock import Mock
+    import app.delivery.api as delivery_api
+
+    provider = Mock(side_effect=AssertionError("No platform calls on dashboards"))
+    monkeypatch.setattr(delivery_api, "DeliveryProvider", provider)
+    client, _ = api
+    for path in ["report", "syncs", "jobs", "settings"]:
+        assert client.get("/api/v1/delivery/" + path).status_code == 200
+    provider.assert_not_called()
+
+
+def test_legacy_routes_distinguish_budget_deferral_from_uncertain_write():
+    from datetime import timedelta
+    from fastapi import HTTPException
+    from app.delivery.budget import RequestDeferred
+    from app.api.v1.facebook import raise_if_budget_busy
+
+    for written, expected in [(False, 429), (True, 409)]:
+        with pytest.raises(HTTPException) as failure:
+            raise_if_budget_busy(
+                RequestDeferred(
+                    utcnow() + timedelta(seconds=30), may_have_written=written
+                )
+            )
+        assert failure.value.status_code == expected
 
 
 def test_report_window_uses_each_accounts_date(api, sessions, buyer, monkeypatch):
@@ -225,3 +364,196 @@ def test_report_window_uses_each_accounts_date(api, sessions, buyer, monkeypatch
     assert sorted(
         row["report_date"] for row in rows if row["account_timezone"] == "UTC"
     ) == ["2026-09-02", "2026-09-07", "2026-09-08"]
+
+
+def test_retry_endpoint_checks_owner_current_failure_and_permission(
+    api, sessions, buyer
+):
+    from app.delivery.queue import fail_job
+    from app.delivery.models import DeliveryJob
+
+    client, application = api
+    with sessions() as db:
+        job = enqueue(
+            db,
+            buyer.id,
+            "test-retry-api",
+            "act_789",
+            "ad",
+            {
+                "name": "test-retry-api",
+                "adset_id": "123",
+                "creative_id": "456",
+                "status": "PAUSED",
+            },
+        )
+        fail_job(db, job, "Reconnect Meta", code="META_CONNECTION", retry_allowed=True)
+        job_id, failure_id = job.id, job.failure_id
+    path = f"/api/v1/delivery/jobs/{job_id}/retry"
+    other = User(
+        id="test-other",
+        email="test-other@example.com",
+        is_active=True,
+        is_superuser=False,
+    )
+    application.dependency_overrides[get_current_active_user] = lambda: other
+    assert client.post(path, json={"failure_id": failure_id}).status_code in {403, 404}
+    application.dependency_overrides[get_current_active_user] = lambda: buyer
+    assert client.post(path, json={}).status_code == 422
+    assert client.post(path, json={"failure_id": failure_id}).status_code == 200
+    assert client.post(path, json={"failure_id": failure_id}).status_code == 409
+    with sessions() as db:
+        assert db.get(DeliveryJob, job_id).status == "queued"
+
+
+def test_notifications_are_private_acknowledged_independently_and_respect_role_revocation(
+    api, sessions, buyer
+):
+    from app.delivery.queue import fail_job
+    from app.delivery.models import DeliveryJob
+
+    client, application = api
+    with sessions() as db:
+        recipient = User(
+            id="test-recipient",
+            email="test-recipient@example.com",
+            hashed_password="test-unused",
+            is_active=True,
+            is_superuser=True,
+            roles=[],
+        )
+        db.add(recipient)
+        db.commit()
+        job = enqueue(
+            db,
+            buyer.id,
+            "test-notify-api",
+            "act_789",
+            "ad",
+            {
+                "name": "test-notify-api",
+                "adset_id": "123",
+                "creative_id": "456",
+                "status": "PAUSED",
+            },
+        )
+        fail_job(db, job, "Meta result unknown", uncertain=True)
+        job_id = job.id
+    notifications = client.get("/api/v1/delivery/notifications")
+    assert notifications.status_code == 200
+    notice = notifications.json()["data"][0]
+    assert (
+        notice["job_id"] == job_id and notifications.json()["pagination"]["total"] == 1
+    )
+    assert (
+        client.post(f"/api/v1/delivery/notifications/{notice['id']}/read").status_code
+        == 200
+    )
+    assert (
+        client.get("/api/v1/delivery/notifications").json()["pagination"]["total"] == 0
+    )
+    application.dependency_overrides[get_current_active_user] = lambda: recipient
+    response = client.get("/api/v1/delivery/notifications").json()
+    assert response["pagination"]["total"] == 1
+    assert (
+        client.post(f"/api/v1/delivery/notifications/{notice['id']}/read").status_code
+        == 404
+    )
+    recipient.is_superuser = False
+    assert (
+        client.get("/api/v1/delivery/notifications").json()["pagination"]["total"] == 0
+    )
+
+
+@pytest.mark.parametrize("status", ["needs_reconciliation", "succeeded", "cancelled"])
+def test_retry_endpoint_cannot_reopen_unsafe_or_completed_jobs(
+    api, sessions, buyer, status
+):
+    from app.delivery.models import DeliveryJob
+    from uuid import uuid4
+
+    client, _ = api
+    with sessions() as db:
+        job = enqueue(
+            db,
+            buyer.id,
+            "test-no-retry",
+            "act_789",
+            "ad",
+            {
+                "name": "test-no-retry",
+                "adset_id": "123",
+                "creative_id": "456",
+                "status": "PAUSED",
+            },
+        )
+        job.status, job.retry_allowed, job.failure_id = status, True, str(uuid4())
+        db.commit()
+        job_id, failure_id = job.id, job.failure_id
+    assert (
+        client.post(
+            f"/api/v1/delivery/jobs/{job_id}/retry", json={"failure_id": failure_id}
+        ).status_code
+        == 409
+    )
+
+
+def test_reconciliation_reads_use_job_owner_and_shared_budget(
+    api, sessions, monkeypatch
+):
+    from unittest.mock import Mock
+    from app.delivery import api as delivery_api
+
+    client, _ = api
+    with sessions() as db:
+        owner = User(
+            id="test-job-owner",
+            email="test-job-owner@example.com",
+            hashed_password="test-unused",
+            is_active=True,
+        )
+        db.add(owner)
+        db.commit()
+        job = enqueue(
+            db,
+            owner.id,
+            "test-owner-reconcile",
+            "act_123",
+            "ad",
+            {
+                "name": "test-owner-reconcile",
+                "adset_id": "123",
+                "creative_id": "456",
+                "status": "PAUSED",
+            },
+        )
+        job.status = "needs_reconciliation"
+        db.commit()
+        identity = job.id
+    provider = Mock()
+    provider.reconciliation_candidates.return_value = []
+    provider.ad_status.return_value = {"id": "987"}
+    factory = Mock(
+        side_effect=AssertionError(
+            "Reconciliation must resolve the job owner's credentials"
+        )
+    )
+    factory.for_user.return_value = provider
+    monkeypatch.setattr(delivery_api, "DeliveryProvider", factory)
+    assert client.get(f"/api/v1/delivery/jobs/{identity}/candidates").status_code == 200
+    assert (
+        client.post(
+            f"/api/v1/delivery/jobs/{identity}/reconcile", json={"fb_ad_id": "987"}
+        ).status_code
+        == 409
+    )
+    assert factory.for_user.call_count == 2
+    assert all(
+        call.args[1] == "test-job-owner" for call in factory.for_user.call_args_list
+    )
+    assert provider.configure_budget.call_count == 2
+    assert all(
+        call.args[1:] == ("act_123", "interactive")
+        for call in provider.configure_budget.call_args_list
+    )
+    factory.assert_not_called()
