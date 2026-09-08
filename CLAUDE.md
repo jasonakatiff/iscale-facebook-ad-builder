@@ -27,10 +27,12 @@ Facebook Ad Automation App - A full-stack application for automating the lifecyc
 
 ## Development Commands
 
-Follow [Manual Local Setup in README](README.md#manual-local-setup) with a dedicated
-PostgreSQL database and process environment. Backend startup is `python startup.py`
-from `backend/`; the worker uses `python -m app.sync_worker`. Do not use the legacy
-setup wizard, Compose startup or `init_db.py` alone for a fresh v2 installation.
+Follow [local development](docs/deployment/local-development.md) with a dedicated
+PostgreSQL database and process environment. The repaired `setup.sh` validates
+configuration and runs the v2 bootstrap; Docker Compose provides all four local
+services. For manual startup, run `python startup.py` from `backend/` and start
+the worker with `python -m app.sync_worker`. `init_db.py` alone does not complete
+v2 installation setup.
 
 Frontend commands from `frontend/`: `npm ci`, `npm run dev`, `npm run test:unit`,
 `npm run test:coverage`, and `npm run build`. Tests and servers require the target

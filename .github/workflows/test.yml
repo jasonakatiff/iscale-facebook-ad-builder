@@ -12,7 +12,7 @@ permissions:
 jobs:
   deployment-images:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Build backend, worker and frontend images
@@ -22,6 +22,8 @@ jobs:
           docker build --file frontend/Dockerfile.railway --tag breadwinner-frontend:${{ github.sha }} --build-arg VITE_API_URL=https://test-api.example.com/api/v1 frontend
       - name: Verify fresh startup and persistence with disposable containers
         run: python3 backend/scripts/check_installation_containers.py ${{ github.sha }}
+      - name: Verify local Compose bootstrap and recreation
+        run: python3 backend/scripts/check_compose_installation.py ${{ github.sha }}
 
   backend-tests:
     runs-on: ubuntu-latest

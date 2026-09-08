@@ -8,6 +8,12 @@ Remove deployment-specific URLs and tracked upload artifacts from published sour
 
 [Cutover plan and acceptance status](docs/plans/public-production-cutover.md). Local verification: 613 backend tests and both upgrade baselines passed, 98 frontend unit tests and build passed. Secret and content scans passed. Hosted cutover and container CI remain pending until release verification.
 
+## Local v2 setup and Docker Compose — 2026-09-08
+
+Replace the legacy secret-writing wizard with process-environment validation and the shared v2 bootstrap. Repeated setup preserves the owner and saved encrypted provider credentials. Repair fresh Compose startup, add the sync worker and readiness ordering, keep database/media/dependency data in named volumes, and restrict development HTTP ports to loopback. Update the README and add a [local development guide](docs/deployment/local-development.md).
+
+[Plan and test status](docs/plans/local-installers-v2.md): eight standalone setup checks and four isolated PostgreSQL integration tests passed locally, including actual setup reruns and provider decryption. Shell syntax and Compose configuration checks passed. All required PR checks passed, including the actual Compose stack, frontend proxy, worker, and container recreation with disposable storage. CI verified persistent owner/JWT/setup state, encrypted provider decryption, and media; all test containers, volumes, and networks were removed. Frontend checks passed 85 unit and 41 browser tests; five installation/telemetry browser tests used simulated AI. The 27 existing browser tests requiring a separate live app were skipped. No production data or paid provider calls used.
+
 ## Public repository routing for agents — 2026-09-08
 
 Add canonical agent guidance for `jasonakatiff/theleadrouter-ad-studio`, require
