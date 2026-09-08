@@ -1,0 +1,14 @@
+.git
+.claude
+docs
+**/.env*
+.env*
+**/.venv
+**/venv
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/test-results
+**/playwright-report
+**/dist
+backend/uploads
