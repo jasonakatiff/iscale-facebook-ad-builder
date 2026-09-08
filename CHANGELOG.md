@@ -8,6 +8,13 @@ Remove deployment-specific URLs and tracked upload artifacts from published sour
 
 [Cutover plan and acceptance status](docs/plans/public-production-cutover.md). Local verification: 613 backend tests and both upgrade baselines passed, 98 frontend unit tests and build passed. Secret and content scans passed. Hosted cutover and container CI remain pending until release verification.
 
+## Public repository routing for agents — 2026-09-08
+
+Add canonical agent guidance for `jasonakatiff/theleadrouter-ad-studio`, require
+fetch/push and GitHub visibility checks, and treat the private repository as a
+historical reference. Align Claude instructions with the public v2 setup and
+isolated test data. Verify instruction links and repository identity; required
+GitHub checks apply to the documentation PR.
 
 ## Security: critical dependencies and exception privacy — 2026-09-08
 

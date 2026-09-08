@@ -12,7 +12,7 @@ import subprocess
 RULES = {
     "hosted-deployment": re.compile(r"[a-z0-9-]{1,63}\.up\.railway\.app", re.I),
     "private-application": re.compile(r"breadwinner\.a4d\.com", re.I),
-    "private-repository": re.compile(r"A4DLLC/breadWinner\.com", re.I),
+    "private-repository": re.compile(r"(?:https://github\.com/|git@github\.com:)A4DLLC/breadWinner\.com", re.I),
     "personal-home-path": re.compile(r"(?:/Users/[^/\s]+/|C:\\Users\\[^\\\s]+\\)"),
     "internal-email": re.compile(r"[\w.+-]{1,64}@(?:a4d|iscale)\.com", re.I),
     "private-evidence": re.compile(r"docs/evidence/.+(?:production|deployment)[^\s]*\.(?:json|png)"),
