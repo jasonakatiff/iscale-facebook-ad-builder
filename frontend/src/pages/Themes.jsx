@@ -104,7 +104,7 @@ export default function Themes() {
             new Blob([JSON.stringify(themeDocument(theme), null, 2) + '\n'], {
                 type: 'application/json',
             }),
-            'leadrouter-ad-builder-manager-theme.json',
+            'theleadrouter-ad-studio-theme.json',
         );
     const refresh = async (theme) => {
         if (pending) return;

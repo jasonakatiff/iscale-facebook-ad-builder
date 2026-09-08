@@ -25,7 +25,7 @@ test('user keys, theme library, and downloadable API docs work together', async 
     let jwt, refreshToken, keyId, themeId;
     try {
         await page.goto('/login');
-        await expect(page).toHaveTitle('theLeadRouter — Ad Builder & Manager');
+        await expect(page).toHaveTitle('theLeadRouter — Ad Studio');
         await expect(
             page.getByText('Powered by', { exact: false }).first(),
         ).toBeVisible();
@@ -150,7 +150,7 @@ test('user keys, theme library, and downloadable API docs work together', async 
             .getByRole('button', { name: `Download ${themeName}` })
             .click();
         expect((await exported).suggestedFilename()).toBe(
-            'leadrouter-ad-builder-manager-theme.json',
+            'theleadrouter-ad-studio-theme.json',
         );
         await page.goto('/help');
         await expect(
@@ -158,7 +158,7 @@ test('user keys, theme library, and downloadable API docs work together', async 
         ).toBeVisible();
         await expect(
             page.getByRole('heading', {
-                name: 'Use Ad Builder & Manager from Claude Code',
+                name: 'Use Ad Studio from Claude Code',
                 exact: true,
             }),
         ).toBeVisible();
@@ -174,7 +174,7 @@ test('user keys, theme library, and downloadable API docs work together', async 
             .getByRole('button', { name: 'Download all docs', exact: true })
             .click();
         expect((await docsDownload).suggestedFilename()).toBe(
-            'leadrouter-ad-builder-manager-docs.zip',
+            'theleadrouter-ad-studio-docs.zip',
         );
         const schema = await request.get(`${api}/openapi.json`);
         expect((await schema.json()).paths['/api/v1/api-keys']).toBeTruthy();

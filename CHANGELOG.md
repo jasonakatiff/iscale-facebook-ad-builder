@@ -1,5 +1,9 @@
 # Changelog
 
+## Ad Studio naming — 2026-09-08
+
+Use **theLeadRouter — Ad Studio** for the public product and `theleadrouter-ad-studio` for its repository. Update the UI, API title, guides, downloads, package metadata, and Railway source references. Existing workspace branding overrides and integration identifiers remain compatible. See the [release and rename plan](docs/deployment/v2-railway-release.md). Verification: 85 frontend tests, production build, scoped lint, installer checks, public login smoke, and desktop/mobile branding passed. Hosted Railway naming is recorded separately from checked-in configuration.
+
 ## Railway installer preview — 2026-09-08
 
 An unlisted [Deploy on Railway preview](https://railway.com/deploy/rNhJ3h) creates the four connected services and persistent storage from two owner fields. Sign in to configure AI keys in the first-run wizard or Settings → Integrations.

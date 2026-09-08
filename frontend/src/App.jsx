@@ -1,5 +1,5 @@
 /**
- * theLeadRouter — Ad Builder & Manager - Frontend
+ * theLeadRouter — Ad Studio - Frontend
  *
  * Created by Jason Akatiff
  * iSCALE.com | A4D.com

@@ -1,6 +1,6 @@
 # API guide and examples
 
-theLeadRouter — Ad Builder & Manager
+theLeadRouter — Ad Studio
 
 ## Base URL and authentication
 Production API origin: https://ad-builder-backend-production.up.railway.app

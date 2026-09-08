@@ -49,7 +49,7 @@
     "f70dd9bc-b0bd-445f-8291-a0cb152d23ac": {
       "name": "Backend",
       "source": {
-        "repo": "jasonakatiff/iscale-facebook-ad-builder",
+        "repo": "jasonakatiff/theleadrouter-ad-studio",
         "branch": "main",
         "rootDirectory": "/"
       },
@@ -86,7 +86,7 @@
         "ADMIN_EMAIL": {
           "defaultValue": "",
           "isOptional": false,
-          "description": "Owner email: sign in to your new Ad Builder & Manager workspace.",
+          "description": "Owner email: sign in to your new Ad Studio workspace.",
           "preserveExisting": true
         },
         "ADMIN_PASSWORD": {
@@ -142,7 +142,7 @@
     "0926662b-61e0-4703-a465-59552bfddfb5": {
       "name": "Frontend",
       "source": {
-        "repo": "jasonakatiff/iscale-facebook-ad-builder",
+        "repo": "jasonakatiff/theleadrouter-ad-studio",
         "branch": "main",
         "rootDirectory": "/frontend"
       },
@@ -181,7 +181,7 @@
     "422b8f0c-4516-40aa-b732-4d5c15953808": {
       "name": "Worker",
       "source": {
-        "repo": "jasonakatiff/iscale-facebook-ad-builder",
+        "repo": "jasonakatiff/theleadrouter-ad-studio",
         "branch": "main",
         "rootDirectory": "/"
       },

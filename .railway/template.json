@@ -1,9 +1,9 @@
 {
-  "name": "theLeadRouter \u2014 Ad Builder & Manager",
+  "name": "theLeadRouter \u2014 Ad Studio",
   "description": "Deploy your application, sign in, and connect Gemini and fal.ai in the setup wizard. Create, save, and download your first image ad. Railway and AI services bill your own accounts.",
   "publicationStatus": "unlisted_preview_automated_install_verified",
   "templateUrl": "https://railway.com/deploy/rNhJ3h",
-  "sourceRepository": "jasonakatiff/iscale-facebook-ad-builder",
+  "sourceRepository": "jasonakatiff/theleadrouter-ad-studio",
   "sourceRevision": "e4c64143404b4389d39d2a66a4e24ee74bae92b2",
   "sourceGate": "Release from reviewed public main after CI and pull-request merge; private Git history is excluded.",
   "installFields": [
@@ -56,7 +56,7 @@
     "Postgres": "/var/lib/postgresql/data",
     "Backend": "/app/uploads"
   },
-  "support": "https://github.com/jasonakatiff/iscale-facebook-ad-builder/issues",
+  "support": "https://github.com/jasonakatiff/theleadrouter-ad-studio/issues",
   "customerGuide": "docs/deployment/install-on-railway.md",
   "generatedPublicDomains": {
     "Frontend": 8080,

@@ -46,7 +46,7 @@ def read_doc(slug: str, download: bool = False):
 
 def endpoint_index(schema):
     lines = [
-        "# theLeadRouter — Ad Builder & Manager API endpoint index",
+        "# theLeadRouter — Ad Studio API endpoint index",
         "",
         "Generated from this deployment’s OpenAPI contract. See openapi.json for schemas and permissions.",
         "",
@@ -86,7 +86,7 @@ def download_bundle(request: Request):
         output.getvalue(),
         media_type="application/zip",
         headers={
-            "Content-Disposition": 'attachment; filename="leadrouter-ad-builder-manager-docs.zip"',
+            "Content-Disposition": 'attachment; filename="theleadrouter-ad-studio-docs.zip"',
             "Cache-Control": "no-cache",
         },
     )

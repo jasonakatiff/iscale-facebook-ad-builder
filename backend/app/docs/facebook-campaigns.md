@@ -1,6 +1,6 @@
 # Facebook campaigns and tracking
 
-theLeadRouter — Ad Builder & Manager
+theLeadRouter — Ad Studio
 
 Open Ad Deployment → Facebook Campaigns. The connection panel distinguishes managed workspace access, a personal connection, disconnected status, expired access, and account selection. Personal connection controls are unavailable until the deployment's Meta OAuth setup is complete.
 

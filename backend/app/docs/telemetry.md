@@ -1,4 +1,4 @@
-# Debugging Ad Builder & Manager with an agent
+# Debugging Ad Studio with an agent
 
 Telemetry connects browser activity, API requests, database timings, provider calls, background work and feedback. An active administrator can create a key at `/settings/api-keys` with **Diagnostics and feedback** access. Give an agent that key through its credential store and this API base:
 

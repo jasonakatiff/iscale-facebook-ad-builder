@@ -1,4 +1,4 @@
-"""Example Ad Builder & Manager service worker. Reads process environment; never saves credentials."""
+"""Example Ad Studio service worker. Reads process environment; never saves credentials."""
 
 import argparse
 import json
@@ -93,7 +93,7 @@ def run_once(origin, key):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Ad Builder & Manager plugin connection demonstration"
+        description="Ad Studio plugin connection demonstration"
     )
     parser.add_argument(
         "--once", action="store_true", help="Process at most one queued job"

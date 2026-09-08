@@ -2,15 +2,15 @@
 
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/rNhJ3h)
 
-Deploy your own **theLeadRouter — Ad Builder & Manager** workspace, enter your owner email/password, then connect AI keys in the setup wizard. Keys can be changed later in **Settings → Integrations**. No terminal or manual database wiring is needed.
+Deploy your own **theLeadRouter — Ad Studio** workspace, enter your owner email/password, then connect AI keys in the setup wizard. Keys can be changed later in **Settings → Integrations**. No terminal or manual database wiring is needed.
 
 The unlisted preview passed fresh cloud installation and persistence checks. Paid AI generation and nontechnical pilot acceptance remain open. Hosting and AI usage use your own accounts. See the [installation guide](docs/deployment/install-on-railway.md).
 
 <p align="center">
-  <img src="frontend/public/leadrouter-mark.svg" alt="theLeadRouter — Ad Builder &amp; Manager" width="120" />
+  <img src="frontend/public/leadrouter-mark.svg" alt="theLeadRouter — Ad Studio" width="120" />
 </p>
 
-<h1 align="center">theLeadRouter — Ad Builder &amp; Manager</h1>
+<h1 align="center">theLeadRouter — Ad Studio</h1>
 
 <p align="center">
   <strong>Version 2 · Release candidate</strong><br>
@@ -42,7 +42,7 @@ The unlisted preview passed fresh cloud installation and persistence checks. Pai
 
 ## Overview
 
-**theLeadRouter — Ad Builder & Manager** is the v2 ad workspace, formerly BreadWinner / Facebook Ad Builder. Research competitors, generate ad copy and creative, launch campaigns, manage delivery, and review performance in one place. LeadRouter campaign connections, workspace API keys, plugins, and guided setup are included in the v2 release candidate.
+**theLeadRouter — Ad Studio** is the v2 ad workspace, formerly BreadWinner / Facebook Ad Builder. Research competitors, generate ad copy and creative, launch campaigns, manage delivery, and review performance in one place. LeadRouter campaign connections, workspace API keys, plugins, and guided setup are included in the v2 release candidate.
 
 ### Guided Railway installation (release preview)
 
@@ -106,8 +106,8 @@ Manage Facebook campaigns directly:
 Run the setup wizard which will guide you through the entire configuration:
 
 ```bash
-git clone https://github.com/jasonakatiff/iscale-facebook-ad-builder.git leadrouter-ad-builder-manager
-cd leadrouter-ad-builder-manager
+git clone https://github.com/jasonakatiff/theleadrouter-ad-studio.git theleadrouter-ad-studio
+cd theleadrouter-ad-studio
 ./setup.sh
 ```
 
@@ -125,8 +125,8 @@ The wizard will:
 #### 1. Clone and Install
 
 ```bash
-git clone https://github.com/jasonakatiff/iscale-facebook-ad-builder.git leadrouter-ad-builder-manager
-cd leadrouter-ad-builder-manager
+git clone https://github.com/jasonakatiff/theleadrouter-ad-studio.git theleadrouter-ad-studio
+cd theleadrouter-ad-studio
 
 # Backend
 cd backend
