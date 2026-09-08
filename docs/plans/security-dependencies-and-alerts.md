@@ -20,7 +20,7 @@ callers and tests.
   action uses a verified commit SHA allowed by repository policy.
 - [x] Review all 21 remaining CodeQL entries. Implement supported fixes and record
   source/test evidence for false positives; no blanket scanner exclusions.
-- [ ] Backend, frontend unit/build/coverage, installation and container checks pass
+- [x] Backend, frontend unit/build/coverage, installation and container checks pass
   on the final PR revision. Review the final diff locally and verify clean secrets
   scanning before push. No production credentials, paid providers or customer DBs.
 
@@ -49,4 +49,23 @@ follow-up. Existing high/medium dependency findings remain explicitly tracked.
 Local verification complete: 509 backend tests passed with one existing XPASS;
 85 frontend tests and coverage/build passed; npm audit has zero critical entries.
 The new JWT and exception tests failed on the old implementation and pass after
-the fix. GitHub CI and merge verification are next. No unresolved questions.
+the fix. After syncing PR #49, seven affected tests passed locally.
+
+GitHub CI passed on `012da5efbedf5d7aea8d96cb9380e96d9b4f9008`:
+
+- [Test Suite](https://github.com/jasonakatiff/theleadrouter-ad-studio/actions/runs/34244927110):
+  512 backend tests, one existing XPASS and two subtests; 85 frontend unit tests,
+  production build, 41 browser tests and container startup/persistence passed.
+  The 27 existing browser tests requiring a separate live app were skipped.
+- [Installation](https://github.com/jasonakatiff/theleadrouter-ad-studio/actions/runs/34244927004):
+  all five installation/telemetry browser tests passed against isolated PostgreSQL
+  and simulated provider responses. No paid or production operation was run.
+- All ten PR checks, including CodeQL and GitGuardian, passed. The reviewed
+  false-positive alerts were individually dismissed with comments linking PR #50;
+  the eleven repaired findings await the merged default-branch scan.
+- Local test databases were dropped and their absence verified. No local app
+  server was started.
+
+[PR #50](https://github.com/jasonakatiff/theleadrouter-ad-studio/pull/50) tracks the
+final documentation revision, required checks, and merge receipt. The final head
+must pass the active ruleset before merge. No unresolved implementation questions.

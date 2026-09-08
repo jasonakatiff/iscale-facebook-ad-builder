@@ -9,8 +9,10 @@
 - [Plan and test status](docs/plans/security-dependencies-and-alerts.md): phase 0
   reproduced three failures; 14 focused backend tests and 85 frontend tests with
   coverage passed, production frontend build passed, and npm audit reports zero
-  critical entries. All 509 backend tests passed with one existing XPASS. GitHub CI verification is
-  in progress.
+  critical entries. GitHub CI passed 512 backend tests with one existing XPASS,
+  41 frontend browser tests, five installation/telemetry browser tests, container
+  startup/persistence and CodeQL checks. The 27 existing browser tests needing a
+  separate live app were skipped.
 - [Review of all 21 remaining CodeQL alerts](docs/security/remaining-codeql-review-2026-09-08.md)
   distinguishes repaired issues from false positives supported by source/tests.
 

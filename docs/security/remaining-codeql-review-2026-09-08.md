@@ -25,6 +25,11 @@ Codex against actual callers and data flow; no independent agent review is claim
 | #26: prototype HTML extractor | The regex extracts script references from repository-controlled Vite build output; it is not a sanitizer for user-supplied HTML. No remote input is consumed by `scripts/export-workflow-prototype.mjs`. |
 | #27/#28: prototype media preview | `URL.createObjectURL(file)` supplies the in-memory media map. Only img/video receive the blob URL; filenames are escaped React text/attributes. No raw HTML or document embedding sink exists in this flow. SVG image context does not run scripts. This is source review, not a new browser penetration test. |
 
+The ten entries above were dismissed individually with source-specific comments
+linking [PR #50](https://github.com/jasonakatiff/theleadrouter-ad-studio/pull/50).
+Alerts #15 and #19 use the test-only disposition; the other eight use false positive.
+No supported vulnerability was dismissed.
+
 False-positive conclusions apply to these current callers and sinks. Future changes
 need fresh review. Dismissal status and API receipts are recorded in the delivered
 verification report; this document does not equate scanner silence with application
