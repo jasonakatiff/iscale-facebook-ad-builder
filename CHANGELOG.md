@@ -6,6 +6,18 @@ Require an explicit API origin in the downloadable plugin worker so a missing se
 
 Verification: three worker configuration regression tests passed after reproducing the missing-origin failure; GitHub Markdown rendering, document links, all seven README API routes, and Railway configuration checks passed. Worker requests were mocked; no production database or provider calls were made.
 
+## Security: media uploads and Graph reads — 2026-09-08
+
+- Facebook uploads reject private network destinations and server file paths,
+  reuse DNS-pinned bounded downloads, and clean up temporary files on failure.
+- Graph video and delivery reads validate resource paths and reject redirects;
+  legacy video requests carry access tokens in headers.
+- Telemetry redaction avoids excessive regex backtracking on hostile strings.
+- [Plan and test status](docs/plans/security-codeql-findings.md): 139 focused tests
+  passed; GitHub CI passed 505 backend tests with one existing XPASS, plus
+  frontend, installation, container persistence, and CodeQL checks. Includes evidence-based
+  triage of all 17 critical/high CodeQL findings.
+
 ## README installation paths — 2026-09-08
 
 Make the Railway one-click preview the Quick Start and Deployment path for **theLeadRouter — Ad Studio**. Label local development separately, add the missing documentation navigation target, and document Render, Northflank, DigitalOcean, and Coolify as future installation options with official sources. Railway remains the only published installer. Verification: GitHub Markdown rendering, README anchors and relative links, and the Railway configuration check passed.

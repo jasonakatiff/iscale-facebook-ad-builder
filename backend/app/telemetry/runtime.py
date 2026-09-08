@@ -29,6 +29,20 @@ _ASSIGNMENT = re.compile(
     r"""(?i)((?:password|passwd|secret|token|access_token|api[_-]?key|worker[_-]?key|authorization|cookie)["']?\s*[=:]\s*)["']?[^\s,;}"']+["']?"""
 )
 
+_EMAIL = re.compile(
+    r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]++@[A-Za-z0-9.-]++"
+)
+_URL = re.compile(r"https?://[^\s]++")
+
+
+def _redact_url(match):
+    url = match.group().split("?", 1)[0].split("#", 1)[0]
+    scheme, _, target = url.partition("://")
+    authority, slash, path = target.partition("/")
+    if "@" in authority:
+        authority = "[REDACTED]@" + authority.rsplit("@", 1)[1]
+    return scheme + "://" + authority + slash + path
+
 
 @contextmanager
 def redact_values(*values):
@@ -66,9 +80,8 @@ def sanitize(value, depth=0):
     text = re.sub(
         r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", "[REDACTED]", text
     )
-    text = re.sub(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", "[EMAIL]", text)
-    text = re.sub(r"(https?://)[^/\s@]+@", r"\1[REDACTED]@", text)
-    text = re.sub(r"(https?://[^\s?#]+)[?#][^\s]*", r"\1", text)
+    text = _URL.sub(_redact_url, text)
+    text = _EMAIL.sub("[EMAIL]", text)
     text = _ASSIGNMENT.sub(r"\1[REDACTED]", text)
     return text[:4000]
 

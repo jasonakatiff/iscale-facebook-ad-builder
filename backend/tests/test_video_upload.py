@@ -1,8 +1,7 @@
 """Tests for video upload functionality."""
 import pytest
-from unittest.mock import MagicMock, patch, mock_open
-import tempfile
-import os
+from unittest.mock import MagicMock, patch
+from contextlib import nullcontext
 
 
 class TestFacebookServiceVideo:
@@ -20,16 +19,11 @@ class TestFacebookServiceVideo:
             service.account = MagicMock()
             service.account.get_id_assured.return_value = "act_123456"
 
-            # Mock requests.get for URL download
-            mock_response = MagicMock()
-            mock_response.iter_content.return_value = [b"fake video content"]
-            mock_response.raise_for_status = MagicMock()
-
             # Mock AdVideo
             mock_video = MagicMock()
-            mock_video.__getitem__ = MagicMock(return_value="video_123")
+            mock_video.__getitem__ = MagicMock(return_value="123456")
 
-            with patch('requests.get', return_value=mock_response):
+            with patch('app.services.facebook_service.download_media', return_value=nullcontext('/test-managed-video.mp4')):
                 with patch('app.services.facebook_service.AdVideo', return_value=mock_video):
                     with patch.object(service, 'wait_for_video_ready', return_value={'status': 'ready'}):
                         with patch.object(service, 'get_video_thumbnails', return_value=['thumb1.jpg']):
@@ -38,33 +32,22 @@ class TestFacebookServiceVideo:
                                 ad_account_id="123456"
                             )
 
-            assert result['video_id'] == "video_123"
+            assert result['video_id'] == "123456"
             assert result['status'] == 'ready'
             assert 'thumbnails' in result
 
-    def test_upload_video_from_local_file(self):
-        """Test uploading video from local file path."""
+    def test_upload_video_rejects_local_file(self):
+        """Only public URLs are accepted from upload callers."""
         from app.services.facebook_service import FacebookService
 
         with patch.object(FacebookService, 'initialize'):
             service = FacebookService()
             service.api = MagicMock()
-            service.access_token = "test_token"
             service.account = MagicMock()
-            service.account.get_id_assured.return_value = "act_123456"
-
-            mock_video = MagicMock()
-            mock_video.__getitem__ = MagicMock(return_value="video_456")
-
-            with patch('app.services.facebook_service.AdVideo', return_value=mock_video):
-                with patch.object(service, 'wait_for_video_ready', return_value={'status': 'ready'}):
-                    with patch.object(service, 'get_video_thumbnails', return_value=[]):
-                        result = service.upload_video(
-                            "/path/to/video.mp4",
-                            wait_for_ready=True
-                        )
-
-            assert result['video_id'] == "video_456"
+            with patch('app.services.facebook_service.AdVideo') as video:
+                with pytest.raises(ValueError, match="public HTTP or HTTPS URL"):
+                    service.upload_video("/test-private-video.mp4")
+                video.assert_not_called()
 
     def test_get_video_status_ready(self):
         """Test getting video status when ready."""
@@ -74,18 +57,18 @@ class TestFacebookServiceVideo:
             service = FacebookService()
             service.access_token = "test_token"
 
-            mock_response = MagicMock()
+            mock_response = MagicMock(status_code=200)
             mock_response.json.return_value = {
-                'id': 'video_123',
+                'id': '123456',
                 'status': {'video_status': 'ready'},
                 'length': 30.5
             }
 
             with patch('requests.get', return_value=mock_response):
-                result = service.get_video_status("video_123")
+                result = service.get_video_status("123456")
 
             assert result['status'] == 'ready'
-            assert result['video_id'] == 'video_123'
+            assert result['video_id'] == '123456'
             assert result['length'] == 30.5
 
     def test_get_video_status_processing(self):
@@ -96,14 +79,14 @@ class TestFacebookServiceVideo:
             service = FacebookService()
             service.access_token = "test_token"
 
-            mock_response = MagicMock()
+            mock_response = MagicMock(status_code=200)
             mock_response.json.return_value = {
-                'id': 'video_123',
+                'id': '123456',
                 'status': {'video_status': 'processing'}
             }
 
             with patch('requests.get', return_value=mock_response):
-                result = service.get_video_status("video_123")
+                result = service.get_video_status("123456")
 
             assert result['status'] == 'processing'
 
@@ -115,13 +98,13 @@ class TestFacebookServiceVideo:
             service = FacebookService()
             service.access_token = "test_token"
 
-            mock_response = MagicMock()
+            mock_response = MagicMock(status_code=200)
             mock_response.json.return_value = {
                 'error': {'message': 'Video not found'}
             }
 
             with patch('requests.get', return_value=mock_response):
-                result = service.get_video_status("invalid_id")
+                result = service.get_video_status("999999")
 
             assert result['status'] == 'error'
             assert 'Video not found' in result['error']
@@ -134,7 +117,7 @@ class TestFacebookServiceVideo:
             service = FacebookService()
             service.access_token = "test_token"
 
-            mock_response = MagicMock()
+            mock_response = MagicMock(status_code=200)
             mock_response.json.return_value = {
                 'data': [
                     {'uri': 'https://example.com/thumb1.jpg'},
@@ -143,7 +126,7 @@ class TestFacebookServiceVideo:
             }
 
             with patch('requests.get', return_value=mock_response):
-                result = service.get_video_thumbnails("video_123")
+                result = service.get_video_thumbnails("123456")
 
             assert len(result) == 2
             assert 'thumb1.jpg' in result[0]
@@ -163,7 +146,7 @@ class TestFacebookServiceVideo:
                     {'status': 'ready'}
                 ]
                 with patch('time.sleep'):  # Skip actual sleeping
-                    result = service.wait_for_video_ready("video_123", timeout=60, interval=1)
+                    result = service.wait_for_video_ready("123456", timeout=60, interval=1)
 
             assert result['status'] == 'ready'
 
@@ -180,7 +163,7 @@ class TestFacebookServiceVideo:
                         # Simulate timeout by returning increasing times
                         mock_time.side_effect = [0, 100, 200]
                         with pytest.raises(Exception, match="timeout"):
-                            service.wait_for_video_ready("video_123", timeout=1)
+                            service.wait_for_video_ready("123456", timeout=1)
 
     def test_create_creative_with_video(self):
         """Test creating ad creative with video."""

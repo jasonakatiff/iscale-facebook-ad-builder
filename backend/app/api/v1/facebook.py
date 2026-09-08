@@ -538,6 +538,10 @@ def upload_image(
             raise HTTPException(status_code=400, detail="image_url is required")
         image_hash = service.upload_image(image_url, ad_account_id)
         return {"image_hash": image_hash}
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from None
     except Exception as e:
         capture_exception(e, "facebook.upload_image")
         raise HTTPException(status_code=500, detail=str(e))
@@ -578,6 +582,8 @@ def upload_video(
         return result
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from None
     except Exception as e:
         capture_exception(e, "facebook.upload_video")
         raise HTTPException(status_code=500, detail=str(e))
@@ -597,6 +603,8 @@ def get_video_status(
     """
     try:
         return service.get_video_status(video_id)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from None
     except Exception as e:
         capture_exception(e, "facebook.get_video_status")
         raise HTTPException(status_code=500, detail=str(e))
@@ -615,6 +623,8 @@ def get_video_thumbnails(
     try:
         thumbnails = service.get_video_thumbnails(video_id)
         return {"thumbnails": thumbnails}
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from None
     except Exception as e:
         capture_exception(e, "facebook.get_video_thumbnails")
         raise HTTPException(status_code=500, detail=str(e))
