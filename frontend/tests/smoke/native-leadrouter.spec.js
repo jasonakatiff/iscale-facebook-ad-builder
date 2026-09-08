@@ -20,7 +20,7 @@ test('native LeadRouter setup, reporting, and downloadable contract are accessib
     await page.getByRole('link', { name: 'Configure LeadRouter', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'LeadRouter', exact: true })).toBeVisible();
     await expect(
-        page.getByText('Private to your BreadWinner user.', { exact: false }),
+        page.getByText('Private to your ad workspace user.', { exact: false }),
     ).toBeVisible();
     // Read-only smoke supports either an already connected or a disconnected account.
     await expect(page.getByRole('region', { name: 'LeadRouter connection' })).not.toContainText(

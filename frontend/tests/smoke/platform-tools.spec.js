@@ -1,15 +1,15 @@
 import process from 'node:process';
 import { test, expect } from '@playwright/test';
 
-test('public login branding and downloadable user guides are available', async ({
-    page,
-    request,
-}) => {
+test('public login shows the product branding', async ({ page }) => {
     await page.goto('/login');
-    await expect(page).toHaveTitle('BreadWinner by theLeadRouter.com');
+    await expect(page).toHaveTitle('theLeadRouter — Ad Builder & Manager');
     await expect(
         page.getByRole('button', { name: 'Sign In', exact: true }),
     ).toBeVisible();
+});
+
+test('downloadable user guides are available', async ({ request }) => {
     const api = process.env.TEST_API_URL;
     test.skip(!api, 'TEST_API_URL identifies the deployed docs API.');
     const guides = await request.get(`${api}/help/docs`);
