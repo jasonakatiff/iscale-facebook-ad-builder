@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from decimal import Decimal, InvalidOperation
 
 import requests
@@ -116,6 +117,10 @@ class DeliveryProvider(FacebookService):
         raise ProviderError("Ad lookup exceeded its page limit")
 
     def read(self, path, params=None):
+        if not isinstance(path, str) or (
+            path and not re.fullmatch(r"(?:act_)?[0-9]+(?:/(?:ads|insights|thumbnails))?", path)
+        ):
+            raise ProviderError("Invalid Facebook resource path")
         if not self.access_token:
             raise ProviderError(
                 "Facebook access token is missing; an administrator must configure it"
@@ -126,9 +131,12 @@ class DeliveryProvider(FacebookService):
                 headers={"Authorization": "Bearer " + self.access_token},
                 params=params,
                 timeout=(5, 30),
+                allow_redirects=False,
             )
         except (requests.Timeout, requests.ConnectionError):
             raise ProviderError("Facebook connection failed", retryable=True) from None
+        if 300 <= response.status_code < 400:
+            raise ProviderError("Facebook returned an unexpected redirect")
         try:
             data = response.json()
         except ValueError:
