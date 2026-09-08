@@ -1,11 +1,3 @@
-## Install on Railway — preview
-
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/rNhJ3h?version=ad-studio)
-
-Deploy your own **theLeadRouter — Ad Studio** workspace, enter your owner email/password, then connect AI keys in the setup wizard. Keys can be changed later in **Settings → Integrations**. No terminal or manual database wiring is needed.
-
-The unlisted **Ad Studio** preview passed a fresh cloud installation, owner login/setup, worker readiness, and browser branding check. Earlier installer checks covered database and media persistence. Paid AI generation and nontechnical pilot acceptance remain open. Hosting and AI usage use your own accounts. See the [installation guide](docs/deployment/install-on-railway.md).
-
 <p align="center">
   <img src="frontend/public/leadrouter-mark.svg" alt="theLeadRouter — Ad Studio" width="120" />
 </p>
@@ -37,6 +29,14 @@ The unlisted **Ad Studio** preview passed a fresh cloud installation, owner logi
   <a href="https://theleadrouter.com">theLeadRouter.com</a> • <a href="https://iscale.com">iSCALE.com</a> • <a href="https://a4d.com">A4D.com</a><br>
   <a href="https://t.me/jasonakatiff">Telegram</a> • <a href="mailto:jason@jasonakatiff.com">jason@jasonakatiff.com</a>
 </p>
+
+## Install on Railway — preview
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/rNhJ3h?version=ad-studio)
+
+Deploy your own **theLeadRouter — Ad Studio** workspace, enter your owner email/password, then connect AI keys in the setup wizard. Keys can be changed later in **Settings → Integrations**. No terminal or manual database wiring is needed.
+
+The unlisted **Ad Studio** preview passed a fresh cloud installation, owner login/setup, worker readiness, and browser branding check. Earlier installer checks covered database and media persistence. Paid AI generation and nontechnical pilot acceptance remain open. Hosting and AI usage use your own accounts. See the [installation guide](docs/deployment/install-on-railway.md).
 
 ---
 
@@ -95,13 +95,25 @@ Manage Facebook campaigns directly:
 
 ## Quick Start
 
+### Install your own workspace (recommended)
+
+1. [Deploy on Railway](https://railway.com/deploy/rNhJ3h?version=ad-studio), sign in to your Railway account, and select your workspace.
+2. Enter your owner email and password in **Backend → ADMIN_EMAIL / ADMIN_PASSWORD**, then deploy. The installer creates the frontend, backend, background worker, PostgreSQL database, and persistent storage.
+3. Open the deployed **Frontend** website and sign in. Connect your AI providers and add a brand/product in the setup wizard. Provider accounts pay for any ads you generate.
+
+Follow the [installation guide](docs/deployment/install-on-railway.md) for password requirements, provider setup, and backups. Railway is the only published installer for Ad Studio today; see [other hosting options](#other-hosting-options) for alternatives under consideration.
+
+## Local Development
+
+The commands below are for developers running the code locally. The Railway installer above does not require local Node.js, Python, or PostgreSQL.
+
 ### Prerequisites
 
 - **Node.js** 18+ ([download](https://nodejs.org))
 - **Python** 3.11+ ([download](https://python.org))
 - **PostgreSQL** 15+ (local or cloud: [Railway](https://railway.app), [Supabase](https://supabase.com))
 
-### Option 1: Interactive Setup (Recommended)
+### Option 1: Interactive Local Setup
 
 Run the setup wizard which will guide you through the entire configuration:
 
@@ -117,7 +129,7 @@ The wizard will:
 3. Set up the database
 4. Create your admin account
 
-### Option 2: Manual Setup
+### Option 2: Manual Local Setup
 
 <details>
 <summary>Click to expand manual setup instructions</summary>
@@ -141,7 +153,10 @@ npm install
 
 #### 2. Configure Environment
 
+Return to the repository root after installing the frontend dependencies:
+
 ```bash
+cd ..
 cp .env.example .env.local
 ```
 
@@ -250,12 +265,15 @@ R2_PUBLIC_URL=https://pub-xxx.r2.dev
 
 ## Environment Variables
 
-Create a `.env.local` file in the project root:
+For local development or a custom deployment, configure the values below. The Railway installer creates the database connection and signing/encryption keys automatically; its setup wizard stores AI keys through **Settings → Integrations**.
+
+For local development, use a `.env.local` file in the project root:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DATABASE_URL` | ✅ | PostgreSQL connection string |
 | `SECRET_KEY` | ✅ | JWT signing key (generate random string) |
+| `OAUTH_TOKEN_ENCRYPTION_KEY` | ✅ | Fernet key for encrypted integration credentials; share the same value with the worker |
 | `GEMINI_API_KEY` | ✅ | Google Gemini API key |
 | `ALLOWED_ORIGINS` | Production | Comma-separated CORS origins |
 | `FACEBOOK_ACCESS_TOKEN` | For FB features | Facebook Marketing API token |
@@ -354,7 +372,7 @@ theleadrouter-ad-studio/
 | Backend | Python 3.11+, FastAPI, SQLAlchemy |
 | Database | PostgreSQL |
 | AI | Google Gemini, Fal.ai |
-| Storage | Cloudflare R2 |
+| Storage | Persistent media volume on Railway; optional Cloudflare R2 |
 | Auth | JWT (access + refresh tokens) |
 
 ---
@@ -407,23 +425,37 @@ pytest
 
 ## Deployment
 
-### Railway (Recommended)
+### Railway — available preview
 
-Deploy to [Railway](https://railway.app) in minutes:
+Use the [Deploy on Railway installer](https://railway.com/deploy/rNhJ3h?version=ad-studio) for a new **theLeadRouter — Ad Studio** workspace. It deploys all four connected services from this public repository:
 
-1. Fork this repo to your GitHub account
-2. [Create a new Railway project](https://railway.app/new)
-3. Click "Deploy from GitHub repo" and select your fork
-4. Add a PostgreSQL database: **+ New** → **Database** → **PostgreSQL**
-5. Set environment variables in both services (see `.env.example`)
-6. Set `ALLOWED_ORIGINS` to your frontend URL
-7. Deploy!
+| Service | Purpose |
+| --- | --- |
+| Frontend | Ad Studio website |
+| Backend | API, authentication, and creative media storage |
+| Worker | Background synchronization |
+| PostgreSQL | Workspace data |
 
-> **Tip:** Railway config-as-code files configure one service at a time. For this monorepo, configure the backend service with the root `railway.toml`, keep its root directory at `/`, and configure the frontend service with `/frontend/railway.toml` and root directory `/frontend`.
+Database and media volumes retain saved data. The only required installation inputs are your owner email and password; configure AI keys after signing in. The template is publicly shareable and unlisted in Railway's marketplace.
 
-📖 **[Full Deployment Guide →](./RAILWAY_DEPLOYMENT.md)**
+See the [customer installation guide](docs/deployment/install-on-railway.md) or [template maintainer guide](docs/deployment/railway-template-maintainer.md).
 
-### Docker
+### Other hosting options
+
+Platform documentation checked on **2026-09-08 (UTC)**. These are possible deployment targets; **Ad Studio installers for them are not implemented or tested yet**.
+
+| Platform | Installation approach | Ad Studio status |
+| --- | --- | --- |
+| [Render](https://render.com/docs/deploy-to-render) | A Deploy to Render button backed by a [Blueprint](https://render.com/docs/blueprint-spec) can define the web services, worker, PostgreSQL, and media disk. | Recommended next target based on the existing architecture; no installer yet. |
+| [Northflank](https://northflank.com/docs/v1/application/infrastructure-as-code/share-a-template) | A shared template lets customers add and run the application stack in their own account. | Under consideration; no template yet. |
+| [DigitalOcean Marketplace](https://docs.digitalocean.com/products/marketplace/) | A Droplet 1-Click App packages the stack in a server image with a marketplace listing. | Under consideration; requires an Ad Studio image and listing. |
+| [Coolify](https://coolify.io/docs/services/introduction) | A Docker Compose package runs on a customer's server connected to Coolify; catalog templates are curated separately. | Under consideration; no production package or catalog entry yet. |
+
+DigitalOcean's [App Platform deploy button](https://docs.digitalocean.com/products/app-platform/how-to/add-deploy-do-button/) documents one service or static site, optionally with a development database. App Platform also [does not support persistent volumes](https://docs.digitalocean.com/products/app-platform/details/limits/). An App Platform installer needs a different service/storage setup from the current Railway package.
+
+Each host needs its own deployment definition and fresh-install verification. Customers use their own hosting and AI-provider accounts.
+
+### Docker — developer builds
 
 ```bash
 # From the repository root, build the application images
@@ -431,7 +463,14 @@ docker build -f backend/Dockerfile -t theleadrouter-ad-studio-backend .
 docker build -f frontend/Dockerfile -t theleadrouter-ad-studio-frontend frontend
 ```
 
-For a connected local stack, [docker-compose.yml](docker-compose.yml) provides PostgreSQL, the backend, and the frontend. It reads backend environment values from `.env`.
+For a connected local development stack, [docker-compose.yml](docker-compose.yml) provides PostgreSQL, the backend, and the Vite frontend. It reads backend environment values from `.env`. This development configuration does not include the background worker or provide a production one-click installation.
+
+## Documentation
+
+- [Install Ad Studio on Railway](docs/deployment/install-on-railway.md)
+- [Railway template maintenance and verification](docs/deployment/railway-template-maintainer.md)
+- [Product naming and compatibility](docs/brand-guidelines.md)
+- [Release history](CHANGELOG.md)
 
 ---
 
