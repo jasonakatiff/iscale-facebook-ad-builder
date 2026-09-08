@@ -29,11 +29,18 @@ from app.delivery.queue import posting_tick
 from app.delivery.sync import sync_tick
 from app.delivery import api
 from app.delivery.provider import matches_job
+from app.creatives import api as creatives_api
+from app.creatives.models import CreativeAsset
+from app.creatives.schemas import CreativeMetadata
+from app.models import GeneratedAd
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 ads = {}
 serial = 910000
+reports = {}
+
+failed_once = set()
 
 
 class FakeProvider:
@@ -58,6 +65,17 @@ class FakeProvider:
 
     def create_ad(self, data, account_id):
         global serial
+        if (
+            data["name"].startswith(("test-retry-", "test-rate-retry-"))
+            and data["name"] not in failed_once
+        ):
+            from facebook_business.exceptions import FacebookRequestError
+
+            failed_once.add(data["name"])
+            code = 190 if data["name"].startswith("test-retry-") else 4
+            raise FacebookRequestError(
+                "test-simulated-rejection", {}, 400, {}, {"error": {"code": code}}
+            )
         serial += 1
         identity = str(serial)
         ads[identity] = {
@@ -81,19 +99,33 @@ class FakeProvider:
     def ad_statuses(self, ad_ids):
         return {ad_id: ads[ad_id] for ad_id in ad_ids}
 
-    def insight_pages(self, account_id, ad_ids, since, until):
-        yield [
-            {
-                "ad_id": ad_id,
-                "date_start": until.isoformat(),
-                "date_stop": until.isoformat(),
-                "impressions": "100",
-                "clicks": "3",
-                "spend": "0.29",
-                "actions": [],
-            }
-            for ad_id in ad_ids
-        ]
+    def start_report(self, account_id, since, until):
+        identity = str(990000 + len(reports))
+        reports[identity] = (account_id, since, until)
+        return identity
+
+    def report_status(self, report_id):
+        return {"id": report_id, "async_status": "Job Completed"}
+
+    def report_page(self, report_id, cursor=None):
+        account_id, since, until = reports[report_id]
+        return (
+            [
+                {
+                    "account_id": account_id,
+                    "ad_id": ad_id,
+                    "date_start": until.isoformat(),
+                    "date_stop": until.isoformat(),
+                    "impressions": "100",
+                    "clicks": "3",
+                    "spend": "0.29",
+                    "actions": [],
+                }
+                for ad_id, ad in ads.items()
+                if "act_" + ad["account_id"] == account_id
+            ],
+            None,
+        )
 
     def reconciliation_candidates(self, job):
         return [
@@ -148,6 +180,20 @@ with SessionLocal() as db:
     )
     db.flush()
     db.add(
+        CreativeAsset(
+            id="test-delivery-legacy-asset",
+            source_type="external_upload",
+            created_by_id=admin.id,
+            registered_by_id=admin.id,
+            name="test-delivery-legacy-asset",
+            media_url="https://example.com/test.png",
+            media_type="image",
+            analysis_status="ready",
+            metadata_revision=1,
+            metadata_values=CreativeMetadata().model_dump(),
+        )
+    )
+    db.add(
         FacebookAdSet(
             id="test-delivery-adset",
             campaign_id="test-delivery-campaign",
@@ -157,6 +203,106 @@ with SessionLocal() as db:
         )
     )
     db.commit()
+
+if os.environ.get("CREATIVE_DEMO") == "1":
+    from app.api.v1 import facebook as facebook_api
+    from fastapi.responses import Response
+    from uuid import uuid4
+    import base64
+
+    media = {}
+    sample = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jA1sAAAAASUVORK5CYII="
+    )
+    media["test-generated.png"] = (sample, "image/png")
+    media_root = os.environ["DELIVERY_DEMO_FRONTEND"] + "/api/v1/test-creative-media/"
+
+    @app.get("/api/v1/test-creative-media/{name}")
+    def test_creative_media(name: str):
+        content, mime = media[name]
+        return Response(content, media_type=mime)
+
+    def fake_store(file):
+        # Only this isolated harness bypasses R2; production validation has unit coverage.
+        if Path(file.filename).suffix.lower() not in creatives_api.MEDIA_TYPES:
+            creatives_api.problem(
+                422, "MEDIA_TYPE", "Select a supported image or video"
+            )
+        name = "test-" + str(uuid4()) + Path(file.filename).suffix
+        media[name] = (file.file.read(), file.content_type)
+        return media_root + name
+
+    creatives_api.store_upload = fake_store
+    creatives_api.analyze_media = lambda *args: CreativeMetadata(
+        talent_type="single_presenter",
+        background="studio",
+        camera_angle="eye level",
+        lighting="soft",
+        color_scheme="warm",
+        visual_style="testimonial",
+        messaging_angle="product demonstration",
+        composition="centered",
+    ).model_dump()
+    FakeProvider.video_thumbnails = lambda *args: [media_root + "test-generated.png"]
+
+    class FakeFacebook:
+        def get_ad_accounts(self):
+            return [
+                {
+                    "id": "act_919999",
+                    "account_id": "919999",
+                    "name": "test-creative-account",
+                    "currency": "USD",
+                    "account_status": 1,
+                }
+            ]
+
+        def get_campaigns(self, *args, **kwargs):
+            return [
+                {
+                    "id": "911111",
+                    "name": "test-creative-campaign",
+                    "objective": "OUTCOME_SALES",
+                    "status": "PAUSED",
+                }
+            ]
+
+        def get_adsets(self, *args, **kwargs):
+            return [
+                {
+                    "id": "912222",
+                    "name": "test-creative-adset",
+                    "optimization_goal": "OFFSITE_CONVERSIONS",
+                    "status": "PAUSED",
+                    "daily_budget": "1000",
+                }
+            ]
+
+        def get_pages(self, *args, **kwargs):
+            return [{"id": "919888", "name": "test-creative-page"}]
+
+        def get_pixels(self, *args, **kwargs):
+            return []
+
+    app.dependency_overrides[facebook_api.get_facebook_service] = FakeFacebook
+    with SessionLocal() as db:
+        from app.creatives.service import register_generated
+
+        generated = GeneratedAd(
+            id="test-generated-creative",
+            headline="test-generated-creative",
+            image_url=media_root + "test-generated.png",
+            created_by_id="test-delivery-admin",
+        )
+        db.add(generated)
+        db.flush()
+        asset = register_generated(db, generated, "test-delivery-admin")
+        asset.analysis_status = "ready"
+        asset.metadata_revision = 1
+        asset.metadata_values = CreativeMetadata(
+            lighting="natural", background="outdoors"
+        ).model_dump()
+        db.commit()
 
 stop = threading.Event()
 threads = []

@@ -1,5 +1,6 @@
+import { DeliverySettings } from '../components/DeliverySettings';
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ListOrdered, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -9,22 +10,16 @@ import { deliveryRequest, DELIVERY_PAGE_SIZE, DELIVERY_POLL_MS, formatDeliveryTi
 const panel = 'bg-surface border border-line rounded-xl p-5 space-y-4';
 const input = 'w-full border border-line rounded-lg px-3 py-2 focus:outline-brand';
 const button = 'rounded-lg bg-brand text-white px-4 py-2 disabled:opacity-50';
-const settingsFields = [
-    ['min_interval_seconds', 'Minimum seconds between postings', 1, 3600],
-    ['max_posts', 'Maximum postings per window', 1, 10000],
-    ['window_seconds', 'Rolling window in seconds', 1, 86400],
-    ['max_read_retries', 'Maximum data-pull retries', 0, 10],
-    ['status_interval_seconds', 'Status refresh in seconds', 60, 86400],
-    ['performance_interval_seconds', 'Performance refresh in seconds', 60, 86400],
-];
 const labels = { queued: 'Queued', working: 'In progress', succeeded: 'Posted', failed: 'Failed', needs_reconciliation: 'Needs reconciliation', cancelled: 'Cancelled' };
 
 export function PostingQueue() {
-    const { hasRole } = useAuth();
+    const { hasRole, hasPermission } = useAuth();
+    const [searchParams] = useSearchParams();
+    const focusedJob = searchParams.get('job');
+    const [retry, setRetry] = useState(null);
     const admin = hasRole('admin');
     const { showSuccess, showError } = useToast();
     const [settings, setSettings] = useState(null);
-    const [draft, setDraft] = useState(null);
     const [jobs, setJobs] = useState(null);
     const [syncs, setSyncs] = useState(null);
     const [offset, setOffset] = useState(0);
@@ -39,15 +34,14 @@ export function PostingQueue() {
     const load = useCallback(async (signal) => {
         const [configuration, postings, imports] = await Promise.all([
             deliveryRequest('/settings', { signal }),
-            deliveryRequest(`/jobs?limit=${DELIVERY_PAGE_SIZE}&offset=${offset}`, { signal }),
+            deliveryRequest(`/jobs?limit=${DELIVERY_PAGE_SIZE}&offset=${focusedJob ? 0 : offset}${focusedJob ? `&job_id=${encodeURIComponent(focusedJob)}` : ''}`, { signal }),
             deliveryRequest('/syncs?limit=100', { signal }),
         ]);
         setSettings(configuration);
-        setDraft(previous => previous || configuration.config);
         setJobs(postings);
         setSyncs(imports);
         setError('');
-    }, [offset]);
+    }, [offset, focusedJob]);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -66,10 +60,6 @@ export function PostingQueue() {
         try { await operation(); showSuccess(message); await load(); }
         catch (failure) { setError(failure.message); showError(failure.message); }
         finally { setBusy(false); }
-    };
-    const save = event => {
-        event.preventDefault();
-        act(() => deliveryRequest('/settings', { method: 'PUT', body: draft }), 'Delivery settings saved');
     };
     const findCandidates = async job => {
         setBusy(true);
@@ -92,23 +82,19 @@ export function PostingQueue() {
         {!settings && !error && <p role="status">Loading delivery settings…</p>}
         {settings && <section className={panel} aria-label="Delivery settings">
             <div className="flex flex-wrap justify-between gap-3"><h2 className="text-lg font-semibold">Delivery settings</h2><span className={workerActive ? 'text-success' : 'text-brand-ink'}>{workerActive ? 'Posting worker active' : 'Posting worker has not checked in recently'}</span></div>
+            <p className="text-sm text-secondary">Posting retries apply only to confirmed safe failures. Uncertain writes stay stopped for reconciliation.</p>
             <p className="text-sm text-secondary">One shared limit counts final ad-creation attempts. Media preparation runs before dispatch. The configured interval is a minimum; Facebook processing can take longer.</p>
             <p className="text-sm text-secondary">Current: {settings.config.min_interval_seconds}s minimum · {settings.config.max_posts} postings per {settings.config.window_seconds}s · {settings.config.max_read_retries} retries after the initial data-pull attempt.</p>
-            {admin && draft && <form onSubmit={save} className="space-y-4">
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">{settingsFields.map(([key, label, min, max]) => <label key={key} className="text-sm font-medium text-gray-700">{label}<input className={`${input} mt-1`} type="number" min={min} max={max} step="1" required value={draft[key]} onChange={event => setDraft({ ...draft, [key]: event.target.value === '' ? '' : Number(event.target.value) })} /></label>)}</div>
-                <div className="flex flex-wrap gap-6"><label className="flex items-center gap-2"><input type="checkbox" checked={draft.paused} onChange={event => setDraft({ ...draft, paused: event.target.checked })} />Pause posting</label>
-                    <label className="flex items-center gap-2"><input type="checkbox" checked={draft.imports_enabled} onChange={event => setDraft({ ...draft, imports_enabled: event.target.checked })} />Enable status and performance imports</label></div>
-                <p className="text-sm text-muted">Changes apply to queued work. Running requests finish. Failed imports stay stopped until an admin restarts them.</p>
-                <button className={button} disabled={busy}>Save delivery settings</button>
-            </form>}
+            {admin && <DeliverySettings onSaved={() => load()} />}
         </section>}
         <section className={panel} aria-label="Posting jobs">
             <div className="flex justify-between items-center"><h2 className="text-lg font-semibold">{admin ? 'All posting jobs' : 'Your posting jobs'}</h2><span className="text-sm text-muted">Refreshes every 5 seconds</span></div>
-            {jobs?.data.length === 0 && <p>No posting jobs yet. Queue ads from Facebook Campaigns.</p>}
+            {focusedJob && <Link to="/posting-queue" className="underline text-brand-ink">View all posting jobs</Link>}
+            {jobs?.data.length === 0 && <p>{focusedJob ? 'This posting job is unavailable for your account.' : 'No posting jobs yet. Queue ads from Facebook Campaigns.'}</p>}
             {jobs?.data.length > 0 && <div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead><tr className="border-b text-muted"><th className="py-3">Ad</th><th>Account</th><th>Status</th><th>Submitted</th><th>Actions</th></tr></thead><tbody>{jobs.data.map(job => <tr key={job.id} className="border-b align-top">
                 <td className="py-3 pr-4"><p className="font-medium">{job.name}</p><details className="mt-1 text-muted"><summary>Job details</summary><p className="break-all">Job: {job.id}</p><p>Stage: {job.stage}</p>{job.results?.ad_id && <p>Facebook ad: {job.results.ad_id}</p>}{job.results?.creative_id && <p>Creative: {job.results.creative_id}</p>}</details></td>
-                <td className="py-3 pr-4">{job.account_id}</td><td className="py-3 pr-4"><span className={`rounded-full px-2 py-1 text-xs ${['failed', 'needs_reconciliation'].includes(job.status) ? 'bg-danger-soft text-danger' : job.status === 'succeeded' ? 'bg-success-soft text-success' : 'bg-brand-soft text-brand-ink'}`}>{labels[job.status] || job.status}</span>{job.error_message && <p className="max-w-sm mt-2 text-danger">{job.error_message}</p>}</td>
-                <td className="py-3 pr-4 whitespace-nowrap">{formatDeliveryTime(job.created_at)}</td><td className="py-3">{job.status === 'queued' && <button disabled={busy} className="text-red-700 underline" onClick={() => setCancel(job)}>Cancel {job.name}</button>}{admin && job.status === 'needs_reconciliation' && job.stage === 'ad' && <button disabled={busy} className="underline" onClick={() => findCandidates(job)}>Find matching Facebook ad</button>}</td>
+                <td className="py-3 pr-4">{job.account_id}</td><td className="py-3 pr-4"><span className={`rounded-full px-2 py-1 text-xs ${['failed', 'needs_reconciliation'].includes(job.status) ? 'bg-danger-soft text-danger' : job.status === 'succeeded' ? 'bg-success-soft text-success' : 'bg-brand-soft text-brand-ink'}`}>{labels[job.status] || job.status}</span>{job.error_message && <p className="max-w-sm mt-2 text-danger">{job.error_message}</p>}{job.provider_error_code != null && <p className="text-xs mt-1">Meta code {job.provider_error_code}{job.provider_error_subcode != null ? ` / ${job.provider_error_subcode}` : ''}</p>}{job.write_failures > 0 && <p className="text-xs mt-1">{job.write_failures} failed posting {job.write_failures === 1 ? 'attempt' : 'attempts'}{job.status === 'queued' ? ` · Next attempt: ${formatDeliveryTime(job.available_at)}` : ''}</p>}</td>
+                <td className="py-3 pr-4 whitespace-nowrap">{formatDeliveryTime(job.created_at)}</td><td className="py-3">{job.status === 'queued' && <button disabled={busy} className="text-red-700 underline" onClick={() => setCancel(job)}>Cancel {job.name}</button>}{job.status === 'failed' && job.retry_allowed && hasPermission('campaigns:write') && <button disabled={busy} className="underline mr-3" onClick={() => setRetry(job)}>Retry {job.name}</button>}{admin && job.status === 'needs_reconciliation' && job.stage === 'ad' && <button disabled={busy} className="underline" onClick={() => findCandidates(job)}>Find matching Facebook ad</button>}</td>
             </tr>)}</tbody></table></div>}
             {jobs && <div className="flex justify-between items-center text-sm"><button className="underline disabled:opacity-40" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - DELIVERY_PAGE_SIZE))}>Previous jobs</button><span>{jobs.pagination.total} jobs</span><button className="underline disabled:opacity-40" disabled={!jobs.pagination.hasMore} onClick={() => setOffset(offset + DELIVERY_PAGE_SIZE)}>Next jobs</button></div>}
         </section>
@@ -122,6 +108,7 @@ export function PostingQueue() {
             {syncs?.data.length === 0 && <p>Imports begin after the first queued ad is posted.</p>}
             {syncs?.data.map(sync => <div key={sync.id} className="border-t pt-3 flex flex-wrap justify-between gap-3"><div><p className="font-medium">{sync.account_id} · {sync.kind}</p><p className="text-sm">{sync.status} · {sync.failures} failed attempts · Last success: {formatDeliveryTime(sync.last_success_at)}</p>{sync.error_message && <p className="text-danger text-sm">{sync.error_message}</p>}</div>{admin && <button className={button} disabled={busy || sync.status === 'running'} onClick={() => act(() => deliveryRequest(`/syncs/${sync.id}/restart`, { method: 'POST' }), 'Import scheduled')}><RefreshCw className="inline mr-2" size={15} />{sync.status === 'failed' ? 'Restart import' : 'Sync now'}</button>}</div>)}
         </section>
+        <ConfirmationModal isOpen={!!retry} onClose={() => setRetry(null)} title="Retry this ad?" message={`Retry ${retry?.name || 'this ad'} after resolving the reported issue. Confirmed media and creative IDs are reused. The current posting retry limit and shared cadence apply.`} confirmText="Retry posting" onConfirm={() => act(async () => { await deliveryRequest(`/jobs/${retry.id}/retry`, { method: 'POST', body: { failure_id: retry.failure_id } }); setRetry(null); }, 'Posting retry queued')} />
         <ConfirmationModal isOpen={!!cancel} onClose={() => setCancel(null)} title="Cancel queued ad?" message={`Stop ${cancel?.name || 'this ad'} before it posts. Any media already prepared remains on Facebook.`} confirmText="Cancel posting" onConfirm={() => act(() => deliveryRequest(`/jobs/${cancel.id}/cancel`, { method: 'POST' }), 'Posting cancelled')} />
     </div>;
 }

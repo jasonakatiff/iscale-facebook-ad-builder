@@ -4,6 +4,7 @@ import threading
 from app.delivery import config
 from app.delivery.queue import posting_tick
 from app.delivery.sync import sync_tick
+from app.analytics.sync import analytics_tick
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ class DeliveryWorkers:
         if not config.WORKER_ENABLED or self.threads:
             return
         self.stop_event.clear()
-        for name, tick in [("posting", posting_tick), ("sync", sync_tick)]:
+        for name, tick in [("posting", posting_tick), ("sync", sync_tick), ("analytics", analytics_tick)]:
             thread = threading.Thread(
                 target=self.run,
                 args=(engine, tick),

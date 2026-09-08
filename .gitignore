@@ -48,6 +48,7 @@ playwright-report/
 .pytest_cache/
 
 # Uploads (user generated)
+backend/uploads/
 backend/uploads/*.png
 backend/uploads/*.jpg
 backend/uploads/*.jpeg
@@ -60,6 +61,7 @@ backend/uploads/*.webm
 
 # Backups
 *.sql
+!backend/tests/integration/fixtures/cutover/*.sql
 .vercel
 .env*.local
 

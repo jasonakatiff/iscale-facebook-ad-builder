@@ -1,3 +1,5 @@
+from app.analytics import models as analytics_models
+from app.creatives import models as creative_models
 """
 theLeadRouter — Ad Studio API
 
@@ -208,3 +210,9 @@ from app.api.v1.uploads import UPLOAD_DIR
 uploads_dir = str(UPLOAD_DIR)
 os.makedirs(uploads_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+
+from app.creatives.api import router as creative_router
+app.include_router(creative_router, prefix="/api/v1/creatives", tags=["creatives"])
+
+from app.analytics.api import router as analytics_router
+app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["creative analytics"])

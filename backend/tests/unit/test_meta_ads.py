@@ -19,7 +19,7 @@ class TestMetaOAuthHelpers:
         assert query["state"] == ["signed-state"]
         assert set(query["scope"][0].split(",")) == set(META_SCOPES)
 
-    def test_ad_accounts_are_limited_to_selected_connection(self, monkeypatch):
+    def test_ad_accounts_are_limited_to_selected_connection(self, monkeypatch, db_session):
         accounts = [
             {"id": "act_111", "name": "Personal"},
             {"id": "act_222", "name": "Test Ads"},
@@ -35,7 +35,9 @@ class TestMetaOAuthHelpers:
 
         monkeypatch.setattr("app.services.facebook_service.User", FakeUser)
         service = FacebookService(access_token="token", ad_account_id="act_222")
-        service.api = object()
+        from types import SimpleNamespace
+        from app.delivery.budget import RequestBudget
+        service.api = SimpleNamespace(_request_budget=RequestBudget(db_session.get_bind()))
 
         assert service.get_ad_accounts() == [{"id": "act_222", "name": "Test Ads"}]
 

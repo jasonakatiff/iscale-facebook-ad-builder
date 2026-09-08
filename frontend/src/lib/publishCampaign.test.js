@@ -1,3 +1,5 @@
+import { readyCreative } from './creatives';
+vi.mock('./creatives', () => ({ readyCreative: vi.fn() }));
 import { beforeEach, expect, it, vi } from 'vitest';
 import { publishCampaign } from './publishCampaign';
 import { deliveryRequest, prepareQueueMedia } from './delivery';
@@ -10,7 +12,7 @@ const draft = () => ({
  adsData: [{ id: 'test-ad', creativeId: 'test-image', bodyIndex: 0, headlineIndex: 0, name: 'test-ad'}],
  publishProgress: { campaignId: '123', adsetId: '456', campaignSaved: true, adsetSaved: true, ads: {} },
 });
-beforeEach(() => { vi.clearAllMocks(); prepareQueueMedia.mockResolvedValue('https://example.com/test.png'); deliveryRequest.mockResolvedValue({id: 'test-job', status: 'queued'}); });
+beforeEach(() => { vi.clearAllMocks(); readyCreative.mockImplementation(async creative => ({ ...creative, creativeAssetId: 'test-asset', queueMediaUrl: 'https://example.com/test.png' })); prepareQueueMedia.mockResolvedValue('https://example.com/test.png'); deliveryRequest.mockResolvedValue({id: 'test-job', status: 'queued'}); });
 it('queues the reviewed paused ad with its exact copy, identity and tracking', async () => {
  const checkpoint = vi.fn();
  await publishCampaign(draft(), checkpoint, vi.fn());
@@ -27,4 +29,21 @@ it('persists the submission before sending and retries the same request after a 
  await publishCampaign(state, checkpoint, vi.fn());
  expect(deliveryRequest.mock.calls[1][1].body).toEqual(first);
  expect(prepareQueueMedia).toHaveBeenCalledTimes(1);
+});
+
+it('preflights metadata before creating any campaign or ad set', async () => {
+ const state = draft(); state.publishProgress = null;
+ readyCreative.mockRejectedValueOnce(new Error('test-analysis-failed'));
+ await expect(publishCampaign(state, vi.fn(), vi.fn())).rejects.toThrow('test-analysis-failed');
+ expect(facebookRequest).not.toHaveBeenCalled();
+ expect(deliveryRequest).not.toHaveBeenCalled();
+});
+it('includes saved creative identity in the durable submission', async () => {
+ await publishCampaign(draft(), vi.fn(), vi.fn());
+ expect(deliveryRequest).toHaveBeenCalledWith('/launches', expect.objectContaining({body: expect.objectContaining({creative_asset_id:'test-asset'})}));
+});
+it('resumes an already queued checkpoint without reanalyzing the asset', async () => {
+ const state = draft(); state.publishProgress.ads['test-ad'] = {jobId:'test-job'};
+ await publishCampaign(state, vi.fn(), vi.fn());
+ expect(readyCreative).not.toHaveBeenCalled(); expect(deliveryRequest).not.toHaveBeenCalled();
 });

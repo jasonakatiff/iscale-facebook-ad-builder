@@ -17,12 +17,12 @@ def main():
         subprocess.run([
             "docker", "run", "--detach", "--name", name,
             "--publish", "127.0.0.1::8080", "--env", "PORT=8080",
-            "--env", "PREVIEW_ALLOWED_HOSTS=breadwinner.a4d.com", sys.argv[1], *command,
+            "--env", "PREVIEW_ALLOWED_HOSTS=test-app.example.com", sys.argv[1], *command,
         ], check=True, stdout=subprocess.DEVNULL)
         address = subprocess.check_output(["docker", "port", name, "8080/tcp"], text=True).strip()
         for attempt in range(30):
             try:
-                for host in ["healthcheck.railway.app", "breadwinner.a4d.com"]:
+                for host in ["healthcheck.railway.app", "test-app.example.com"]:
                     with urlopen(Request(f"http://{address}/", headers={"Host": host}), timeout=2) as response:
                         assert response.status == 200
                         assert b'<div id="root">' in response.read()

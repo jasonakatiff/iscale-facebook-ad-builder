@@ -196,55 +196,7 @@ export default function ImageAds() {
             const data = await response.json();
             console.log('📸 Image generation response:', data);
 
-            // Generate a unique bundle ID for this set of images
-            const bundleId = `bundle_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-            // Add bundle ID to images
-            const imagesWithBundle = (data.images || []).map(img => ({
-                ...img,
-                url: resolveMediaUrl(img.url),
-                adBundleId: bundleId
-            }));
-
-            setGeneratedImages(imagesWithBundle);
-
-            // Save generated ads to database
-            try {
-                const adsToSave = imagesWithBundle.map(img => ({
-                    id: `ga_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                    brandId: wizardData.brand?.id,
-                    productId: wizardData.product?.id,
-                    // Built-in styles are frontend-only and do not have a
-                    // corresponding winning_ads row. Only persist a real
-                    // database template ID.
-                    templateId: wizardData.template?.type === 'template'
-                        ? wizardData.template?.id
-                        : undefined,
-                    imageUrl: img.url,
-                    headline: copy.headline,
-                    body: copy.body,
-                    cta: copy.cta,
-                    sizeName: img.size,
-                    dimensions: img.dimensions,
-                    prompt: img.prompt,
-                    adBundleId: img.adBundleId
-                }));
-
-                const saveResponse = await authFetch(`${API_URL}/generated-ads/batch`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ads: adsToSave })
-                });
-
-                if (!saveResponse.ok) {
-                    throw new Error(`Batch save failed: ${saveResponse.statusText}`);
-                }
-
-                console.log('✅ Saved generated ads to database with bundle ID:', bundleId);
-            } catch (saveError) {
-                console.error('Failed to save ads to database:', saveError);
-                showError('Your images were generated but could not be saved. Download them before leaving this page.');
-            }
+            setGeneratedImages(data.images || []);
 
             setCurrentStep(10); // Move to image result step
         } catch (error) {

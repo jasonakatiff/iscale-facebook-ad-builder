@@ -1,3 +1,5 @@
+from app.analytics import models as analytics_models
+from app.creatives import models as creative_models
 from logging.config import fileConfig
 import os
 import sys

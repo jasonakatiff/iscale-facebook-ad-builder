@@ -1,15 +1,13 @@
-import { useEffect, useState } from 'react';
-import { ChevronRight, Upload } from 'lucide-react';
+import { CreativePicker } from './CreativePicker';
+import { useEffect, useState, useCallback } from 'react';
+import { ChevronRight } from 'lucide-react';
 import { useCampaign } from '../context/CampaignContext';
-import { useToast } from '../context/ToastContext';
 import { getPages, getInstagramAccounts, facebookRequest } from '../lib/facebookApi';
-import { defaultTrackingParameters, validateWizard, MEDIA_LIMITS } from '../lib/campaignWizard';
+import { defaultTrackingParameters, validateWizard } from '../lib/campaignWizard';
 import { SearchableSelect } from './SearchableSelect';
 import { ValidationErrors } from './ValidationErrors';
 import { TrackingParameters } from './TrackingParameters';
 
-const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-const VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
 const CTA_OPTIONS = [
     'LEARN_MORE',
     'SHOP_NOW',
@@ -26,13 +24,13 @@ const inputClass =
 
 export default function AdCreativeStep({ onNext, onBack }) {
     const { state, creativeData, setCreativeData, selectedAdAccount, adsetData } = useCampaign();
-    const { showError } = useToast();
     const [pages, setPages] = useState([]);
     const [instagram, setInstagram] = useState([]);
     const [loading, setLoading] = useState(true);
     const [lookupErrors, setLookupErrors] = useState([]);
     const [errors, setErrors] = useState([]);
-    const [dragging, setDragging] = useState(false);
+    const [creativeBusy, setCreativeBusy] = useState(false);
+    const changeCreatives = useCallback(change => setCreativeData(previous => ({ ...previous, creatives: change(previous.creatives) })), [setCreativeData]);
     const [retry, setRetry] = useState(0);
     const update = (field, value) =>
         setCreativeData((previous) => ({ ...previous, [field]: value }));
@@ -84,39 +82,12 @@ export default function AdCreativeStep({ onNext, onBack }) {
                 previous.creativeName ? previous : { ...previous, creativeName: adsetData.name },
             );
     }, [adsetData.name, setCreativeData]);
-    const upload = (files) => {
-        const creatives = [];
-        for (const file of files) {
-            const isVideo = VIDEO_TYPES.includes(file.type);
-            if (!isVideo && !IMAGE_TYPES.includes(file.type)) {
-                showError(`${file.name}: choose a supported image or video.`);
-                continue;
-            }
-            if (file.size > MEDIA_LIMITS[isVideo ? 'video' : 'image']) {
-                showError(
-                    `${file.name}: ${isVideo ? 'videos must be 500 MB' : 'images must be 10 MB'} or smaller.`,
-                );
-                continue;
-            }
-            creatives.push({
-                id: crypto.randomUUID(),
-                name: file.name,
-                file,
-                previewUrl: URL.createObjectURL(file),
-                mediaType: isVideo ? 'video' : 'image',
-            });
-        }
-        setCreativeData((previous) => ({
-            ...previous,
-            creatives: [...previous.creatives.filter((item) => !item.needsUpload), ...creatives],
-        }));
-    };
     const next = () => {
         const found = validateWizard(state, 4);
-        if (creativeData.creatives.some((item) => item.needsUpload))
+        if (creativeBusy || creativeData.creatives.some((item) => item.needsUpload || item.asset?.analysis_status !== 'ready'))
             found.push({
                 field: 'creativeData.creatives',
-                message: 'Re-upload missing media files before continuing.',
+                message: 'Select saved creative and complete metadata analysis before continuing.',
             });
         setErrors(found);
         if (found.length) {
@@ -199,85 +170,8 @@ export default function AdCreativeStep({ onNext, onBack }) {
                         placeholder="Search Instagram accounts..."
                     />
                 </div>
-                <div
-                    id="creativeData.creatives"
-                    tabIndex={-1}
-                    className={`border-2 border-dashed rounded-xl p-6 text-center ${dragging ? 'border-amber-500 bg-brand-soft' : 'border-line-strong'}`}
-                    onDragOver={(event) => {
-                        event.preventDefault();
-                        setDragging(true);
-                    }}
-                    onDragLeave={() => setDragging(false)}
-                    onDrop={(event) => {
-                        event.preventDefault();
-                        setDragging(false);
-                        upload(Array.from(event.dataTransfer.files));
-                    }}
-                >
-                    <Upload size={28} className="mx-auto text-faint mb-2" />
-                    <label className="cursor-pointer text-brand-ink font-medium">
-                        Upload images or videos
-                        <input
-                            aria-label="Upload images or videos"
-                            type="file"
-                            multiple
-                            accept={[...IMAGE_TYPES, ...VIDEO_TYPES].join(',')}
-                            className="block mx-auto mt-3 max-w-full text-sm"
-                            onChange={(event) => {
-                                upload(Array.from(event.target.files));
-                                event.target.value = '';
-                            }}
-                        />
-                    </label>
-                    <p className="text-xs text-muted mt-2">
-                        Or drop files here. Images: up to 10 MB each.
-                    </p>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {creativeData.creatives.map((creative) => (
-                        <div
-                            key={creative.id}
-                            className="border border-line rounded-lg overflow-hidden"
-                        >
-                            {creative.needsUpload ? (
-                                <p className="p-4 text-sm text-danger">
-                                    Re-upload {creative.name}
-                                </p>
-                            ) : creative.mediaType === 'video' ? (
-                                <video
-                                    src={creative.previewUrl || creative.videoUrl}
-                                    className="w-full h-28 object-cover"
-                                    controls
-                                />
-                            ) : (
-                                <img
-                                    src={creative.previewUrl || creative.imageUrl}
-                                    alt={creative.name}
-                                    className="w-full h-28 object-cover"
-                                />
-                            )}
-                            <div className="p-2 text-xs flex items-center justify-between gap-2">
-                                <span className="truncate">{creative.name}</span>
-                                <button
-                                    type="button"
-                                    aria-label={`Remove ${creative.name}`}
-                                    onClick={() => {
-                                        if (creative.previewUrl?.startsWith('blob:'))
-                                            URL.revokeObjectURL(creative.previewUrl);
-                                        update(
-                                            'creatives',
-                                            creativeData.creatives.filter(
-                                                (item) => item.id !== creative.id,
-                                            ),
-                                        );
-                                    }}
-                                    className="text-danger"
-                                >
-                                    Remove
-                                </button>
-                            </div>
-                        </div>
-                    ))}
+                <div id="creativeData.creatives" tabIndex={-1}>
+                    <CreativePicker selected={creativeData.creatives} onChange={changeCreatives} onBusyChange={setCreativeBusy} />
                 </div>
                 {['bodies', 'headlines'].map((field) => (
                     <div

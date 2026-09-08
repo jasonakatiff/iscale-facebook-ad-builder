@@ -406,3 +406,22 @@ def test_connection_owner_regrant_invalidates_previously_queued_work(
     calls = transport(monkeypatch, [])
     factory, run = runner(data)
     assert run() == "blocked" and calls == []
+
+
+def test_shared_request_budget_defers_metadata_job_without_spending_retry(workspace_data, monkeypatch):
+    from app.services import account_sync
+    from app.delivery.budget import RequestDeferred
+    from app.models import AccountSyncJob
+    data = workspace_data
+    job = api_enqueue(data)
+    until = datetime.now(timezone.utc) + timedelta(minutes=2)
+    monkeypatch.setattr(account_sync, 'fetch_campaign_page', lambda *args: (_ for _ in ()).throw(RequestDeferred(until)))
+    factory, run = runner(data)
+    assert run() == 'deferred'
+    with factory() as db:
+        record = db.get(AccountSyncJob, job['id'])
+        assert record.status == 'queued' and record.attempts == 0
+        assert account_sync.claim_sync_job(db,'test-worker') is None
+        record.available_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        db.commit()
+        assert account_sync.claim_sync_job(db,'test-worker')

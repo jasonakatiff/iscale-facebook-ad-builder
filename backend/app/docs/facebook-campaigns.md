@@ -17,12 +17,14 @@ The base Campaign Setup fits a desktop viewport; conditional budget, location, o
 ## Reuse and tracking
 Saved settings library lets you save, load, rename through update, or delete presets for an account. Review Page, pixel, targeting, and budget after applying a preset. URL parameters are separate from the landing-page URL. Insert Meta macros for campaign/ad-set/ad identifiers; account defaults and admin-only system defaults affect later configurations.
 
-API group: /api/v1/facebook. Campaigns, ad sets, creatives, ads, uploads, account lists, and insights are exposed in the OpenAPI document. The API's create endpoints contact Meta directly; the browser's Review & Launch screen is not an API approval gate. Read/write keys can perform those actions when their owner has the required permission. Use PAUSED status and reconcile returned Meta IDs before retrying a write.
+API group: /api/v1/facebook. Campaigns, ad sets, creatives, ads, uploads, account lists, and insights are exposed in the OpenAPI document. Campaign, ad-set and creative create endpoints contact Meta synchronously; final ad creation uses the durable queue; the browser's Review & Launch screen is not an API approval gate. Read/write keys can perform those actions when their owner has the required permission. Use PAUSED status and reconcile returned Meta IDs before retrying a write.
 
 ## Queued ad posting
 
-The campaign wizard submits media, creative and ad work to `POST /api/v1/delivery/launches`. It returns a durable job; follow Posting queue or `GET /api/v1/delivery/jobs/{id}` for progress. New ads remain PAUSED. Admins control the shared cadence and retry limits at Posting queue.
+The campaign wizard selects analyzed saved creative, then submits media, creative and ad work to `POST /api/v1/delivery/launches`. It returns a durable job; follow Posting queue or `GET /api/v1/delivery/jobs/{id}` for progress. New ads remain PAUSED. Admins control the shared cadence and retry limits at Posting queue.
 
 Direct `POST /api/v1/facebook/ads` requests now require a stable `Idempotency-Key` header and return HTTP 202 with the job. Repeat the same key and payload after a lost response. Read `results.ad_id` only when status is `succeeded`. A write with an unknown outcome stops for reconciliation.
 
-Status imports default to five minutes and daily performance imports to fifteen minutes. Import identity is buyer/account/Facebook ad, with one daily snapshot per attribution dataset; reimports replace totals. LeadRouter lifetime counts remain separately labeled in Reporting.
+New/pending ad status imports default to five minutes, stable status to one hour, and performance imports of daily rows to four hours after each successful run. Import identity is buyer/account/Facebook ad, with one daily snapshot per attribution dataset; reimports replace totals. LeadRouter lifetime counts remain separately labeled in Reporting.
+
+For configuration, error handling, safe retries, notifications and reconciliation, see the [Posting queue guide](/api/v1/help/docs/posting-queue). The [Delivery API reference](/api/v1/help/docs/delivery-api) documents every endpoint, field, permission and error, including the legacy ad endpoint’s different error wrapper.

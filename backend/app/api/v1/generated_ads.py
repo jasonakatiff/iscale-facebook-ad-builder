@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database import get_db
-from app.models import GeneratedAd, User, WinningAd
+from app.models import GeneratedAd, User, Brand, Product, WinningAd
 from app.core.deps import get_current_active_user, require_permission
 from fastapi.responses import StreamingResponse
 import io
@@ -34,21 +34,21 @@ def build_comprehensive_prompt(request: ImageGenerationRequest) -> str:
     - Copy context (headline)
     - Template metadata (mood, lighting, composition, design_style)
     """
-    
+
     # Custom prompt override
     if request.customPrompt:
         return request.customPrompt
-    
+
     # Extract all context
     product_name = request.product.get('name', 'Product') if request.product else 'Product'
     product_desc = request.product.get('description', '') if request.product else ''
     brand_name = request.brand.get('name', '') if request.brand else ''
     brand_voice = request.brand.get('voice', 'Professional') if request.brand else 'Professional'
     brand_color = request.brand.get('colors', {}).get('primary', '') if request.brand else ''
-    
+
     # Get template metadata
     template_type = request.template.get('type') if request.template else None
-    
+
     if template_type == 'style':
         # Style archetype - has metadata fields
         mood = request.template.get('mood', 'Engaging')
@@ -61,7 +61,7 @@ def build_comprehensive_prompt(request: ImageGenerationRequest) -> str:
         lighting = request.template.get('lighting', 'Professional lighting') if request.template else 'Professional lighting'
         composition = request.template.get('composition', 'Balanced') if request.template else 'Balanced'
         design_style = request.template.get('design_style', 'Modern') if request.template else 'Modern'
-    
+
     # Build comprehensive prompt (OLD SYSTEM STYLE)
     parts = [
         f"Product Photography of {product_name}",
@@ -69,20 +69,20 @@ def build_comprehensive_prompt(request: ImageGenerationRequest) -> str:
         f"{brand_name} style: {brand_voice}" if brand_name else f"Style: {brand_voice}",
         f"Primary Color: {brand_color}" if brand_color else "",
     ]
-    
+
     # Add copy context (headline)
     if request.copy and request.copy.get('headline'):
         parts.append(f"Context: Visual representation of \"{request.copy.get('headline')}\"")
-    
+
     # Add template art direction
     parts.append(f"Art Direction: {mood}, {lighting}, {composition}, {design_style}")
-    
+
     # Quality standards
     parts.append("High quality, photorealistic, 4k, advertising standard")
-    
+
     # Join non-empty parts
     prompt = ". ".join([p for p in parts if p])
-    
+
     return prompt
 
 class GeneratedAdCreate(BaseModel):
@@ -103,6 +103,7 @@ class GeneratedAdCreate(BaseModel):
     videoUrl: Optional[str] = None
     videoId: Optional[str] = None  # Facebook video ID
     thumbnailUrl: Optional[str] = None
+    generationContext: Optional[Dict[str, Any]] = None
 
 class BatchSaveRequest(BaseModel):
     ads: List[GeneratedAdCreate]
@@ -170,6 +171,15 @@ async def generate_image(
         if type(width) is not int or type(height) is not int or width <= 0 or height <= 0:
             raise InstallationError("invalid_image_size", "Select a valid image size.", 422)
     images = []
+    from app.creatives.service import register_generated
+    brand_id = request.brand.get("id") if request.brand else None
+    product_id = request.product.get("id") if request.product else None
+    template_id = request.template.get("id") if request.template and request.template.get("type") != "style" else None
+    for model, identity in [(Brand, brand_id), (Product, product_id), (WinningAd, template_id)]:
+        if identity and not db.get(model, identity):
+            raise HTTPException(status_code=422, detail="Select an existing brand, product and template")
+    bundle_id = str(uuid.uuid4())
+
     for _ in range(request.count):
         for size in request.imageSizes:
             width, height = size.get("width", 1080), size.get("height", 1080)
@@ -197,8 +207,29 @@ async def generate_image(
             except InstallationError as exc:
                 exc.details["completed_images"] = images
                 raise
-            images.append({"url": image_url, "size": size_name,
-                           "dimensions": f"{width}x{height}", "prompt": prompt})
+            ad = GeneratedAd(
+                id=str(uuid.uuid4()), created_by_id=current_user.id,
+                brand_id=brand_id, product_id=product_id, template_id=template_id,
+                image_url=image_url, media_type="image", size_name=size_name,
+                dimensions=f"{width}x{height}", prompt=prompt, ad_bundle_id=bundle_id,
+                headline=(request.copy or {}).get("headline"),
+                body=(request.copy or {}).get("body") or (request.copy or {}).get("generatedCopy"),
+                cta=(request.copy or {}).get("cta"),
+                generation_context={"template": request.template, "brand_colors": (request.brand or {}).get("colors"), "input_images": request.productShots if request.useProductImage else [], "model": request.model},
+            )
+            db.add(ad)
+            db.flush()
+            register_generated(db, ad, current_user.id)
+            db.commit()
+            images.append({
+                "id": ad.id,
+                "adBundleId": bundle_id,
+                "url": image_url,
+                "size": size_name,
+                "dimensions": f"{width}x{height}",
+                "prompt": prompt
+            })
+
     return {"images": images}
 
 @router.get("/")
@@ -209,14 +240,15 @@ def get_generated_ads(
 ):
     """Get all generated ads, optionally filtered by brand"""
     query = db.query(GeneratedAd)
-    
+
     if brand_id:
         query = query.filter(GeneratedAd.brand_id == brand_id)
-    
+
     ads = query.order_by(GeneratedAd.created_at.desc()).all()
-    
+
     return [{
         "id": ad.id,
+        "created_by_id": ad.created_by_id,
         "brand_id": ad.brand_id,
         "product_id": ad.product_id,
         "template_id": ad.template_id,
@@ -244,13 +276,13 @@ def delete_generated_ad(
 ):
     """Delete a generated ad by ID"""
     ad = db.query(GeneratedAd).filter(GeneratedAd.id == ad_id).first()
-    
+
     if not ad:
         raise HTTPException(status_code=404, detail="Ad not found")
-    
+
     db.delete(ad)
     db.commit()
-    
+
     return {"message": "Ad deleted successfully"}
 
 @router.post("/export-csv")
@@ -261,16 +293,16 @@ def export_ads_csv(
 ):
     """Export selected ads to CSV"""
     ad_ids = request.get("ids", [])
-    
+
     if not ad_ids:
         raise HTTPException(status_code=400, detail="No ad IDs provided")
-    
+
     ads = db.query(GeneratedAd).filter(GeneratedAd.id.in_(ad_ids)).all()
-    
+
     # Create CSV in memory
     output = io.StringIO()
     writer = csv.writer(output)
-    
+
     # Write header
     writer.writerow([
         "ID", "Brand ID", "Headline", "Body", "CTA",
@@ -294,7 +326,7 @@ def export_ads_csv(
             ad.thumbnail_url or "",
             ad.created_at.isoformat() if ad.created_at else ""
         ])
-    
+
     # Prepare response
     output.seek(0)
     return StreamingResponse(
@@ -310,14 +342,14 @@ def batch_save_ads(
     current_user: User = Depends(require_permission("ads:write"))
 ):
     """Batch save generated ads"""
-    
+
     saved_ads = []
     for ad_data in request.ads:
         # Check if ad already exists
         existing = db.query(GeneratedAd).filter(GeneratedAd.id == ad_data.id).first()
         if existing:
             continue
-            
+
         # The image-ad wizard also supports built-in style archetypes. Their
         # IDs are frontend-only and are not rows in winning_ads, so do not
         # place them in the template foreign key column.
@@ -329,6 +361,8 @@ def batch_save_ads(
 
         new_ad = GeneratedAd(
             id=ad_data.id,
+            created_by_id=current_user.id,
+            generation_context=ad_data.generationContext,
             brand_id=ad_data.brandId,
             product_id=ad_data.productId,
             template_id=template_id,
@@ -347,8 +381,11 @@ def batch_save_ads(
             thumbnail_url=ad_data.thumbnailUrl
         )
         db.add(new_ad)
+        db.flush()
+        from app.creatives.service import register_generated
+        register_generated(db, new_ad, current_user.id)
         saved_ads.append(new_ad)
-    
+
     try:
         db.commit()
         return {"message": f"Saved {len(saved_ads)} ads", "count": len(saved_ads)}

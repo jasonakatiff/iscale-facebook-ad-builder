@@ -66,6 +66,7 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_delivery_ci
           TEST_WORKSPACE_MIGRATION_URL: postgresql://postgres:postgres@localhost:5432/test_workspace_migration
           TEST_INSTALL_BOOTSTRAP_URL: postgresql://postgres:postgres@localhost:5432/test_install_bootstrap
+          TEST_CUTOVER_UPGRADE_URL: postgresql://postgres:postgres@localhost:5432/test_cutover_upgrade
           SECRET_KEY: test-secret-key-for-ci
           GEMINI_API_KEY: mock-key
           FAL_AI_API_KEY: mock-key
@@ -76,6 +77,7 @@ jobs:
           with engine.connect() as connection:
               connection.execute(text("CREATE DATABASE test_workspace_migration"))
               connection.execute(text("CREATE DATABASE test_install_bootstrap"))
+              connection.execute(text("CREATE DATABASE test_cutover_upgrade"))
           engine.dispose()
           PY
           pytest tests/ -v --tb=short --cov=app --cov-report=xml

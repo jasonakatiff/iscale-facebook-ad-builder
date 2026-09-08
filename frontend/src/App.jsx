@@ -1,3 +1,5 @@
+import { CreativeAnalytics } from './pages/CreativeAnalytics';
+import { CreativeLibrary } from './pages/CreativeLibrary';
 /**
  * theLeadRouter — Ad Studio - Frontend
  *
@@ -83,6 +85,7 @@ function App() {
                   <Route path="google-ads" element={<GoogleAdsCampaigns />} />
                   <Route path="tiktok-ads" element={<TikTokAdsCampaigns />} />
                   <Route path="winning-ads" element={<WinningAds />} />
+                  <Route path="creative-library" element={<CreativeLibrary />} />
                   <Route path="generated-ads" element={<GeneratedAds />} />
                   <Route path="brands" element={<Brands />} />
                   <Route path="products" element={<Products />} />
@@ -90,6 +93,7 @@ function App() {
                   <Route path="ad-remix" element={<AdRemix />} />
                   <Route path="posting-queue" element={<PostingQueue />} />
                   <Route path="reporting" element={<Reporting />} />
+                  <Route path="creative-analytics" element={<CreativeAnalytics />} />
                   <Route path="settings" element={<Settings />} />
                   <Route path="connections" element={<Connections />} />
                   <Route path="settings/leadrouter" element={<LeadRouter />} />

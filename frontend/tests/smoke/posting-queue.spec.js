@@ -11,6 +11,12 @@ test('posting navigation, settings validation and reporting load', async ({ page
     await page.goto('/posting-queue');
     await expect(page.getByRole('link', { name: 'Posting queue', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Posting queue', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Posting notifications/ })).toBeVisible();
+    const postingRetries = page.getByLabel('Maximum posting retries', { exact: true });
+    await postingRetries.fill('11');
+    await page.getByRole('button', { name: 'Save delivery settings' }).click();
+    expect(await postingRetries.evaluate(element => element.validity.rangeOverflow)).toBe(true);
+    await postingRetries.fill('3');
     const retryInput = page.getByLabel('Maximum data-pull retries');
     await retryInput.fill('-1');
     await page.getByRole('button', { name: 'Save delivery settings' }).click();

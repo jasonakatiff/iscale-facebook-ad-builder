@@ -1,0 +1,30 @@
+import { test, expect } from '@playwright/test';
+import process from 'node:process';
+import { Buffer } from 'node:buffer';
+
+test('creative library source, author filters and unsupported upload validation', async ({ page }) => {
+    test.skip(process.env.CREATIVE_DEMO !== '1', 'Requires isolated creative demo');
+    await page.goto('/login');
+    await page.getByLabel('Email Address').fill(process.env.TEST_EMAIL);
+    await page.getByLabel('Password', { exact: true }).fill(process.env.TEST_PASSWORD);
+    await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+    await expect(page).not.toHaveURL(/login/);
+    await page.goto('/creative-library');
+    await expect(page.getByRole('heading', { name: 'Creative Library', exact: true })).toBeVisible();
+    await page.getByLabel('Creative source', { exact: true }).selectOption('system_generated');
+    await page.getByLabel('Search creative').fill('test-generated-creative');
+    await expect(page.getByRole('button', { name: 'Select test-generated-creative' })).toBeVisible();
+    await page.getByLabel('Created / uploaded by me').check();
+    await expect(page.getByRole('button', { name: 'Select test-generated-creative' })).toBeVisible();
+    await page.getByLabel('Upload external creative', { exact: true }).setInputFiles({ name: 'test-invalid.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg />') });
+    await expect(page.getByText(/Select a supported image or video/)).toBeVisible();
+    await page.getByRole('button', { name: 'Select test-generated-creative' }).click();
+    await page.getByRole('button', { name: 'Metadata for test-generated-creative' }).click();
+    await expect(page.getByLabel('Lighting', { exact: true })).toHaveValue('natural');
+    await page.getByRole('button', { name: 'Close metadata' }).click();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Open navigation' })).toBeVisible();
+    await expect(page.getByLabel('Upload external creative', { exact: true })).toBeAttached();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});

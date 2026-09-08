@@ -7,3 +7,5 @@ Open Ad Deployment and select Google Ads or TikTok Ads. Connect an account throu
 API groups: /api/v1/google-ads and /api/v1/tiktok-ads. Use the OpenAPI operation schemas for campaign types and required fields. User API keys can operate existing connections according to owner permissions and key scope. OAuth start/callback and account-security actions require a browser session; an API key is not a substitute for provider consent.
 
 Provider errors can indicate missing app configuration, missing permissions, disabled accounts, or invalid campaign settings. Check the account identity and returned error before retrying. Never infer that Meta, Google, and TikTok use identical budget units or objectives; follow each documented schema.
+
+For centrally scheduled ad-level imports and metadata correlations, use **Performance Reports → Creative analytics**. Enable a saved connection in Data sources; configure request budgets and cadence in Settings → Traffic source sync. The Creative analytics guide documents matching imported ads, user attribution, comparison rules and provider limitations.

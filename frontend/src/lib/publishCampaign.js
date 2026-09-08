@@ -1,3 +1,4 @@
+import { readyCreative } from './creatives';
 import { deliveryRequest, prepareQueueMedia } from './delivery';
 import {
     createFacebookCampaign,
@@ -54,6 +55,16 @@ async function publish(state, onCheckpoint, onStatus, nativeApi) {
         throw new Error(
             'A previous Facebook request has an unknown outcome. Check the recorded operation in Ads Manager before starting another publication.',
         );
+    const preparedCreatives = new Map();
+    for (const ad of state.adsData) {
+        const item = progress.ads[ad.id] || {};
+        if (item.saved || item.jobId || item.adId || item.submission) continue;
+        if (preparedCreatives.has(ad.creativeId)) continue;
+        const media = state.creativeData.creatives.find(creative => creative.id === ad.creativeId);
+        if (!media) throw new Error('Select creative for every ad before publishing.');
+        onStatus('Checking creative metadata…');
+        preparedCreatives.set(ad.creativeId, await readyCreative(media));
+    }
     const checkpoint = async () => {
         await onCheckpoint(structuredClone(progress));
     };
@@ -154,7 +165,7 @@ async function publish(state, onCheckpoint, onStatus, nativeApi) {
     }
     for (const [index, ad] of state.adsData.entries()) {
         const item = (progress.ads[ad.id] ||= {});
-        const media = state.creativeData.creatives.find(
+        const media = preparedCreatives.get(ad.creativeId) || state.creativeData.creatives.find(
             (creative) => creative.id === ad.creativeId,
         );
         const isVideo = media.mediaType === 'video';
@@ -214,6 +225,7 @@ async function publish(state, onCheckpoint, onStatus, nativeApi) {
                 instagram_user_id: creative.instagramId || null,
                 url_tags: creative.urlParameters || '',
                 generated_ad_id: media.generatedAdId || null,
+                creative_asset_id: media.creativeAssetId,
                 resume_creative_id: item.creativeId || null,
             };
             await checkpoint();

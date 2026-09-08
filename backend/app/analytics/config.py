@@ -1,0 +1,21 @@
+import os
+
+PLATFORMS = ("google", "tiktok")
+GOOGLE_VERSION = os.getenv("GOOGLE_ADS_API_VERSION", "v25")
+LOCK_KEY = 195558010
+MAX_PAGES = 1000
+MAX_ACCOUNTS = 1000
+MAX_RESPONSE_BYTES = 20 * 1024 * 1024
+MAX_REPORT_ROWS = 100000
+MAX_ANALYSIS_ROWS = 50000
+MAX_CREATIVE_UNITS = 2000
+MAX_CANDIDATES = 256
+PERMUTATIONS = 4095
+REPORT_CHUNK_DAYS = 7
+MANUAL_COOLDOWN_SECONDS = 300
+META_EVENTS = (
+    "offsite_conversion.fb_pixel_lead",
+    "offsite_conversion.fb_pixel_purchase",
+    "lead",
+    "purchase",
+)

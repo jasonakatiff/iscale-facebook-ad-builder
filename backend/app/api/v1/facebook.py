@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional
 from app.services.facebook_service import FacebookService, FacebookConnectionError, resolve_facebook_service
 from app.models import FacebookAd, FacebookAdSet, FacebookCampaign, MetaAdsConnection, User
 from app.delivery.schemas import AdRequest
+from app.delivery.docs import DeliveryJobResult, LegacyDeliveryConflict
 from app.database import get_db
 from app.core.deps import get_current_active_user, require_permission
 from app.core.config import settings
@@ -18,7 +19,27 @@ from sqlalchemy.orm import Session
 from app.services.campaign_validation import money_to_minor
 from app.services.meta_connection import resolve_meta_connection, personal_meta_connection
 
+from app.delivery.budget import RequestDeferred, now_utc
+
 router = APIRouter()
+
+def raise_if_budget_busy(error):
+    if isinstance(error, RequestDeferred):
+        if error.may_have_written:
+            raise HTTPException(status_code=409, detail={"error": {
+                "code": "WRITE_NEEDS_RECONCILIATION",
+                "message": "Facebook preparation stopped after a write; verify its result before retrying",
+                "details": None,
+            }})
+        raise HTTPException(
+            status_code=429,
+            detail={"error": {
+                "code": "REQUEST_BUDGET_BUSY", "message": str(error), "details": None,
+            }},
+            headers={"Retry-After": str(max(1, int((error.until - now_utc()).total_seconds()) + 1))},
+        )
+
+
 PROVIDER = "meta-ads"
 from app.api.v1.campaign_settings import router as settings_router
 router.include_router(settings_router)
@@ -199,6 +220,7 @@ def get_ad_accounts(
     try:
         return service.get_ad_accounts(force_refresh=refresh)
     except Exception as e:
+        raise_if_budget_busy(e)
         capture_exception(e, "facebook.get_ad_accounts")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -213,6 +235,7 @@ def read_campaigns(
         # Convert FB objects to dicts
         return [dict(c) for c in campaigns]
     except Exception as e:
+        raise_if_budget_busy(e)
         capture_exception(e, "facebook.read_campaigns")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -232,6 +255,7 @@ def create_campaign(
         capture_exception(e, "facebook.create_campaign")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        raise_if_budget_busy(e)
         capture_exception(e, "facebook.create_campaign")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -246,6 +270,7 @@ def read_pixels(
         # Convert FB objects to dicts
         return [dict(p) for p in pixels]
     except Exception as e:
+        raise_if_budget_busy(e)
         capture_exception(e, "facebook.read_pixels")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -259,6 +284,7 @@ def read_pages(
         pages = service.get_pages(ad_account_id)
         return pages
     except Exception as e:
+        raise_if_budget_busy(e)
         capture_exception(e, "facebook.read_pages")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -274,6 +300,7 @@ def read_adsets(
         adsets = service.get_adsets(ad_account_id, campaign_id)
         return [dict(a) for a in adsets]
     except Exception as e:
+        raise_if_budget_busy(e)
         capture_exception(e, "facebook.read_adsets")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -291,6 +318,7 @@ def create_adset(
         capture_exception(e, "facebook.create_adset")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        raise_if_budget_busy(e)
         capture_exception(e, "facebook.create_adset")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -308,10 +336,19 @@ def create_creative(
         capture_exception(e, "facebook.create_creative")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        raise_if_budget_busy(e)
         capture_exception(e, "facebook.create_creative")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/ads", status_code=202)
+@router.post(
+    "/ads", status_code=202,
+    responses={202: {"model": DeliveryJobResult}, 409: {"model": LegacyDeliveryConflict}},
+    description="Requires campaigns:write. Queue final ad creation using an existing Meta "
+    "ad set and creative. Requires ad_account_id and an Idempotency-Key unique per buyer "
+    "across delivery submissions. Reuse the same key/payload after a lost response. "
+    "Returns a job, not a Meta ad ID; poll GET /api/v1/delivery/jobs/{id}. "
+    "PAUSED is the default; ACTIVE is allowed. Legacy errors retain their detail wrapper.",
+)
 def create_ad(
     ad: "AdRequest",
     ad_account_id: str = Query(..., pattern=r"^(act_)?[0-9]+$"),
@@ -339,6 +376,7 @@ def read_ads(
         ads = service.get_ads(adset_id)
         return [dict(a) for a in ads]
     except Exception as e:
+        raise_if_budget_busy(e)
         capture_exception(e, "facebook.read_ads")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -372,6 +410,7 @@ def read_insights(
         )
         return rows
     except Exception as e:
+        raise_if_budget_busy(e)
         capture_exception(e, "facebook.read_insights")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -393,6 +432,7 @@ def save_campaign_locally(
         daily_budget = daily_budget_minor // 100 if daily_budget_minor is not None else None
 
         new_campaign = FacebookCampaign(
+            created_by_id=current_user.id,
             id=campaign_data.get('id'),
             name=campaign_data.get('name'),
             objective=campaign_data.get('objective'),
@@ -408,6 +448,7 @@ def save_campaign_locally(
         db.refresh(new_campaign)
         return {"message": "Campaign saved locally", "id": new_campaign.id}
     except Exception as e:
+        raise_if_budget_busy(e)
         capture_exception(e, "facebook.save_campaign_locally")
         db.rollback()
         print(f"Error saving campaign locally: {e}")
@@ -424,24 +465,25 @@ def save_adset_locally(
         existing = db.query(FacebookAdSet).filter(FacebookAdSet.id == adset_data.get('id')).first()
         if existing:
             return {"message": "AdSet already exists", "id": existing.id}
-            
+
         # Ensure campaign exists (FK check)
         campaign_id = adset_data.get('campaignId')
         if not campaign_id:
              raise HTTPException(status_code=400, detail="campaignId is required")
-             
+
         # We assume campaign is already saved by the frontend calling /campaigns/save first
 
         # Handle numeric fields casting
         daily_budget = adset_data.get('dailyBudget')
         daily_budget_minor = money_to_minor(daily_budget) if daily_budget not in (None, '') else None
         daily_budget = daily_budget_minor // 100 if daily_budget_minor is not None else None
-            
+
         bid_amount = adset_data.get('bidAmount')
         bid_amount_minor = money_to_minor(bid_amount) if bid_amount not in (None, '') else None
         bid_amount = bid_amount_minor // 100 if bid_amount_minor is not None else None
 
         new_adset = FacebookAdSet(
+            created_by_id=current_user.id,
             id=adset_data.get('id'),
             campaign_id=campaign_id,
             name=adset_data.get('name'),
@@ -462,6 +504,7 @@ def save_adset_locally(
         db.refresh(new_adset)
         return {"message": "AdSet saved locally", "id": new_adset.id}
     except Exception as e:
+        raise_if_budget_busy(e)
         capture_exception(e, "facebook.save_adset_locally")
         db.rollback()
         print(f"Error saving adset locally: {e}")
@@ -489,6 +532,7 @@ def save_ad_locally(
             return {"message": "Ad already saved locally", "id": existing.id}
 
         new_ad = FacebookAd(
+            created_by_id=current_user.id,
             id=ad_data.get('id'),
             adset_id=ad_data.get('adsetId'),
             name=ad_data.get('name'),
@@ -519,6 +563,7 @@ def save_ad_locally(
         db.rollback()
         raise
     except Exception as e:
+        raise_if_budget_busy(e)
         capture_exception(e, "facebook.save_ad_locally")
         db.rollback()
         print(f"Error saving ad locally: {e}")
@@ -543,6 +588,7 @@ def upload_image(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from None
     except Exception as e:
+        raise_if_budget_busy(e)
         capture_exception(e, "facebook.upload_image")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -585,6 +631,7 @@ def upload_video(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from None
     except Exception as e:
+        raise_if_budget_busy(e)
         capture_exception(e, "facebook.upload_video")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -606,6 +653,7 @@ def get_video_status(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from None
     except Exception as e:
+        raise_if_budget_busy(e)
         capture_exception(e, "facebook.get_video_status")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -626,6 +674,7 @@ def get_video_thumbnails(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from None
     except Exception as e:
+        raise_if_budget_busy(e)
         capture_exception(e, "facebook.get_video_thumbnails")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -642,6 +691,7 @@ def search_locations(
         locations = service.search_locations(q, type, limit, ad_account_id)
         return [dict(loc) for loc in locations]
     except Exception as e:
+        raise_if_budget_busy(e)
         capture_exception(e, "facebook.search_locations")
         raise HTTPException(status_code=500, detail=str(e))
 

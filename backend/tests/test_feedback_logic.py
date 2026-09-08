@@ -1,6 +1,8 @@
 """Real campaign logic; only the external Meta SDK transport is replaced."""
 
 from copy import deepcopy
+from types import SimpleNamespace
+from app.delivery.budget import RequestBudget
 from unittest.mock import MagicMock, patch
 import pytest
 from app.services.campaign_validation import (
@@ -77,9 +79,9 @@ def test_targeting_rejects_conflicting_locations_and_invalid_age():
 
 
 @patch("app.services.facebook_service.User")
-def test_account_cache_and_manual_sync(meta_user):
+def test_account_cache_and_manual_sync(meta_user, db_session):
     service = FacebookService()
-    service.api = MagicMock()
+    service.api = SimpleNamespace(_request_budget=RequestBudget(db_session.get_bind()))
     service.access_token = "test-cache-" + str(id(service))
     meta_user.return_value.get_ad_accounts.return_value = [
         {"id": "act_123", "name": "test-account"}
@@ -93,16 +95,16 @@ def test_account_cache_and_manual_sync(meta_user):
 
 
 @patch("app.services.facebook_service.User")
-def test_account_cache_separates_selected_connections(meta_user):
+def test_account_cache_separates_selected_connections(meta_user, db_session):
     token = "test-connection-cache"
     meta_user.return_value.get_ad_accounts.return_value = [
         {"id": "act_111", "name": "test-first"},
         {"id": "act_222", "name": "test-second"},
     ]
     first = FacebookService.__new__(FacebookService)
-    first.api, first.access_token, first.ad_account_id = object(), token, "act_111"
+    first.api, first.access_token, first.ad_account_id = SimpleNamespace(_request_budget=RequestBudget(db_session.get_bind())), token, "act_111"
     second = FacebookService.__new__(FacebookService)
-    second.api, second.access_token, second.ad_account_id = object(), token, "act_222"
+    second.api, second.access_token, second.ad_account_id = SimpleNamespace(_request_budget=RequestBudget(db_session.get_bind())), token, "act_222"
     assert first.get_ad_accounts(force_refresh=True) == [{"id": "act_111", "name": "test-first"}]
     assert second.get_ad_accounts() == [{"id": "act_222", "name": "test-second"}]
     assert first.get_ad_accounts() == [{"id": "act_111", "name": "test-first"}]

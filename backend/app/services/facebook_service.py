@@ -1,7 +1,6 @@
 from app.telemetry.runtime import capture_exception
 import os
 import re
-from facebook_business.api import FacebookAdsApi
 from facebook_business.adobjects.adaccount import AdAccount
 from facebook_business.adobjects.campaign import Campaign
 from facebook_business.adobjects.adset import AdSet
@@ -18,6 +17,7 @@ import hashlib
 from copy import deepcopy
 from app.services.campaign_validation import campaign_params, adset_params
 from app.delivery.media import download_media
+from app.delivery.config import GRAPH_VERSION
 
 # Load .env from project root (parent of backend)
 env_path = Path(__file__).resolve().parent.parent.parent.parent / '.env'
@@ -35,19 +35,20 @@ class FacebookService:
         self.app_secret = app_secret or os.getenv("FACEBOOK_APP_SECRET") or os.getenv("VITE_FACEBOOK_APP_SECRET")
         self.api = None
         self.account = None
-        
+
         if self.access_token and self.ad_account_id:
             self.initialize()
 
     def initialize(self):
         """Initialize the Facebook API connection."""
         try:
-            self.api = FacebookAdsApi.init(
+            from app.delivery.budget import create_api
+            self.api = create_api(
                 app_id=self.app_id,
                 app_secret=self.app_secret,
                 access_token=self.access_token
             )
-            
+
             # Only set up the AdAccount object if we have an ID
             if self.ad_account_id:
                 # Ensure ad account ID has 'act_' prefix
@@ -55,7 +56,7 @@ class FacebookService:
                 if not account_id.startswith('act_'):
                     account_id = f'act_{account_id}'
                 self.account = AdAccount(account_id, api=self.api)
-            
+
             return True
         except Exception as e:
             # Re-raise the exception so the caller knows what went wrong
@@ -69,18 +70,15 @@ class FacebookService:
         selected_id = self.ad_account_id
         if selected_id and not selected_id.startswith('act_'):
             selected_id = f'act_{selected_id}'
-        key = (hashlib.sha256((self.access_token or '').encode()).hexdigest(), selected_id)
-        with self._accounts_lock:
-            cached = self._accounts_cache.get(key)
-            if cached and not force_refresh and time.monotonic() - cached[0] < self.ACCOUNT_CACHE_SECONDS:
-                return deepcopy(cached[1])
+        from app.delivery.cache import cached_metadata
+        from app.delivery import config
+
+        def load():
             me = User(fbid='me', api=self.api)
             fields = ['id', 'name', 'account_id', 'account_status', 'currency', 'timezone_name', 'min_daily_budget', 'business_name', 'balance', 'amount_spent']
             accounts = sorted([dict(acc) for acc in me.get_ad_accounts(fields=fields, params={'limit': 200})], key=lambda acc: acc.get('name', '').casefold())
-            if selected_id:
-                accounts = [account for account in accounts if account.get('id') == selected_id]
-            self._accounts_cache[key] = (time.monotonic(), accounts)
-            return deepcopy(accounts)
+            return [account for account in accounts if account.get('id') == selected_id] if selected_id else accounts
+        return cached_metadata('accounts:' + config.GRAPH_VERSION + ':' + (selected_id or 'all'), self.access_token, self.api._request_budget.engine, load, force_refresh=force_refresh)
 
     def get_account_details(self, ad_account_id):
         return dict(self._get_account(ad_account_id).api_get(fields=['id', 'name', 'currency', 'timezone_name', 'min_daily_budget']))
@@ -93,14 +91,17 @@ class FacebookService:
 
     def _get_account(self, ad_account_id=None):
         """Helper to get AdAccount object."""
+        if not self.api:
+            self.initialize()
         if ad_account_id:
             if not ad_account_id.startswith('act_'):
                 ad_account_id = f'act_{ad_account_id}'
+            self.api._budget_account_id = ad_account_id
             return AdAccount(ad_account_id, api=self.api)
-        
+
         if self.account:
             return self.account
-            
+
         raise Exception("No Ad Account ID provided and no default account set.")
 
     def get_insights(self, ad_account_id=None, level='campaign', date_preset='last_30d',
@@ -162,7 +163,7 @@ class FacebookService:
     def get_campaigns(self, ad_account_id=None):
         """Fetch all campaigns from the ad account."""
         account = self._get_account(ad_account_id)
-            
+
         fields = [
             Campaign.Field.id,
             Campaign.Field.name,
@@ -177,7 +178,7 @@ class FacebookService:
             'is_adset_budget_sharing_enabled',
         ]
 
-        
+
         return account.get_campaigns(fields=fields)
 
     def create_campaign(self, campaign_data, ad_account_id=None):
@@ -186,14 +187,14 @@ class FacebookService:
     def get_pixels(self, ad_account_id=None):
         """Fetch all pixels for the ad account."""
         from facebook_business.adobjects.adspixel import AdsPixel
-        
+
         account = self._get_account(ad_account_id)
-        
+
         fields = [
             AdsPixel.Field.id,
             AdsPixel.Field.name,
         ]
-        
+
         pixels = account.get_ads_pixels(fields=fields)
         return [dict(pixel) for pixel in pixels]
 
@@ -224,7 +225,7 @@ class FacebookService:
             # Fetch from campaign
             campaign = Campaign(campaign_id, api=self.api)
             return campaign.get_ad_sets(fields=fields)
-        
+
         account = self._get_account(ad_account_id)
         return account.get_ad_sets(fields=fields)
 
@@ -304,18 +305,24 @@ class FacebookService:
 
         if not isinstance(video_id, str) or not re.fullmatch(r"[0-9]+", video_id):
             raise ValueError("Facebook video ID must contain only digits")
-        url = f"https://graph.facebook.com/v21.0/{video_id}"
+        url = f"https://graph.facebook.com/{GRAPH_VERSION}/{video_id}"
         params = {
             'fields': 'id,status,length,source'
         }
 
-        response = requests.get(
-            url,
-            params=params,
-            headers={"Authorization": "Bearer " + self.access_token},
-            timeout=30,
-            allow_redirects=False,
-        )
+        def send():
+            return requests.get(
+                url,
+                params=params,
+                headers={"Authorization": "Bearer " + self.access_token},
+                timeout=30,
+                allow_redirects=False,
+            )
+        from app.delivery.budget import RequestBudget
+        budget = getattr(self.api, "_request_budget", None)
+        response = budget.call(
+            send, account_id=self.ad_account_id, lane="interactive"
+        ) if isinstance(budget, RequestBudget) else send()
         if 300 <= response.status_code < 400:
             raise ValueError("Facebook returned an unexpected redirect")
         data = response.json()
@@ -373,16 +380,22 @@ class FacebookService:
 
         if not isinstance(video_id, str) or not re.fullmatch(r"[0-9]+", video_id):
             raise ValueError("Facebook video ID must contain only digits")
-        url = f"https://graph.facebook.com/v21.0/{video_id}/thumbnails"
+        url = f"https://graph.facebook.com/{GRAPH_VERSION}/{video_id}/thumbnails"
         params = {}
 
-        response = requests.get(
-            url,
-            params=params,
-            headers={"Authorization": "Bearer " + self.access_token},
-            timeout=30,
-            allow_redirects=False,
-        )
+        def send():
+            return requests.get(
+                url,
+                params=params,
+                headers={"Authorization": "Bearer " + self.access_token},
+                timeout=30,
+                allow_redirects=False,
+            )
+        from app.delivery.budget import RequestBudget
+        budget = getattr(self.api, "_request_budget", None)
+        response = budget.call(
+            send, account_id=self.ad_account_id, lane="interactive"
+        ) if isinstance(budget, RequestBudget) else send()
         if 300 <= response.status_code < 400:
             raise ValueError("Facebook returned an unexpected redirect")
         data = response.json()
@@ -523,14 +536,14 @@ class FacebookService:
     def search_locations(self, query, location_type='city', limit=10, ad_account_id=None):
         """Search for targeting locations."""
         account = self._get_account(ad_account_id)
-        
+
         params = {
             'q': query,
             'type': 'adgeolocation',
             'location_types': location_type.split(','),
             'limit': limit,
         }
-        
+
         return account.get_targeting_search(params=params)
 
 

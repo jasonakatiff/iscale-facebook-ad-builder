@@ -15,6 +15,7 @@ class TestFacebookServiceVideo:
             service = FacebookService()
             service.api = MagicMock()
             service.access_token = "test_token"
+            service.api = MagicMock()
             service.ad_account_id = "123456"
             service.account = MagicMock()
             service.account.get_id_assured.return_value = "act_123456"
@@ -56,6 +57,7 @@ class TestFacebookServiceVideo:
         with patch.object(FacebookService, 'initialize'):
             service = FacebookService()
             service.access_token = "test_token"
+            service.api = MagicMock()
 
             mock_response = MagicMock(status_code=200)
             mock_response.json.return_value = {
@@ -78,6 +80,7 @@ class TestFacebookServiceVideo:
         with patch.object(FacebookService, 'initialize'):
             service = FacebookService()
             service.access_token = "test_token"
+            service.api = MagicMock()
 
             mock_response = MagicMock(status_code=200)
             mock_response.json.return_value = {
@@ -97,6 +100,7 @@ class TestFacebookServiceVideo:
         with patch.object(FacebookService, 'initialize'):
             service = FacebookService()
             service.access_token = "test_token"
+            service.api = MagicMock()
 
             mock_response = MagicMock(status_code=200)
             mock_response.json.return_value = {
@@ -116,6 +120,7 @@ class TestFacebookServiceVideo:
         with patch.object(FacebookService, 'initialize'):
             service = FacebookService()
             service.access_token = "test_token"
+            service.api = MagicMock()
 
             mock_response = MagicMock(status_code=200)
             mock_response.json.return_value = {

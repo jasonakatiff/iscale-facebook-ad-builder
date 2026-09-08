@@ -1,3 +1,5 @@
+from app.analytics import models as analytics_models
+from app.creatives import models as creative_models
 from app.delivery import models as delivery_models  # noqa: F401
 from app.database import engine, Base, SessionLocal
 from app.models import *

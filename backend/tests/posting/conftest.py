@@ -16,6 +16,7 @@ if parsed.hostname not in {"127.0.0.1", "localhost"} or not parsed.path.startswi
 
 from app.database import Base
 from app import models
+from app.creatives import models as creative_models
 
 
 @pytest.fixture(scope="session")

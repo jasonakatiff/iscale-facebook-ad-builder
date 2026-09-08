@@ -1,5 +1,13 @@
 # Changelog
 
+## Creative analytics and public production alignment — 2026-09-08
+
+Bring creative provenance, external uploads, Google/TikTok analytics, metadata patterns, request-volume settings, and posting recovery into the public release. Preserve installer setup, encrypted provider settings, current branding, and the public security fixes. Join both released database histories with an additive merge and retain existing users, credentials, and ads.
+
+Remove deployment-specific URLs and tracked upload artifacts from published source. Add a redacted secret scan and a public-content hygiene gate. The private repository history is excluded.
+
+[Cutover plan and acceptance status](docs/plans/public-production-cutover.md). Local verification: 613 backend tests and both upgrade baselines passed, 98 frontend unit tests and build passed. Secret and content scans passed. Hosted cutover and container CI remain pending until release verification.
+
 ## Local v2 setup and Docker Compose — 2026-09-08
 
 Replace the legacy secret-writing wizard with process-environment validation and the shared v2 bootstrap. Repeated setup preserves the owner and saved encrypted provider credentials. Repair fresh Compose startup, add the sync worker and readiness ordering, keep database/media/dependency data in named volumes, and restrict development HTTP ports to loopback. Update the README and add a [local development guide](docs/deployment/local-development.md).
@@ -159,7 +167,7 @@ Plan: none (external contribution review). Tests: backend pytest 99 passing, 1 x
 ## [2026-09-03]
 
 ### Changed
-- This repo is now the canonical codebase. The private `A4DLLC/breadWinner.com` repo is retired; production deploys from `main` here.
+- This repo is now the canonical codebase. Hosted service migration and archival are tracked separately from the canonical repository designation.
 
 ### Fixed
 - Generated images now upload to Cloudflare R2 instead of local disk, so they survive redeploys (ported from breadWinner `cc921a1`).

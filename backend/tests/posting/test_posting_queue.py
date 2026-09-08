@@ -16,6 +16,47 @@ PAYLOAD = {
 }
 
 
+def test_request_budget_deferral_does_not_retry_or_mark_write_uncertain(
+    sessions, engine, buyer
+):
+    from app.delivery.budget import RequestDeferred
+
+    until = datetime.now(timezone.utc) + timedelta(minutes=1)
+    with sessions() as db:
+        identity = enqueue(db, buyer.id, "test-budget", "act_789", "ad", PAYLOAD).id
+    provider = Mock()
+    provider.create_ad.side_effect = RequestDeferred(until)
+    posting_tick(engine, lambda: provider)
+    posting_tick(engine, lambda: provider)
+    with sessions() as db:
+        job = db.get(DeliveryJob, identity)
+        assert job.status == "queued" and job.available_at == until
+        assert job.post_started_at is None
+        from app.delivery.models import DeliveryPostAttempt
+
+        assert (
+            db.query(DeliveryPostAttempt).filter_by(job_id=job.id).count() == 0
+            and job.read_failures == 0
+        )
+    assert provider.create_ad.call_count == 1
+
+
+def test_deferral_after_an_sdk_write_requires_reconciliation(sessions, engine, buyer):
+    from app.delivery.budget import RequestDeferred
+
+    with sessions() as db:
+        identity = enqueue(
+            db, buyer.id, "test-partial-upload", "act_789", "ad", PAYLOAD
+        ).id
+    provider = Mock()
+    provider.create_ad.side_effect = RequestDeferred(
+        datetime.now(timezone.utc) + timedelta(minutes=1), may_have_written=True
+    )
+    posting_tick(engine, lambda: provider)
+    with sessions() as db:
+        assert db.get(DeliveryJob, identity).status == "needs_reconciliation"
+
+
 def test_concurrent_duplicate_submission_is_one_job(sessions, buyer):
     def submit(_):
         with sessions() as db:

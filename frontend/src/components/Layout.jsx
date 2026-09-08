@@ -27,6 +27,7 @@ import { BrandMark } from './BrandMark';
 import { PoweredBy } from './PoweredBy';
 import { APP_NAME } from '../lib/branding';
 import { TelemetryFeedback } from './TelemetryFeedback';
+import { DeliveryNotifications } from './DeliveryNotifications';
 
 const sections = [
     {
@@ -54,6 +55,7 @@ const sections = [
                     { label: 'Ad Remix', path: '/ad-remix' },
                     { label: 'Winning Ads', path: '/winning-ads' },
                     { label: 'Generated Ads', path: '/generated-ads' },
+                    { label: 'Creative Library', path: '/creative-library' },
                     { label: 'Brands', path: '/brands' },
                     { label: 'Products', path: '/products' },
                     { label: 'Customer Profiles', path: '/profiles' },
@@ -81,6 +83,7 @@ const sections = [
                     { label: 'Overview', path: '/overview' },
                     { label: 'Dashboard', path: '/' },
                     { label: 'Reporting', path: '/reporting' },
+                    { label: 'Creative analytics', path: '/creative-analytics' },
                 ],
             },
         ],
@@ -91,6 +94,7 @@ const routeLabels = {
     '/video-ads': 'Video Ads',
     '/ad-remix': 'Ad Remix',
     '/reporting': 'Reporting',
+    '/creative-analytics': 'Creative analytics',
     '/settings': 'Settings',
     '/connections': 'Connections',
     '/settings/leadrouter': 'LeadRouter',
@@ -417,7 +421,7 @@ export default function Layout() {
                         <span aria-hidden="true">/</span>
                         <strong>{routeLabels[pathname] || APP_NAME}</strong>
                     </div>
-                    <ThemeSwitch />
+                    <div className="flex items-center gap-3"><DeliveryNotifications /><ThemeSwitch /></div>
                 </header>
                 <div
                     id="workspace-content"
