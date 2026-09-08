@@ -99,9 +99,7 @@ def main():
         "--once", action="store_true", help="Process at most one queued job"
     )
     args = parser.parse_args()
-    origin = os.environ.get(
-        "BREADWINNER_API_ORIGIN", "https://ad-builder-backend-production.up.railway.app"
-    ).rstrip("/")
+    origin = os.environ.get("BREADWINNER_API_ORIGIN", "").rstrip("/")
     key = os.environ.get("BREADWINNER_PLUGIN_WORKER_KEY", "")
     parsed = urlsplit(origin)
     if (
