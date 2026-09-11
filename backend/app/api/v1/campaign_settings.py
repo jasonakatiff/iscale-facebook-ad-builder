@@ -424,16 +424,13 @@ def preflight(
                 "Select an accessible Facebook Page for this ad account."
             )
         instagram_id = creative.get("instagramId")
-        if "instagram" in adset_review["targeting"].get(
-            "publisher_platforms", ["instagram"]
-        ):
-            if not instagram_id or instagram_id not in {
-                row["id"]
-                for row in service.get_instagram_accounts(payload.ad_account_id)
-            }:
-                raise CampaignValidationError(
-                    "Select an accessible Instagram account or remove Instagram placements."
-                )
+        if instagram_id and instagram_id not in {
+            row["id"]
+            for row in service.get_instagram_accounts(payload.ad_account_id)
+        }:
+            raise CampaignValidationError(
+                "Select an accessible Instagram account, or leave it on the Facebook Page identity."
+            )
         url = urlparse(creative.get("websiteUrl", ""))
         if url.scheme not in ("http", "https") or not url.netloc:
             raise CampaignValidationError("A valid Website URL is required.")
