@@ -468,6 +468,10 @@ class FacebookService:
             'url_tags': creative_data.get('urlParameters') or creative_data.get('url_tags') or '',
             AdCreative.Field.object_story_spec: object_story_spec,
         }
+        if not instagram_id:
+            # Mirrors Ads Manager's "Use Facebook Page": Instagram placements run
+            # under the Page identity without requiring a linked Instagram account.
+            params['use_page_actor_override'] = True
 
         return account.create_ad_creative(params=params)
 

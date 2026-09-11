@@ -1,5 +1,22 @@
 # Changelog
 
+## Instagram page identity default and honest Gemini analysis errors — 2026-09-10
+
+Ads no longer require a linked Instagram account when Instagram placements are on:
+the creative step defaults to "Use Facebook Page (default)", the wizard and the
+publish preflight accept the page identity, and the creative sets
+`use_page_actor_override` so Meta runs Instagram placements under the Page
+(issue #19).
+
+Creative analysis failures now report their real cause instead of pointing every
+failure at Settings → Integrations: provider safety blocks and rejected requests
+surface per-creative messages, rate limits retry once and then say to wait, and
+only key-level failures (401/403/402) change the stored connection status
+(issue #58).
+
+Tests: 12 backend unit tests passed (6 new for the provider boundary), 98
+frontend unit tests and the frontend build passed locally.
+
 ## Creative analytics and public production alignment — 2026-09-08
 
 Bring creative provenance, external uploads, Google/TikTok analytics, metadata patterns, request-volume settings, and posting recovery into the public release. Preserve installer setup, encrypted provider settings, current branding, and the public security fixes. Join both released database histories with an additive merge and retain existing users, credentials, and ads.

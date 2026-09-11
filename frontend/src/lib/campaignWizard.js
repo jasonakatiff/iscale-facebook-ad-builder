@@ -322,15 +322,6 @@ export function validateWizard(state, step = null) {
         if (!creative.headlines?.some((v) => v.trim()))
             add('creativeData.headlines', 'A headline is required.');
         if (!creative.pageId) add('creativeData.pageId', 'Select a Facebook Page.');
-        if (
-            (!adset.targeting.publisher_platforms ||
-                adset.targeting.publisher_platforms.includes('instagram')) &&
-            !creative.instagramId
-        )
-            add(
-                'creativeData.instagramId',
-                'Select an Instagram account or remove Instagram placements.',
-            );
         try {
             if (!['http:', 'https:'].includes(new URL(creative.websiteUrl).protocol))
                 throw new Error();

@@ -34,9 +34,6 @@ export default function AdCreativeStep({ onNext, onBack }) {
     const [retry, setRetry] = useState(0);
     const update = (field, value) =>
         setCreativeData((previous) => ({ ...previous, [field]: value }));
-    const needsInstagram =
-        !adsetData.targeting.publisher_platforms ||
-        adsetData.targeting.publisher_platforms.includes('instagram');
     useEffect(() => {
         let active = true;
         Promise.allSettled([
@@ -159,10 +156,9 @@ export default function AdCreativeStep({ onNext, onBack }) {
                     <SearchableSelect
                         label="Instagram account"
                         value={creativeData.instagramId || ''}
-                        options={instagram}
+                        options={[{ id: '', name: 'Use Facebook Page (default)' }, ...instagram]}
                         onChange={(id) => update('instagramId', id || null)}
                         loading={loading}
-                        required={needsInstagram}
                         error={
                             errors.find((error) => error.field === 'creativeData.instagramId')
                                 ?.message
